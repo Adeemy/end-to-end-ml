@@ -5,30 +5,10 @@
 
 
 # End-to-end ML Project Template
- A template for end-to-end ML project for tabular data.
+ A template for end-to-end ML project for tabular data. The repo is still under deveploment.
 
-### Environment setup
-- To create virtualenv using pip:
 
-  python3.10 -m venv .my-env
-
-- To remove virtual environment:
-
-  sudo rm -rf .my-env
-
-- To add a virtual env in bash file to activate it automatically when openning new bash terminal:
-
-  nano ~/.bashrc                  # Install nano if needed
-
-  source .my-env/bin/activate     # Add this at the end of bashrc file then hit the following to save changes: ctrl(^) + X, ctrl(^) + Y, then hit Enter.
-
-- To authenticate with Hugging Face:
-
-  python -m pip install huggingface_hub
-
-  huggingface-cli login
-
-# To run repo
+# Usage
 
 - Generate raw dataset
 
@@ -39,9 +19,11 @@
   prep_data
 
 - Split original dataset
+
   split_data
 
 - Submit training job
+
   train
 
 ### Build container
