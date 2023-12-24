@@ -1,0 +1,37 @@
+description: default config for feature store
+logger:
+  entity: adeemy
+  project: diabetes-prediction
+
+data:
+  params:
+    usci_raw_data_num: 891
+    raw_dataset_source: "Bena345/cdc-diabetes-health-indicators"
+    pk_col_name: "ID"
+    class_col_name: "Diabetes_binary"
+    pos_class: "Diabetic"
+    date_col_names: []
+    datetime_col_names: []
+    num_col_names:
+      - BMI
+      - PhysHlth
+    cat_col_names:
+      - Age
+      - HighBP
+      - HighChol
+      - CholCheck
+      - Smoker
+      - Stroke
+      - HeartDiseaseorAttack
+      - PhysActivity
+      - Fruits
+      - Veggies
+      - HvyAlcoholConsump
+      - AnyHealthcare
+      - NoDocbcCost
+      - GenHlth
+      - MentHlth
+      - DiffWalk
+      - Sex
+      - Education
+      - Income

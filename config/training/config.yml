@@ -1,0 +1,92 @@
+description: default config for training experiment
+logger:
+  entity: adeemy
+  project: diabetes-prediction
+
+data:
+  params:
+    raw_dataset_source: "Bena345/cdc-diabetes-health-indicators"
+    split_type: "random" # Can be either random or "time"
+    split_rand_seed: 100 # Seed for random number generator for random split
+    split_date_col_name: null # Name of date column to split dataset based on time (e.g., datetime.strptime("2023-15-11", "%Y-%d-%m").date()).
+    train_test_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is test set).
+    train_valid_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is validation set).
+    split_date_col_format: "%Y-%m-%d %H:%M:%S"
+    cat_features_nan_replacement: "Unspecified"
+    train_set_size: 0.8 # What is the % of train set after splitting original training set into train and validation sets.
+    pk_col_name: "ID"
+    class_col_name: "Diabetes_binary"
+    pos_class: "Diabetic"
+    date_col_names: []
+    datetime_col_names: []
+    num_col_names:
+      - BMI
+      - PhysHlth
+    cat_col_names:
+      - Age
+      - HighBP
+      - HighChol
+      - CholCheck  # Near-zero variance
+      - Smoker
+      - Stroke  # Near-zero variance
+      - HeartDiseaseorAttack
+      - PhysActivity
+      - Fruits
+      - Veggies
+      - HvyAlcoholConsump  # Near-zero variance
+      - AnyHealthcare  # Near-zero variance
+      - NoDocbcCost
+      - GenHlth
+      - MentHlth
+      - DiffWalk
+      - Sex
+      - Education
+      - Income
+
+train:
+  params:
+    initiate_comet_project: False # Should be True if new Comet project should be created
+    comet_project_name: "end-to-end-tabular-ml"
+    comet_workspace_name: "6bmod5d8"
+    search_max_iters: 2
+    parallel_jobs_count: 1 # 1 if training not in parallel, possible value: # int(0.9 * os.cpu_count())
+    exp_timout_secs: 3600
+    cross_val_folds: 5
+    fbeta_score_beta_val: 0.5
+    comparison_metric: "fbeta_score" #  (recall, precision, roc_auc, f1, fbeta_score)
+    voting_rule: "soft" # Voting strategy in voting ensemble
+
+logisticregression:
+  params:
+    n_jobs: -1
+    class_weight: "balanced"
+    solver: "saga"
+    penalty: "elasticnet"
+    max_iter: 200
+
+randomforest:
+  params:
+    n_jobs: -1
+    class_weight: "balanced"
+
+lgbm:
+  params:
+    objective: "binary"
+    n_jobs: -1  # -1 means use all threads
+    min_data_in_leaf: 100  # Larger values speeds up training.
+    num_leaves: 80  # Lower values speeds up training.
+    min_split_gain: 1e-8  # Larger values speeds up training.
+    class_weight: "balanced"  # Adjusts weights inversely proportional to class freqs
+
+xgboost:
+  params:
+    objective: "binary:logistic"
+
+modelregistry:
+  params:
+    lr_registered_model_name: "logistic-regression" # Name used to register logistic regression model
+    rf_registered_model_name: "random-forest" # Name used to register random forest model
+    lgbm_registered_model_name: "lightgbm" # Name used to register lightgbm model
+    xgb_registered_model_name: "xgboost" # Name used to register xgboost model
+    voting_ensemble_registered_model_name: "voting-ensemble" # Name used to register voting ensemble model
+    champion_model_name: "champion_model" # Name used to register champion model
