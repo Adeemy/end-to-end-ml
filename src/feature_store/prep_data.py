@@ -4,8 +4,6 @@ for training.
 """
 
 import os
-
-#################################
 import sys
 
 import pandas as pd
@@ -51,9 +49,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # a target value is joined with the latest feature values prior to
     # event_timestamp of the target. This ensures that class labels of
     # an event is attributed to the correct feature values.
-    target_data = pd.read_parquet(
-        path="src/feature_store/feature_repo/data/raw_dataset_target.parquet"
-    )
+    target_data = pd.read_parquet(path=data_dir / "raw_dataset_target.parquet")
     raw_data = store.get_historical_features(
         entity_df=target_data,
         features=[
@@ -87,9 +83,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     raw_dataset = store.create_saved_dataset(
         from_=raw_data,
         name="raw_data",
-        storage=SavedDatasetFileStorage(
-            "src/feature_store/feature_repo/data/raw_data.parquet"
-        ),
+        storage=SavedDatasetFileStorage(str(data_dir) + "/raw_dataset.parquet"),
         allow_overwrite=True,
     ).to_df()
 

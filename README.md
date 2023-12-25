@@ -16,19 +16,23 @@ A template for end-to-end ML project for tabular data. The repo is still under d
 
 - Generate raw dataset
 
-        get_init_data
+        make get_init_data
+
+- Setup feature store
+
+        make setup_feast
 
 - Import data from feature store
 
-        prep_data
+        make prep_data
 
-- Split original dataset
+- Split dataset
 
-        split_data
+        make split_data
 
 - Submit training job
 
-        train
+        make train
 
 ### Build container
 

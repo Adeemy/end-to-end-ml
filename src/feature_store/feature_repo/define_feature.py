@@ -5,7 +5,7 @@ store capability, but in this project feature
 store is created in local path.
 """
 
-#################################
+import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -30,8 +30,12 @@ CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
 ttl_duration_in_days = timedelta(days=180)
 
 # Specify path to features and target
-feat_path_source = "raw_dataset_features.parquet"
-target_path_source = "raw_dataset_target.parquet"
+feat_path_source = (
+    os.path.abspath("..") + "/feature_repo/data/raw_dataset_features.parquet"
+)
+target_path_source = (
+    os.path.abspath("..") + "/feature_repo/data/raw_dataset_target.parquet"
+)
 
 #################################
 # Define an entity for encounters

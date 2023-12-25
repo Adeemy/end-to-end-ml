@@ -35,6 +35,7 @@ prep_init_data:
 
 get_init_data: gen_init_data prep_init_data
 
+
 # Setup feature store and view entities and feature views
 teardown_feast:
 	cd ./src/feature_store/feature_repo &&\
@@ -52,12 +53,12 @@ show_feast_views:
 	cd ./src/feature_store/feature_repo &&\
 	feast feature-views list
 
-setup_feast: init_feast show_feast_entities
+setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 
 
 # Submit train experiment
 prep_data:
-	python ./src/feature_store/prep_data.py src/feature_store/feature_repo/ ./config/feature_store/config.yml
+	python ./src/feature_store/prep_data.py ./src/feature_store/feature_repo/  ./config/feature_store/config.yml
 
 split_data:
 	python ./src/training/split_data.py ./config/training/config.yml
