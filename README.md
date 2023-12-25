@@ -6,7 +6,12 @@
 
 A template for end-to-end ML project for tabular data. The repo is still under development.
 
-# Usage
+### Setup environment
+  python3.10 -m venv .venv
+  source .venv/bin/activate
+  pip install -r requirements.txt
+
+### Usage
 
 - Generate raw dataset
 
