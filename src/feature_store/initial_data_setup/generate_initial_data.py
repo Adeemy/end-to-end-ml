@@ -2,7 +2,7 @@
 This code splits raw data into three portions:
 1. train set (75%),
 2. test set (20%),
-3. inference set (5%), which is a data split that serves as a production
+3. inference set (5%), a data split that serves as a production
    data to be scored by the deployed model in inference pipeline.
  
 This script is only used in the beginning of this project and isn't part
