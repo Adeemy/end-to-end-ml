@@ -37,20 +37,20 @@ get_init_data: gen_init_data prep_init_data
 
 # Setup feature store and view entities and feature views
 teardown_feast:
-	cd /workspaces/end-to-end-ml/src/feature_store/feature_repo &&\
+	cd ./src/feature_store/feature_repo &&\
 	feast teardown
 
 init_feast:
-	cd /workspaces/end-to-end-ml/src/feature_store/feature_repo &&\
+	cd ./src/feature_store/feature_repo &&\
 	feast apply
 
 show_feast_entities:
-	cd /workspaces/end-to-end-ml/src/feature_store/feature_repo &&\
+	cd ./src/feature_store/feature_repo &&\
 	feast entities list
 
 show_feast_views:
-	cd /workspaces/end-to-end-ml/src/feature_store/feature_repo &&\
-	feast feature-views list show_feast_views
+	cd ./src/feature_store/feature_repo &&\
+	feast feature-views list
 
 setup_feast: init_feast show_feast_entities
 
