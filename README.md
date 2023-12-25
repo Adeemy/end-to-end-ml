@@ -16,25 +16,25 @@ A template for end-to-end ML project for tabular data. The repo is still under d
 
 - Generate raw dataset
 
-  get_init_data
+        get_init_data
 
 - Import data from feature store
 
-  prep_data
+        prep_data
 
 - Split original dataset
 
-  split_data
+        split_data
 
 - Submit training job
 
-  train
+        train
 
 ### Build container
 
-`docker build .`
-`docker image ls`
+    `docker build .`
+    `docker image ls`
 
 ### Pull packaged model
 
-docker pull ghcr.io/adeemy/end-to-end-ml:36ebd68919acff1dda2454c38d0c59b7df1c2daf@sha256:6343e8f8e946bc3458b6a3a064e46c58edf7fc0e0b68bbb6e84ab536ade0f80f
+    docker pull ghcr.io/adeemy/end-to-end-ml:36ebd68919acff1dda2454c38d0c59b7df1c2daf@sha256:6343e8f8e946bc3458b6a3a064e46c58edf7fc0e0b68bbb6e84ab536ade0f80f
