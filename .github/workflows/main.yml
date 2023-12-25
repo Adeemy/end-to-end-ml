@@ -11,50 +11,51 @@ on:
   workflow_dispatch:
 
 jobs:
-  train:
-    runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3.10.*
-        uses: actions/setup-python@v1
-        with:
-          python-version: 3.10.*
-      - name: Install dependencies
-        run: |
-          make install
+  # train:
+  #   runs-on: ubuntu-latest
 
-      - name: Sort imports
-        run: |
-          make isort
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Set up Python 3.10.*
+  #       uses: actions/setup-python@v1
+  #       with:
+  #         python-version: 3.10.*
+  #     - name: Install dependencies
+  #       run: |
+  #         make install
 
-      - name: Format code
-        run: |
-          make format
+  #     - name: Sort imports
+  #       run: |
+  #         make isort
 
-      - name: Unit tests
-        run: |
-          make test
+  #     - name: Format code
+  #       run: |
+  #         make format
 
-      - name: Lint with pylint
-        run: |
-          make lint
+  #     - name: Unit tests
+  #       run: |
+  #         make test
 
-      - name: Prepare data
-        run: make prep_data
+  #     - name: Lint with pylint
+  #       run: |
+  #         make lint
 
-      - name: Split data
-        run: make split_data
+  #     - name: Prepare data
+  #       run: make prep_data
 
-      - name: Train
-        env:
-          COMET_API_KEY: ${{secrets.COMET_API_KEY}}
-        run: |
-          make train
+  #     - name: Split data
+  #       run: make split_data
+
+  #     - name: Train
+  #       env:
+  #         COMET_API_KEY: ${{secrets.COMET_API_KEY}}
+  #       run: |
+  #         make train
 
   build:
     runs-on: ubuntu-latest
-    needs: train
+    # needs: train
 
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
