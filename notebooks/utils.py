@@ -30,7 +30,6 @@ from sklearn.metrics import (
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 
-
 ##########################################################
 class ModelEvaluator:
     """A class to evaluate models."""
@@ -51,7 +50,7 @@ class ModelEvaluator:
         self.y_test = y_test
         self.fbeta_score_beta = fbeta_score_beta
 
-    def calculate_performance_metrics(
+    def calc_perf_metrics(
         self,
         true_class: ArrayLike,
         pred_class: ArrayLike,
@@ -254,11 +253,11 @@ class ModelEvaluator:
         pred_y_test_decoded = class_encoder.inverse_transform(pred_y_test)
 
         # Calculate performance metrics
-        training_scores = self.calculate_performance_metrics(
+        training_scores = self.calc_perf_metrics(
             true_class=self.y_train,
             pred_class=pred_y_train,
         )
-        testing_scores = self.calculate_performance_metrics(
+        testing_scores = self.calc_perf_metrics(
             true_class=self.y_test,
             pred_class=pred_y_test,
         )
@@ -414,7 +413,7 @@ def specify_data_types(
 
 
 ##########################################################
-def check_class_distributions(
+def check_class_dist(
     input_data: pd.DataFrame, class_col_name: str
 ) -> Union[pd.Series, pd.Series]:
     """
@@ -476,7 +475,7 @@ def check_datasets_overlap(
 
 
 ##########################################################
-def plot_missing_values(input_data: pd.DataFrame, fig_size: tuple = (24, 24)) -> None:
+def plot_nans_counts(input_data: pd.DataFrame, fig_size: tuple = (24, 24)) -> None:
     """Visualizes missing values"""
 
     # Calculate missing values
@@ -501,7 +500,7 @@ def plot_missing_values(input_data: pd.DataFrame, fig_size: tuple = (24, 24)) ->
 
 
 ##########################################################
-def plot_two_dataset_size_by_date(
+def plot_data_sizes_by_date(
     first_dataset: pd.DataFrame,
     second_dataset: pd.DataFrame,
     date_col_name: str,
@@ -568,7 +567,7 @@ def plot_two_dataset_size_by_date(
 
 
 ##########################################################
-def calculate_percentage_per_time_period(
+def calc_percent_per_over_time(
     input_data: pd.DataFrame,
     date_col_name: str,
     class_col_name: str,
@@ -627,9 +626,9 @@ def calculate_percentage_per_time_period(
 
 
 ##########################################################
-def plot_cont_var_histograms(
+def plot_num_var_histograms(
     input_data: pd.DataFrame,
-    cont_var_names: list,
+    num_var_names: list,
     no_of_bins: int = 100,
     x_axis_label_size: int = 8,
     y_axis_label_size: int = 8,
@@ -644,7 +643,7 @@ def plot_cont_var_histograms(
     """
 
     # Plot histograms in one figure
-    dataset = input_data[cont_var_names].copy()
+    dataset = input_data[num_var_names].copy()
     dataset = dataset.apply(
         lambda x: x[
             (x >= x.quantile(lower_percentile)) & (x < x.quantile(upper_percentile))
@@ -660,7 +659,7 @@ def plot_cont_var_histograms(
 
 
 ##########################################################
-def remove_vars_with_nans(
+def remove_cols_with_nans(
     input_data: pd.DataFrame,
     vars_to_exclude_from_removal: list = None,
     threshold_val_for_exclusion: float = 0.3,
@@ -687,7 +686,7 @@ def remove_vars_with_nans(
 
 
 ##########################################################
-def plot_cont_var_dist_by_class(
+def plot_num_cols_dist_by_class(
     input_data: pd.DataFrame,
     num_col_names: list,
     class_col_name: str,
@@ -714,9 +713,9 @@ def plot_cont_var_dist_by_class(
 
 
 ##########################################################
-def plot_cont_vars_density(
+def plot_num_cols_density(
     input_data: pd.DataFrame,
-    cont_vars_names: list,
+    num_vars_names: list,
     figure_size: tuple = (12, 60),
     smooth_function_grid_size: int = 500,
     lower_percentile: float = 0.0,
@@ -730,11 +729,11 @@ def plot_cont_vars_density(
 
     # Copy continuous variables
     dataset = input_data.copy()
-    cont_vars = dataset[cont_vars_names].copy()
+    num_vars = dataset[num_vars_names].copy()
 
-    if len(cont_vars_names) > 1:
+    if len(num_vars_names) > 1:
         fig, axes = plt.subplots(
-            nrows=int(np.ceil(len(cont_vars_names) / 2)),
+            nrows=int(np.ceil(len(num_vars_names) / 2)),
             ncols=2,
             figsize=figure_size,
             sharex=False,
@@ -744,15 +743,15 @@ def plot_cont_vars_density(
         axes = axes.ravel()  # array to 1D
 
         # Create a list of dataframe columns to use
-        cols = cont_vars[cont_vars_names].columns
+        cols = num_vars[num_vars_names].columns
 
         for col, ax in zip(cols, axes):
             # Extract column values to set upper and lowr x-axis limits
-            cont_col_values = cont_vars[col]
+            num_col_values = num_vars[col]
 
             # Plot
             sns.kdeplot(
-                data=cont_vars[[col]],
+                data=num_vars[[col]],
                 x=col,
                 fill=True,
                 ax=ax,
@@ -760,8 +759,8 @@ def plot_cont_vars_density(
             )
             ax.set(title=f"Distribution of: {col}", xlabel=None)
             ax.set_xlim(
-                cont_col_values.quantile(lower_percentile),
-                cont_col_values.quantile(upper_percentile),
+                num_col_values.quantile(lower_percentile),
+                num_col_values.quantile(upper_percentile),
             )
     else:
         fig, ax = plt.subplots(
@@ -769,11 +768,11 @@ def plot_cont_vars_density(
         )
 
         # Plot
-        col = cont_vars_names[0]
-        cont_col_values = cont_vars[col]
+        col = num_vars_names[0]
+        num_col_values = num_vars[col]
 
         sns.kdeplot(
-            data=cont_vars[[col]],
+            data=num_vars[[col]],
             x=col,
             fill=True,
             ax=ax,
@@ -781,17 +780,17 @@ def plot_cont_vars_density(
         )
         ax.set(title=f"Distribution of: {col}", xlabel=None)
         ax.set_xlim(
-            cont_col_values.quantile(lower_percentile),
-            cont_col_values.quantile(upper_percentile),
+            num_col_values.quantile(lower_percentile),
+            num_col_values.quantile(upper_percentile),
         )
 
     fig.tight_layout()
 
 
 ##########################################################
-def plot_cont_vars_density_by_class(
+def plot_num_cols_density_by_class(
     input_data: pd.DataFrame,
-    cont_vars_names: list,
+    num_vars_names: list,
     class_col_name: str,
     figure_size: tuple = (12, 60),
     smooth_function_grid_size: int = 500,
@@ -806,9 +805,9 @@ def plot_cont_vars_density_by_class(
 
     # Copy continuous variables and class
     dataset = input_data.copy()
-    cont_vars_with_class = dataset[cont_vars_names + [class_col_name]].copy()
+    num_vars_with_class = dataset[num_vars_names + [class_col_name]].copy()
     fig, axes = plt.subplots(
-        nrows=int(np.ceil(len(cont_vars_names) / 2)),
+        nrows=int(np.ceil(len(num_vars_names) / 2)),
         ncols=2,
         figsize=figure_size,
         sharex=False,
@@ -817,15 +816,15 @@ def plot_cont_vars_density_by_class(
     axes = axes.ravel()  # array to 1D
 
     # Create a list of dataframe columns to use
-    cols = cont_vars_with_class[cont_vars_names].columns
+    cols = num_vars_with_class[num_vars_names].columns
 
     for col, ax in zip(cols, axes):
         # Extract column values to set upper and lowr x-axis limits
-        cont_col_values = cont_vars_with_class[col]
+        num_col_values = num_vars_with_class[col]
 
         # Plot
         sns.kdeplot(
-            data=cont_vars_with_class[[col, class_col_name]],
+            data=num_vars_with_class[[col, class_col_name]],
             x=col,
             hue=class_col_name,
             fill=True,
@@ -834,15 +833,15 @@ def plot_cont_vars_density_by_class(
         )
         ax.set(title=f"Distribution of: {col}", xlabel=None)
         ax.set_xlim(
-            cont_col_values.quantile(lower_percentile),
-            cont_col_values.quantile(upper_percentile),
+            num_col_values.quantile(lower_percentile),
+            num_col_values.quantile(upper_percentile),
         )
 
     fig.tight_layout()
 
 
 ##########################################################
-def plot_cat_vars_dist(
+def plot_num_cols_dist(
     input_data: pd.DataFrame,
     cat_vars_names: list,
     top_cat_count: int = 10,
@@ -896,7 +895,7 @@ def plot_cat_vars_dist(
 
 
 ##########################################################
-def plot_non_missing_values_count_over_time(
+def plot_non_nans_count_over_time(
     input_data: pd.DataFrame,
     var_names: list,
     date_col_name: str,
@@ -932,7 +931,7 @@ def plot_non_missing_values_count_over_time(
 
 
 ##########################################################
-def calculate_cat_vars_cardinality(
+def calc_cat_cols_cardinality(
     input_data: pd.DataFrame, cat_var_names: list
 ) -> pd.DataFrame:
     """Calculates the cardinality of each categorical feature."""
@@ -957,9 +956,9 @@ def calculate_cat_vars_cardinality(
 
 
 ##########################################################
-def plot_cont_vars_corr_heatmap(
+def plot_num_cols_corr_heatmap(
     input_data: pd.DataFrame,
-    cont_var_names: list,
+    num_var_names: list,
     min_pos_corr_threshold: float = 0.5,
     min_neg_corr_threshold: float = -0.4,
     figure_size: tuple = (12, 10),
@@ -968,7 +967,7 @@ def plot_cont_vars_corr_heatmap(
 
     # Correlation matrix for continuous variables
     dataset = input_data.copy()
-    continuous_vars_corr = dataset[cont_var_names].corr()
+    continuous_vars_corr = dataset[num_var_names].corr()
     plt.figure(figsize=figure_size)
 
     # Highlight only correlations between min_pos_corr_threshold and min_neg_corr_threshold
@@ -989,29 +988,31 @@ def plot_cont_vars_corr_heatmap(
 
 ##########################################################
 # Extract feature importance
-def prepare_train_set(
+def prepare_data(
     model,
     training_set: pd.DataFrame,
     train_class_col_name: str,
-    continuous_features: list,
-    cont_features_simple_imputer: str = "median",
+    numerical_features: list,
+    num_features_simple_imputer: str = "median",
     cat_features_simple_imputer: str = "constant",
     cat_features_one_hot_encoder_handle_unknown: str = "infrequent_if_exist",
     features_selection_threshold: float = 0.05,
-    cat_features_missing_vals_replacement=np.nan,
-    high_cardinality_cat_features: list = [],
+    high_cardinal_cat_features: list = None,
     output_hashed_cat_features_count: int = 200,
 ) -> pd.DataFrame:
     """Prepares training set for feature importance."""
 
+    if high_cardinal_cat_features is None:
+        high_cardinal_cat_features = []
+        
     # Extract categorical features by excluding continuous features names
     categorical_features = [
         col
         for col in list(training_set.columns)
-        if col not in continuous_features + [train_class_col_name]
+        if col not in numerical_features + [train_class_col_name]
     ]
     train_features_set = training_set[
-        continuous_features + categorical_features + [train_class_col_name]
+        numerical_features + categorical_features + [train_class_col_name]
     ].copy()
 
     # Encode class labels
@@ -1019,39 +1020,28 @@ def prepare_train_set(
     binary_class_col = train_features_set.pop(train_class_col_name)
     train_class = class_encoder.fit_transform(ravel(binary_class_col))
 
-    # Combine transformers parameters into a dict to log them in parent run
-    transformer_params = {
-        "Continuous Features Simple Imputer": cont_features_simple_imputer,
-        "Categorical Features Simple Imputer": cat_features_simple_imputer,
-        "Categorical Features Missing Values Replacement": cat_features_missing_vals_replacement,
-        "Categorical Features OneHot Encoder Unknown Handling": cat_features_one_hot_encoder_handle_unknown,
-        "Features Selection Threshold Value": features_selection_threshold,
-    }
-
-    print("Transformer configuration:", transformer_params)
-
     # Define transformers and create pipeline
     numeric_transformer = Pipeline(
         steps=[
-            ("imputer", SimpleImputer(strategy=cont_features_simple_imputer)),
+            ("imputer", SimpleImputer(strategy=num_features_simple_imputer)),
             ("scaler", StandardScaler()),
         ]
     )
 
-    if len(high_cardinality_cat_features) > 0:
+    if len(high_cardinal_cat_features) > 0:
         # Extract low cardinality features for one-hot encoding
         low_cardinality_cat_features = [
             col
             for col in categorical_features
-            if col not in high_cardinality_cat_features
+            if col not in high_cardinal_cat_features
         ]
 
         # Convert high cardinality categorical features to string data type as it's one of the required data types
         train_features_set.loc[
-            :, high_cardinality_cat_features
-        ] = train_features_set.loc[:, high_cardinality_cat_features].astype("object")
+            :, high_cardinal_cat_features
+        ] = train_features_set.loc[:, high_cardinal_cat_features].astype("object")
 
-        low_cardinality_categorical_transformer = Pipeline(
+        low_cardinal_cat_features_transformer = Pipeline(
             steps=[
                 (
                     "imputer",
@@ -1071,7 +1061,7 @@ def prepare_train_set(
             ]
         )
 
-        high_cardinality_categorical_transformer = Pipeline(
+        high_cardinal_cat_features_transformer = Pipeline(
             steps=[
                 (
                     "imputer",
@@ -1090,31 +1080,26 @@ def prepare_train_set(
 
         preprocessor = ColumnTransformer(
             transformers=[
-                ("numeric", numeric_transformer, continuous_features),
+                ("numeric", numeric_transformer, numerical_features),
                 (
-                    "low_cardinality_categorical",
-                    low_cardinality_categorical_transformer,
+                    "low_cardinal",
+                    low_cardinal_cat_features_transformer,
                     low_cardinality_cat_features,
                 ),
                 (
-                    "high_cardinality_categorical",
-                    high_cardinality_categorical_transformer,
-                    high_cardinality_cat_features,
+                    "high_cardinal",
+                    high_cardinal_cat_features_transformer,
+                    high_cardinal_cat_features,
                 ),
             ]
         )
 
-        print("\nContinuous features:\n", continuous_features)
-        print("\nLow cardinality categorical features:\n", low_cardinality_cat_features)
-        print(
-            "\nHigh cardinality categorical features:\n", high_cardinality_cat_features
-        )
 
-    if len(high_cardinality_cat_features) == 0:
+    if len(high_cardinal_cat_features) == 0:
         # Extract low cardinality features for one-hot encoding
         low_cardinality_cat_features = categorical_features
 
-        low_cardinality_categorical_transformer = Pipeline(
+        low_cardinal_cat_features_transformer = Pipeline(
             steps=[
                 (
                     "imputer",
@@ -1136,17 +1121,14 @@ def prepare_train_set(
 
         preprocessor = ColumnTransformer(
             transformers=[
-                ("numeric", numeric_transformer, continuous_features),
+                ("numeric", numeric_transformer, numerical_features),
                 (
-                    "low_cardinality_categorical",
-                    low_cardinality_categorical_transformer,
+                    "low_cardinal",
+                    low_cardinal_cat_features_transformer,
                     low_cardinality_cat_features,
                 ),
             ]
         )
-
-        print("\nContinuous features:\n", continuous_features)
-        print("\nCategorical features:\n", categorical_features)
 
     selector = VarianceThreshold(threshold=features_selection_threshold)
 
@@ -1173,7 +1155,7 @@ def prepare_train_set(
     train_set_transformed_features = pd.DataFrame(train_set_transformed_features)
 
     # Add features names to ouput transformed dataframe
-    col_names = continuous_features + list(
+    col_names = numerical_features + list(
         fitted_model.named_steps["preprocessor"]
         .transformers_[1][1]
         .named_steps["onehot_encoder"]
@@ -1191,140 +1173,3 @@ def prepare_train_set(
     return train_set_transformed_features, fitted_model
 
 
-##########################################################
-def convert_class_prob_to_label(
-    value,
-    class_threshold=0.5,
-    class_label_above_threshold="Yes",
-    class_label_below_threshold="No",
-):
-    """
-    Converts class probability to No/Yes label based on threshold value.
-
-    Args:
-        value (float): class probability
-        class_threshold (float): threshold value to map class probability to No/Yes label
-
-    Returns:
-        pred_class_label (string): class label ("No" if value < class_threshold, otherwise "Yes")
-    """
-
-    if value < class_threshold:
-        pred_class_label = class_label_below_threshold
-    else:
-        pred_class_label = class_label_above_threshold
-
-    return predicted_class_label
-
-
-##########################################################
-def calculate_performance_metrics(true_class, predicted_class):
-    """
-    Calculates different performance metrics for classification models.
-
-    input:
-        true_class (list): true class label.
-        predicted_class (list): predicted class label not probability.
-    output:
-        performance_metrics (dataframe): two-column dataframe with metric name and score.
-    """
-
-    # Compute performance metrics on the testing set using model trained with unbalanced training set
-    try:
-        calculated_accuracy = accuracy_score(true_class, predicted_class)
-    except Exception as e:
-        calculated_accuracy = None
-        print(f"Accuracy calculation error --> {e}")
-
-    try:
-        calculated_percision = precision_score(true_class, predicted_class)
-    except Exception as e:
-        calculated_percision = None
-        print(f"Precision calculation error --> {e}")
-
-    try:
-        calculated_recall = recall_score(true_class, predicted_class)
-    except Exception as e:
-        calculated_recall = None
-        print(f"Recall (sensitivity) calculation error --> {e}")
-
-    try:
-        calculated_f1 = f1_score(true_class, predicted_class)
-    except Exception as e:
-        calculated_f1 = None
-        print(f"F1 score calculation error --> {e}")
-
-    try:
-        calculated_auc = roc_auc_score(true_class, predicted_class)
-    except Exception as e:
-        calculated_auc = None
-        print(f"AUC calculation error --> {e}")
-
-    performance_metrics = pd.DataFrame(
-        {
-            "Metric": ["Accuracy", "Precision", "Recall", "F1-Score", "AUC Score"],
-            "Score": [
-                calculated_accuracy,
-                calculated_percision,
-                calculated_recall,
-                calculated_f1,
-                calculated_auc,
-            ],
-        }
-    )
-
-    return performance_metrics
-
-
-##########################################################
-def calculate_accuracy_by_class(
-    true_class: np.ndarray,
-    pred_class: np.ndarray,
-    class_labels: list,
-    normalize_conf_mat: str = None,
-) -> Union[dict, pd.DataFrame]:
-    """
-    Returns accuracies per class label and confusion
-    matrix as dataframe. If 'normalize_conf_mat' argument
-    is notset to None, it will normalize confusion matrix
-    over the true (rows), predicted (columns) conditions
-    or all the population. If None, confusion matrix will
-    not be normalized (per sklearn package documentation).
-    """
-
-    confusion_mat = confusion_matrix(
-        y_true=true_class, y_pred=pred_class, normalize=normalize_conf_mat
-    )
-    class_accuracies = confusion_mat.diagonal() / confusion_mat.sum(axis=1)
-    acc_per_class_label = {
-        label: acc for label, acc in zip(class_labels, class_accuracies)
-    }
-    confusion_mat = pd.DataFrame(
-        confusion_mat, index=class_labels, columns=class_labels
-    )
-
-    return acc_per_class_label, confusion_mat
-
-
-##########################################################
-def plot_feature_importance(
-    feature_importance_scores: np.array,
-    feature_names: list,
-    top_features_count: int = 30,
-    font_size: int = 10,
-    fig_size: tuple = (8, 18),
-    figure_title: str = None,
-) -> None:
-    """Plots top feature importance with their encoded names."""
-
-    feat_importances = pd.Series(feature_importance_scores, index=feature_names)
-    feat_importances = feat_importances.nlargest(top_features_count, keep="all")
-    feat_importances.sort_values(ascending=True, inplace=True)
-    feat_importances.plot(
-        kind="barh", fontsize=font_size, legend=None, figsize=fig_size
-    )
-    if figure_title is None:
-        plt.title(f"Top {top_features_count} important features")
-    if figure_title is not None:
-        plt.title(figure_title)
-    plt.show()

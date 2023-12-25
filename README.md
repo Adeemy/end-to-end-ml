@@ -4,7 +4,7 @@
 
 # End-to-end ML Project Template
 
-A template for end-to-end ML project for tabular data. The repo is still under deveploment.
+A template for end-to-end ML project for tabular data. The repo is still under development.
 
 # Usage
 
