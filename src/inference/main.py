@@ -5,7 +5,7 @@ production data via API calls.
 
 import os
 
-# import numpy as np
+import numpy as np
 import pandas as pd
 from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse
@@ -34,30 +34,29 @@ from training.utils.path import ARTIFACTS_DIR, PARENT_DIR
 # dataset = load_dataset(hf_data_source, data_files = "inference.parquet")
 # prod_data = dataset["train"].to_pandas()
 # input_data = prod_data[0:][:1].to_json(orient="records")
-
-# test_sample = {
-#     "BMI": 29.0,
-#     "PhysHlth": 0,
-#     "Age": "65 to 69",
-#     "HighBP": "0",
-#     "HighChol": "1",
-#     "CholCheck": "0",
-#     "Smoker": "1",
-#     "Stroke": "1",
-#     "HeartDiseaseorAttack": "0",
-#     "PhysActivity": "1",
-#     "Fruits": "1",
-#     "Veggies": "1",
-#     "HvyAlcoholConsump": "1",
-#     "AnyHealthcare": "1",
-#     "NoDocbcCost": "1",
-#     "GenHlth": "Poor",
-#     "MentHlth": "1",
-#     "DiffWalk": "1",
-#     "Sex": "1",
-#     "Education": "1",
-#     "Income": "7",
-# }
+data = {
+    "BMI": 29.0,
+    "PhysHlth": 0,
+    "Age": "65 to 69",
+    "HighBP": "0",
+    "HighChol": "1",
+    "CholCheck": "0",
+    "Smoker": "1",
+    "Stroke": "1",
+    "HeartDiseaseorAttack": "0",
+    "PhysActivity": "1",
+    "Fruits": "1",
+    "Veggies": "1",
+    "HvyAlcoholConsump": "1",
+    "AnyHealthcare": "1",
+    "NoDocbcCost": "1",
+    "GenHlth": "Poor",
+    "MentHlth": "1",
+    "DiffWalk": "1",
+    "Sex": "1",
+    "Education": "1",
+    "Income": "7"
+}
 
 # Extracts config params
 (
@@ -69,7 +68,6 @@ from training.utils.path import ARTIFACTS_DIR, PARENT_DIR
 ) = get_config_params(
     config_yaml_abs_path=str(PARENT_DIR.parent) + "/config/training/config.yml"
 )
-
 
 # Define data model for the input received from the request body
 # Note: this setup if flexible as it takes into account dynamic list
@@ -89,22 +87,34 @@ model = _download_model(
     artifacts_path=ARTIFACTS_DIR,
 )
 
-
-# Run "uvicorn --host 0.0.0.0 main:app" after rooting to /src/inference
+# Root to ./src/inference and run "uvicorn --host 0.0.0.0 main:app" 
 app = FastAPI()
-
 
 @app.get("/")
 def root():
     return HTMLResponse("<h1>Predict pre-diabetes/diabetes.</h1>")
 
+# @app.post("/predict")
+# def predict(data: Data = Body(...)):
+    
+#     data = np.array(data).reshape(1, -1)
+#     preds = model.predict_proba(data)[0]
+    
+#     return {"Predicted Probability": round(preds[1], 2)}
 
 @app.post("/predict")
-def predict(data: Data = Body(...)):
-    # data = np.array(data).reshape(1, -1)
-    data = pd.DataFrame([data])
-
-    data.columns = [
+def predict(data: dict = Body(...)):
+    
+    # Convert the dictionary values to a list
+    data_list = list(data.values())
+    
+    # Reshape the list to a 2D array
+    data_array = np.array(data_list).reshape(1, -1)
+    
+    # Convert to pandas dataframe
+    data_df = pd.DataFrame(data_array)
+    
+    data_df.columns = [
         "BMI",
         "PhysHlth",
         "Age",
@@ -127,6 +137,7 @@ def predict(data: Data = Body(...)):
         "Education",
         "Income",
     ]
-
-    preds = model.predict_proba(data)[0]
+        
+    # Predict the probability using the model
+    preds = model.predict_proba(data_df)[0]
     return {"Predicted Probability": round(preds[1], 2)}
