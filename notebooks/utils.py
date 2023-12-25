@@ -30,6 +30,7 @@ from sklearn.metrics import (
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 
+
 ##########################################################
 class ModelEvaluator:
     """A class to evaluate models."""
@@ -1004,7 +1005,7 @@ def prepare_data(
 
     if high_cardinal_cat_features is None:
         high_cardinal_cat_features = []
-        
+
     # Extract categorical features by excluding continuous features names
     categorical_features = [
         col
@@ -1031,15 +1032,13 @@ def prepare_data(
     if len(high_cardinal_cat_features) > 0:
         # Extract low cardinality features for one-hot encoding
         low_cardinality_cat_features = [
-            col
-            for col in categorical_features
-            if col not in high_cardinal_cat_features
+            col for col in categorical_features if col not in high_cardinal_cat_features
         ]
 
         # Convert high cardinality categorical features to string data type as it's one of the required data types
-        train_features_set.loc[
+        train_features_set.loc[:, high_cardinal_cat_features] = train_features_set.loc[
             :, high_cardinal_cat_features
-        ] = train_features_set.loc[:, high_cardinal_cat_features].astype("object")
+        ].astype("object")
 
         low_cardinal_cat_features_transformer = Pipeline(
             steps=[
@@ -1093,7 +1092,6 @@ def prepare_data(
                 ),
             ]
         )
-
 
     if len(high_cardinal_cat_features) == 0:
         # Extract low cardinality features for one-hot encoding
@@ -1171,5 +1169,3 @@ def prepare_data(
     train_set_transformed_features.columns = col_names
 
     return train_set_transformed_features, fitted_model
-
-
