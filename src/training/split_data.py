@@ -52,10 +52,6 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
     train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
     test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
 
-    print("preprocessed_dataset_file_name:", preprocessed_dataset_file_name)
-    print("train_set_file_name:", train_set_file_name)
-    print("test_set_file_name:", test_set_file_name)
-
     # Check inputs
     try:
         input_data_split_seed = int(DATASET_SPLIT_SEED)
