@@ -157,7 +157,7 @@ cython_debug/
 *.csv
 *.parquet
 *.pkl
-/notebooks/eda_figures/*.png
+/notebooks/.eda_figures/*.png
 /src/training/*.png
 /src/inference/*.png
 /src/training/artifacts/*.png
