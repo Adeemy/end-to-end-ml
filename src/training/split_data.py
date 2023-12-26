@@ -1,6 +1,7 @@
 """
-This script extracts training data from feature store,
-i.e., features and class labels. 
+This script extracts preprocessed data from feature store,
+i.e., features and class labels, and creates data splits
+for model training. 
 """
 
 #################################
@@ -38,6 +39,7 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
     SPLIT_DATE_COL_NAME = config.params["data"]["params"]["split_date_col_name"]
     SPLIT_CUTOFF_DATE = config.params["data"]["params"]["train_test_split_curoff_date"]
     SPLIT_DATE_FORMAT = config.params["data"]["params"]["split_date_col_format"]
+    TRAIN_SET_SIZE = config.params["data"]["params"]["train_set_size"]
     PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
     CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
     date_col_names = config.params["data"]["params"]["date_col_names"]
@@ -95,7 +97,7 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
 
     train_set, test_set = data_splitter.split_dataset(
         split_type=DATASET_SPLIT_TYPE,
-        train_set_size=0.8,
+        train_set_size=TRAIN_SET_SIZE,
         split_random_seed=input_data_split_seed,
         split_date_col_name=SPLIT_DATE_COL_NAME,
         split_cutoff_date=input_split_cutoff_date,
