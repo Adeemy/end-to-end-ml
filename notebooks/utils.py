@@ -1,5 +1,5 @@
 """
-This script includes functions to generate EDA plots.
+This module includes helper functions for EDA.
 """
 
 from datetime import datetime
