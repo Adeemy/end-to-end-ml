@@ -44,6 +44,15 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
+    preprocessed_dataset_file_name = config.params["files"]["params"][
+        "preprocessed_dataset_file_name"
+    ]
+    train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
+    test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
+
+    print("preprocessed_dataset_file_name:", preprocessed_dataset_file_name)
+    print("train_set_file_name:", train_set_file_name)
+    print("test_set_file_name:", test_set_file_name)
 
     # Check inputs
     try:
@@ -65,9 +74,7 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
         ) from e
 
     # Get prepared data from feature store
-    preprocessed_data = pd.read_parquet(
-        path="./src/feature_store/feature_repo/data/preprocessed_data.parquet"
-    )
+    preprocessed_data = pd.read_parquet(path=data_dir / preprocessed_dataset_file_name)
 
     # Select specified features
     required_input_col_names = (
@@ -80,7 +87,6 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
     )
     preprocessed_data = preprocessed_data[required_input_col_names].copy()
 
-    print("\nTrain snd inference sets split:\n")
     data_splitter = DataSplitter(
         dataset=preprocessed_data,
         primary_key_col_name=PRIMARY_KEY,
@@ -99,12 +105,12 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
     # Store train and test sets locally
     # Note: should be registered and tagged for reproducibility.
     train_set.to_parquet(
-        data_dir / "train.parquet",
+        data_dir / train_set_file_name,
         index=False,
     )
 
     test_set.to_parquet(
-        data_dir / "test.parquet",
+        data_dir / test_set_file_name,
         index=False,
     )
 

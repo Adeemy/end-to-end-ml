@@ -90,7 +90,7 @@ protobuf==4.23.3
 psutil==5.9.7
 ptyprocess==0.7.0
 pure-eval==0.2.2
-pyarrow==11.0.0
+pyarrow
 pyarrow-hotfix==0.6
 pydantic==1.10.13
 Pygments==2.17.2

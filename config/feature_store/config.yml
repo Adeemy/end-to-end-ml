@@ -35,3 +35,14 @@ data:
       - Sex
       - Education
       - Income
+
+files:
+  params:
+    raw_dataset_file_name: "raw_dataset.parquet"
+    train_set_file_name: "train.parquet"
+    test_set_file_name: "test.parquet"
+    inference_set_file_name: "inference.parquet"
+    raw_dataset_features_file_name: "raw_dataset_features.parquet"
+    raw_dataset_target_file_name: "raw_dataset_target.parquet"
+    preprocessed_dataset_file_name: "preprocessed_dataset.parquet"
+    

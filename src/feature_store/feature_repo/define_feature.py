@@ -5,48 +5,26 @@ store capability, but in this project feature
 store is created in local path.
 """
 
-#################################
 import os
+import sys
 from datetime import timedelta
+from pathlib import Path
 
 from feast import Entity, FeatureView, Field, FileSource
 from feast.types import Float32, String
 
+sys.path.append(str(Path(__file__).parent.resolve().parent.parent))
+
+from feature_store.utils.config import Config
+
 #################################
 # Specify required column names by data type
-PRIMARY_KEY = "ID"
-CLASS_COL_NAME = "Diabetes_binary"
-date_col_names = []
-datetime_col_names = []
-num_faature_names = ["BMI", "PhysHlth"]
-cat_faature_names = [
-    "Age",
-    "HighBP",
-    "HighChol",
-    "CholCheck",
-    "Smoker",
-    "Stroke",
-    "HeartDiseaseorAttack",
-    "PhysActivity",
-    "Fruits",
-    "Veggies",
-    "HvyAlcoholConsump",
-    "AnyHealthcare",
-    "NoDocbcCost",
-    "GenHlth",
-    "MentHlth",
-    "DiffWalk",
-    "Sex",
-    "Education",
-    "Income",
-]
-required_input_col_names = (
-    [PRIMARY_KEY]
-    + date_col_names
-    + datetime_col_names
-    + num_faature_names
-    + cat_faature_names
+config = Config(
+    config_path=str(Path(__file__).parent.resolve().parent.parent.parent)
+    + "/config/feature_store/config.yml"
 )
+PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
+CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
 
 # TTL duration
 ttl_duration_in_days = timedelta(days=180)
@@ -74,7 +52,7 @@ feat_source = FileSource(
 )
 
 # Define a view for training set features
-feat_view = FeatureView(
+_feat_view = FeatureView(
     name="features_view",
     ttl=ttl_duration_in_days,
     entities=[patient],
@@ -116,7 +94,7 @@ target_source = FileSource(
 )
 
 # Define a view for training set target
-target_view = FeatureView(
+_target_view = FeatureView(
     name="target_view",
     ttl=ttl_duration_in_days,
     entities=[patient],
@@ -127,4 +105,5 @@ target_view = FeatureView(
     ],
     online=True,
     tags={"patient": "population_health"},
+    description="Patient level target value.",
 )
