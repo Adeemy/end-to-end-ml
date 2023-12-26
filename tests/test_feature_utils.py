@@ -11,7 +11,6 @@ import pandas.api.types as ptypes
 import pytest
 
 sys.path.insert(0, "src/feature_store/")
-# sys.path.insert(1, "src/feature_store/")
 from utils.prep import DataPreprocessor, DataSplitter
 
 

@@ -17,6 +17,9 @@ format:
 test:	
 	pytest -vvv
 
+test_cov:
+	coverage report -m
+
 debug:
 	pytest -vvv --pdb
 
