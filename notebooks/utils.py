@@ -3,7 +3,7 @@ This script includes functions to generate EDA plots.
 """
 
 from datetime import datetime
-from typing import Literal, Union
+from typing import Callable, Literal, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -31,7 +31,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 
 
-##########################################################
 class ModelEvaluator:
     """A class to evaluate models."""
 
@@ -316,7 +315,6 @@ class ModelEvaluator:
         )
 
 
-##########################################################
 def specify_data_types(
     input_data: pd.DataFrame,
     date_cols_names: list = None,
@@ -342,9 +340,9 @@ def specify_data_types(
     if categorical_cols_names is None:
         categorical_cols_names = []
 
-    # Categorical variables are all veriables that are not numerical or date
+    # Categorical features are all veriables that are not numerical or date
     dataset = input_data.copy()
-    input_data_vars_names = dataset.columns.tolist()
+    input_data_cols_names = dataset.columns.tolist()
     non_cat_col_names = date_cols_names + datetime_cols_names + numerical_cols_names
 
     # Replace common missing values representations with with np.nan
@@ -362,10 +360,10 @@ def specify_data_types(
         }
     )
 
-    # Identify categorical variables if not provided
+    # Identify categorical features if not provided
     if len(categorical_cols_names) == 0:
         categorical_cols_names = [
-            col for col in input_data_vars_names if col not in non_cat_col_names
+            col for col in input_data_cols_names if col not in non_cat_col_names
         ]
 
     # Cast date columns
@@ -413,31 +411,6 @@ def specify_data_types(
     return dataset
 
 
-##########################################################
-def check_class_dist(
-    input_data: pd.DataFrame, class_col_name: str
-) -> Union[pd.Series, pd.Series]:
-    """
-    This funtion checks class distributions (counts and percentages).
-    """
-
-    # Calculate class labels counts and percentages
-    dataset = input_data.copy()
-    class_labels_counts = dataset[class_col_name].value_counts()
-    class_labels_proportions = round(100 * class_labels_counts / dataset.shape[0], 2)
-
-    # Print class proportions as dictionaries
-    class_counts = class_labels_counts.to_dict()
-    class_proportions = class_labels_proportions.to_dict()
-
-    print("\nDataset class counts:\n")
-    print(class_counts, "\n")
-    print(class_proportions, "\n")
-
-    return class_labels_counts, class_labels_proportions
-
-
-##########################################################
 def check_datasets_overlap(
     first_dataset: pd.DataFrame, second_dataset: pd.DataFrame, primary_key_name: list
 ) -> None:
@@ -475,7 +448,29 @@ def check_datasets_overlap(
         return print("\nNo overlapping samples between the two datasets.\n")
 
 
-##########################################################
+def check_class_dist(
+    input_data: pd.DataFrame, class_col_name: str
+) -> Union[pd.Series, pd.Series]:
+    """
+    This funtion checks class distributions (counts and percentages).
+    """
+
+    # Calculate class labels counts and percentages
+    dataset = input_data.copy()
+    class_labels_counts = dataset[class_col_name].value_counts()
+    class_labels_proportions = round(100 * class_labels_counts / dataset.shape[0], 2)
+
+    # Print class proportions as dictionaries
+    class_counts = class_labels_counts.to_dict()
+    class_proportions = class_labels_proportions.to_dict()
+
+    print("\nDataset class counts:\n")
+    print(class_counts, "\n")
+    print(class_proportions, "\n")
+
+    return class_labels_counts, class_labels_proportions
+
+
 def plot_nans_counts(input_data: pd.DataFrame, fig_size: tuple = (24, 24)) -> None:
     """Visualizes missing values"""
 
@@ -500,7 +495,6 @@ def plot_nans_counts(input_data: pd.DataFrame, fig_size: tuple = (24, 24)) -> No
         print("No missing values found")
 
 
-##########################################################
 def plot_data_sizes_by_date(
     first_dataset: pd.DataFrame,
     second_dataset: pd.DataFrame,
@@ -567,7 +561,6 @@ def plot_data_sizes_by_date(
     fig.show()
 
 
-##########################################################
 def calc_percent_per_over_time(
     input_data: pd.DataFrame,
     date_col_name: str,
@@ -626,10 +619,9 @@ def calc_percent_per_over_time(
     return dataset
 
 
-##########################################################
-def plot_num_var_histograms(
+def plot_num_col_histograms(
     input_data: pd.DataFrame,
-    num_var_names: list,
+    num_col_names: list,
     no_of_bins: int = 100,
     x_axis_label_size: int = 8,
     y_axis_label_size: int = 8,
@@ -637,14 +629,14 @@ def plot_num_var_histograms(
     lower_percentile: float = 0.0,
     upper_percentile: float = 1.0,
 ) -> None:
-    """Plots histograms of all specified continuous variables in one figure. It
+    """Plots histograms of all specified numerical features in one figure. It
     gives the option to remove outlier by limitting values to desired lower
     and upper percentiles to make distribution more readable. Default is
     not excluding outliers.
     """
 
     # Plot histograms in one figure
-    dataset = input_data[num_var_names].copy()
+    dataset = input_data[num_col_names].copy()
     dataset = dataset.apply(
         lambda x: x[
             (x >= x.quantile(lower_percentile)) & (x < x.quantile(upper_percentile))
@@ -659,34 +651,32 @@ def plot_num_var_histograms(
     )
 
 
-##########################################################
 def remove_cols_with_nans(
     input_data: pd.DataFrame,
-    vars_to_exclude_from_removal: list = None,
-    threshold_val_for_exclusion: float = 0.3,
+    cols_to_keep: list = None,
+    thresh_for_exclusion: float = 0.3,
 ) -> pd.DataFrame:
-    """Removes variables with missing values above threshold value [0, 1]."""
+    """Removes features with missing values above threshold value [0, 1]."""
 
-    # Specify vars to include in nans removal
+    # Specify cols to include in nans removal
     dataset = input_data.copy()
-    vars_with_nans_to_include_in_removal = dataset.columns.difference(
-        vars_to_exclude_from_removal
+    cols_with_nans_to_include_in_removal = dataset.columns.difference(
+        cols_to_keep
     ).to_list()
 
-    # Remove variables with missing values higher than nans_removal_threshold_val
-    missing_values_counts = dataset[vars_with_nans_to_include_in_removal].isna().sum()
+    # Remove features with missing values higher than nans_removal_thresh_val
+    missing_values_counts = dataset[cols_with_nans_to_include_in_removal].isna().sum()
     missing_values_percentages = (
         missing_values_counts / dataset.shape[0]
-    ) > threshold_val_for_exclusion
+    ) > thresh_for_exclusion
     missing_values_percentages = missing_values_counts[
-        missing_values_percentages > threshold_val_for_exclusion
+        missing_values_percentages > thresh_for_exclusion
     ].index.to_list()
     dataset.drop(missing_values_percentages, axis=1, inplace=True)
 
     return dataset
 
 
-##########################################################
 def plot_num_cols_dist_by_class(
     input_data: pd.DataFrame,
     num_col_names: list,
@@ -694,12 +684,12 @@ def plot_num_cols_dist_by_class(
     figure_size: tuple = (8, 4),
     box_max_length: float = 1.5,
 ) -> None:
-    """Plots the distributions (boxplots) of numerical variables versus class."""
+    """Plots the distributions (boxplots) of numerical features versus class."""
 
     # Plot boxplots with respect to class label
     dataset = input_data.copy()
     for i, col_name in enumerate(num_col_names):
-        # Check the distribution of numerical variables vs. class
+        # Check numerical features distribution vs. class
         plt.figure(figsize=figure_size)
         ax = sns.boxplot(
             x=class_col_name,
@@ -713,28 +703,27 @@ def plot_num_cols_dist_by_class(
         plt.tight_layout(pad=1)
 
 
-##########################################################
 def plot_num_cols_density(
     input_data: pd.DataFrame,
-    num_vars_names: list,
+    num_cols_names: list,
     figure_size: tuple = (12, 60),
     smooth_function_grid_size: int = 500,
     lower_percentile: float = 0.0,
     upper_percentile: float = 1,
 ) -> None:
-    """Plots density of continuous variables with respect to class. It
+    """Plots density of numerical features with respect to class. It
     gives the option to remove outlier by limitting values to desired
     lower and upper percentiles to make overlap betwen distribution more
     visible if any. Default is not excluding outliers.
     """
 
-    # Copy continuous variables
+    # Copy numerical features
     dataset = input_data.copy()
-    num_vars = dataset[num_vars_names].copy()
+    num_cols = dataset[num_cols_names].copy()
 
-    if len(num_vars_names) > 1:
+    if len(num_cols_names) > 1:
         fig, axes = plt.subplots(
-            nrows=int(np.ceil(len(num_vars_names) / 2)),
+            nrows=int(np.ceil(len(num_cols_names) / 2)),
             ncols=2,
             figsize=figure_size,
             sharex=False,
@@ -744,15 +733,15 @@ def plot_num_cols_density(
         axes = axes.ravel()  # array to 1D
 
         # Create a list of dataframe columns to use
-        cols = num_vars[num_vars_names].columns
+        cols = num_cols[num_cols_names].columns
 
         for col, ax in zip(cols, axes):
             # Extract column values to set upper and lowr x-axis limits
-            num_col_values = num_vars[col]
+            num_col_values = num_cols[col]
 
             # Plot
             sns.kdeplot(
-                data=num_vars[[col]],
+                data=num_cols[[col]],
                 x=col,
                 fill=True,
                 ax=ax,
@@ -769,11 +758,11 @@ def plot_num_cols_density(
         )
 
         # Plot
-        col = num_vars_names[0]
-        num_col_values = num_vars[col]
+        col = num_cols_names[0]
+        num_col_values = num_cols[col]
 
         sns.kdeplot(
-            data=num_vars[[col]],
+            data=num_cols[[col]],
             x=col,
             fill=True,
             ax=ax,
@@ -788,27 +777,26 @@ def plot_num_cols_density(
     fig.tight_layout()
 
 
-##########################################################
 def plot_num_cols_density_by_class(
     input_data: pd.DataFrame,
-    num_vars_names: list,
+    num_cols_names: list,
     class_col_name: str,
     figure_size: tuple = (12, 60),
     smooth_function_grid_size: int = 500,
     lower_percentile: float = 0.0,
     upper_percentile: float = 1,
 ) -> None:
-    """Plots density of continuous variables with respect to class. It
+    """Plots density of numerical features with respect to class. It
     gives the option to remove outlier by limitting values to desired
     lower and upper percentiles to make overlap betwen distribution more
     visible if any. Default is not excluding outliers.
     """
 
-    # Copy continuous variables and class
+    # Copy numerical features and class
     dataset = input_data.copy()
-    num_vars_with_class = dataset[num_vars_names + [class_col_name]].copy()
+    num_cols_with_class = dataset[num_cols_names + [class_col_name]].copy()
     fig, axes = plt.subplots(
-        nrows=int(np.ceil(len(num_vars_names) / 2)),
+        nrows=int(np.ceil(len(num_cols_names) / 2)),
         ncols=2,
         figsize=figure_size,
         sharex=False,
@@ -817,15 +805,15 @@ def plot_num_cols_density_by_class(
     axes = axes.ravel()  # array to 1D
 
     # Create a list of dataframe columns to use
-    cols = num_vars_with_class[num_vars_names].columns
+    cols = num_cols_with_class[num_cols_names].columns
 
     for col, ax in zip(cols, axes):
         # Extract column values to set upper and lowr x-axis limits
-        num_col_values = num_vars_with_class[col]
+        num_col_values = num_cols_with_class[col]
 
         # Plot
         sns.kdeplot(
-            data=num_vars_with_class[[col, class_col_name]],
+            data=num_cols_with_class[[col, class_col_name]],
             x=col,
             hue=class_col_name,
             fill=True,
@@ -841,40 +829,39 @@ def plot_num_cols_density_by_class(
     fig.tight_layout()
 
 
-##########################################################
 def plot_num_cols_dist(
     input_data: pd.DataFrame,
-    cat_vars_names: list,
+    cat_cols_names: list,
     top_cat_count: int = 10,
     x_axis_label_size: int = 12,
     y_axis_label_size: int = 12,
     figure_size: tuple = (12, 60),
     x_axis_rot: int = 45,
 ) -> None:
-    """Plots distributions of categorical variables."""
+    """Plots categorical features distributions."""
 
     dataset = input_data.copy()
-    fig, _ = plt.subplots(len(cat_vars_names), 1, figsize=figure_size)
+    fig, _ = plt.subplots(len(cat_cols_names), 1, figsize=figure_size)
 
     for i, ax in enumerate(fig.axes):
-        if i < len(dataset[cat_vars_names].columns):
+        if i < len(dataset[cat_cols_names].columns):
             categories_order = (
-                dataset[cat_vars_names[i]]
+                dataset[cat_cols_names[i]]
                 .value_counts()
                 .sort_values(ascending=False)
                 .iloc[:top_cat_count]
                 .index
             )
             sns.countplot(
-                x=dataset[cat_vars_names].columns[i],
+                x=dataset[cat_cols_names].columns[i],
                 alpha=0.7,
-                data=dataset[cat_vars_names],
+                data=dataset[cat_cols_names],
                 ax=ax,
                 order=categories_order,
             )
             ax.tick_params(axis="x", labelsize=(x_axis_label_size - 2))
             ax.tick_params(axis="y", labelsize=(y_axis_label_size - 2))
-            ax.set(xlabel="", ylabel=dataset[cat_vars_names].columns[i] + " Count")
+            ax.set(xlabel="", ylabel=dataset[cat_cols_names].columns[i] + " Count")
             ax.set_xticklabels(ax.get_xticklabels(), rotation=x_axis_rot, ha="right")
 
         for p in ax.patches:
@@ -895,27 +882,23 @@ def plot_num_cols_dist(
     fig.tight_layout()
 
 
-##########################################################
 def plot_non_nans_count_over_time(
     input_data: pd.DataFrame,
-    var_names: list,
+    col_names: list,
     date_col_name: str,
     figure_size: tuple = (12, 100),
 ) -> None:
-    """Plots continuous variables values count over time to see if certain
+    """Plots numerical features values count over time to see if certain
     columns started populated on specific date."""
 
-    # Correlation matrix for continuous variables
-    dataset = input_data[[date_col_name] + var_names].copy()
+    dataset = input_data[[date_col_name] + col_names].copy()
 
     fig, axes = plt.subplots(
-        nrows=len(var_names), ncols=1, figsize=figure_size, sharex=False, sharey=False
+        nrows=len(col_names), ncols=1, figsize=figure_size, sharex=False, sharey=False
     )
-    axes = axes.ravel()  # array to 1D
+    axes = axes.ravel()
 
-    # Create a list of dataframe columns to use
-    cols = dataset[var_names].columns
-
+    cols = dataset[col_names].columns
     for col, ax in zip(cols, axes):
         if col != date_col_name:
             data = pd.DataFrame(
@@ -931,51 +914,47 @@ def plot_non_nans_count_over_time(
         fig.tight_layout()
 
 
-##########################################################
 def calc_cat_cols_cardinality(
-    input_data: pd.DataFrame, cat_var_names: list
+    input_data: pd.DataFrame, cat_col_names: list
 ) -> pd.DataFrame:
     """Calculates the cardinality of each categorical feature."""
 
-    dataset = input_data[cat_var_names].copy()
-    cat_vars_cardinality = pd.DataFrame(
-        columns=("Categorical Variable Name", "Unique Values count")
+    dataset = input_data[cat_col_names].copy()
+    cat_cols_cardinality = pd.DataFrame(
+        columns=("Categorical Feature Name", "Unique Values count")
     )
 
-    for i, col_name in enumerate(cat_var_names):
+    for i, col_name in enumerate(cat_col_names):
         feature = col_name
-        cat_vars_cardinality.loc[i, "Categorical Feature Name"] = dataset[
+        cat_cols_cardinality.loc[i, "Categorical Feature Name"] = dataset[
             [feature]
         ].columns[0]
-        cat_vars_cardinality.loc[i, "Unique Values count"] = dataset[feature].nunique()
+        cat_cols_cardinality.loc[i, "Unique Values count"] = dataset[feature].nunique()
 
-    cat_vars_cardinality.sort_values(
+    cat_cols_cardinality.sort_values(
         by=["Unique Values count"], ascending=False, inplace=True
     )
 
-    return cat_vars_cardinality
+    return cat_cols_cardinality
 
 
-##########################################################
 def plot_num_cols_corr_heatmap(
     input_data: pd.DataFrame,
-    num_var_names: list,
-    min_pos_corr_threshold: float = 0.5,
-    min_neg_corr_threshold: float = -0.4,
+    num_col_names: list,
+    min_pos_corr_thresh: float = 0.5,
+    min_neg_corr_thresh: float = -0.4,
     figure_size: tuple = (12, 10),
 ) -> None:
-    """Plots heatmap for correlation matrix for continuous variables."""
+    """Plots heatmap for correlation matrix for numerical features."""
 
-    # Correlation matrix for continuous variables
     dataset = input_data.copy()
-    continuous_vars_corr = dataset[num_var_names].corr()
+    numeric_cols_corr = dataset[num_col_names].corr()
     plt.figure(figsize=figure_size)
 
-    # Highlight only correlations between min_pos_corr_threshold and min_neg_corr_threshold
     sns.heatmap(
-        continuous_vars_corr[
-            (continuous_vars_corr >= min_pos_corr_threshold)
-            | (continuous_vars_corr <= min_neg_corr_threshold)
+        numeric_cols_corr[
+            (numeric_cols_corr >= min_pos_corr_thresh)
+            | (numeric_cols_corr <= min_neg_corr_thresh)
         ],
         cmap="viridis",
         vmax=1.0,
@@ -987,17 +966,16 @@ def plot_num_cols_corr_heatmap(
     )
 
 
-##########################################################
 # Extract feature importance
 def prepare_data(
-    model,
+    model: Callable,
     training_set: pd.DataFrame,
     train_class_col_name: str,
     numerical_features: list,
     num_features_simple_imputer: str = "median",
     cat_features_simple_imputer: str = "constant",
-    cat_features_one_hot_encoder_handle_unknown: str = "infrequent_if_exist",
-    features_selection_threshold: float = 0.05,
+    cat_features_ohe_handle_unknown: str = "infrequent_if_exist",
+    features_selection_thresh: float = 0.05,
     high_cardinal_cat_features: list = None,
     output_hashed_cat_features_count: int = 200,
 ) -> pd.DataFrame:
@@ -1006,7 +984,7 @@ def prepare_data(
     if high_cardinal_cat_features is None:
         high_cardinal_cat_features = []
 
-    # Extract categorical features by excluding continuous features names
+    # Extract categorical features by excluding numerical features names
     categorical_features = [
         col
         for col in list(training_set.columns)
@@ -1016,7 +994,6 @@ def prepare_data(
         numerical_features + categorical_features + [train_class_col_name]
     ].copy()
 
-    # Encode class labels
     class_encoder = LabelEncoder()
     binary_class_col = train_features_set.pop(train_class_col_name)
     train_class = class_encoder.fit_transform(ravel(binary_class_col))
@@ -1031,7 +1008,7 @@ def prepare_data(
 
     if len(high_cardinal_cat_features) > 0:
         # Extract low cardinality features for one-hot encoding
-        low_cardinality_cat_features = [
+        low_cardinal_cat_features = [
             col for col in categorical_features if col not in high_cardinal_cat_features
         ]
 
@@ -1047,11 +1024,11 @@ def prepare_data(
                     SimpleImputer(
                         strategy=cat_features_simple_imputer, fill_value=np.nan
                     ),
-                ),  # Replace missing values with np.NaNs
+                ),
                 (
                     "onehot_encoder",
                     OneHotEncoder(
-                        handle_unknown=cat_features_one_hot_encoder_handle_unknown,
+                        handle_unknown=cat_features_ohe_handle_unknown,
                         categories="auto",
                         drop="first",
                         sparse=False,
@@ -1083,7 +1060,7 @@ def prepare_data(
                 (
                     "low_cardinal",
                     low_cardinal_cat_features_transformer,
-                    low_cardinality_cat_features,
+                    low_cardinal_cat_features,
                 ),
                 (
                     "high_cardinal",
@@ -1095,7 +1072,7 @@ def prepare_data(
 
     if len(high_cardinal_cat_features) == 0:
         # Extract low cardinality features for one-hot encoding
-        low_cardinality_cat_features = categorical_features
+        low_cardinal_cat_features = categorical_features
 
         low_cardinal_cat_features_transformer = Pipeline(
             steps=[
@@ -1104,11 +1081,11 @@ def prepare_data(
                     SimpleImputer(
                         strategy=cat_features_simple_imputer, fill_value=np.nan
                     ),
-                ),  # Replace missing values with np.NaNs
+                ),
                 (
                     "onehot_encoder",
                     OneHotEncoder(
-                        handle_unknown=cat_features_one_hot_encoder_handle_unknown,
+                        handle_unknown=cat_features_ohe_handle_unknown,
                         categories="auto",
                         drop="first",
                         sparse=False,
@@ -1123,12 +1100,12 @@ def prepare_data(
                 (
                     "low_cardinal",
                     low_cardinal_cat_features_transformer,
-                    low_cardinality_cat_features,
+                    low_cardinal_cat_features,
                 ),
             ]
         )
 
-    selector = VarianceThreshold(threshold=features_selection_threshold)
+    selector = VarianceThreshold(threshold=features_selection_thresh)
 
     data_transform_pipeline = Pipeline(
         steps=[("preprocessor", preprocessor), ("selector", selector)]
@@ -1157,7 +1134,7 @@ def prepare_data(
         fitted_model.named_steps["preprocessor"]
         .transformers_[1][1]
         .named_steps["onehot_encoder"]
-        .get_feature_names_out(low_cardinality_cat_features)
+        .get_feature_names_out(low_cardinal_cat_features)
     )
     col_names = [i for (i, v) in zip(col_names, list(selector.get_support())) if v]
     transformed_hashed_features_count = len(
