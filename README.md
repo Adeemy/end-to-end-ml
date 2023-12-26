@@ -34,11 +34,6 @@ A template for end-to-end ML project for tabular data. The repo is still under d
 
         make train
 
-### Build container
-
-    `docker build .`
-    `docker image ls`
-
 ### Pull packaged model
 
     docker pull ghcr.io/adeemy/end-to-end-tabular-ml:9c670633e181da234e0c57639d72a4b2834c7809
