@@ -71,6 +71,11 @@ def main(
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
+    train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
+    test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
+    inference_set_file_name = config.params["files"]["params"][
+        "inference_set_file_name"
+    ]
 
     try:
         usci_dataset_id = int(usci_dataset_id)
@@ -139,14 +144,14 @@ def main(
 
     # Save data splits in feature_repo before uploading
     # them to Hugging Face (Bena345/cdc-diabetes-health-indicators)
-    train_set.to_parquet(data_dir / "train.parquet", index=False)
-    test_set.to_parquet(data_dir / "test.parquet", index=False)
+    train_set.to_parquet(data_dir / train_set_file_name, index=False)
+    test_set.to_parquet(data_dir / test_set_file_name, index=False)
     inference_set.to_parquet(
-        data_dir / "inference.parquet",
+        data_dir / inference_set_file_name,
         index=False,
     )
 
-    print("\nInitial dataset was generated.\n")
+    print("\nInitial data splits was generated.\n")
 
 
 # python ./src/feature_store/initial_data_setup/generate_initial_data.py ./config/feature_store/config.yml 891 random 123

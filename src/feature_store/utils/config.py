@@ -35,38 +35,18 @@ class Config:
 
     @staticmethod
     def _check_params(params: Dict):
-        """Check all training exp values"""
+        """Check all required values exist."""
         assert "description" in params, "description is not included in config file"
         assert "data" in params, "data is not included in config file"
-        assert "train" in params, "train is not included in config file"
-        assert "modelregistry" in params, "modelregistry is not included in config file"
 
         # Check beta value (primarily used to compare models)
-        if params["train"]["params"]["fbeta_score_beta_val"] != "none":
-            try:
-                fbeta_score_beta_val = float(
-                    params["train"]["params"]["fbeta_score_beta_val"]
-                )
-            except ValueError as e:
-                raise ValueError("fbeta_score_beta_val must be a float type!") from e
+        if params["data"]["params"]["raw_dataset_source"] == "none":
+            raise ValueError("raw_dataset_source must be specified!")
 
-            assert (
-                fbeta_score_beta_val > 0
-            ), f"fbeta_score_beta_val must be > 0. Got {fbeta_score_beta_val}"
-            params["train"]["params"][
-                "comparison_metric"
-            ] = f"f_{fbeta_score_beta_val}_score"
+        if params["data"]["params"]["pk_col_name"] == "none":
+            raise ValueError("pk_col_name must be specified!")
 
-        # Check if comparison metric is a valid value
-        comparison_metric = params["train"]["params"]["comparison_metric"]
-        comparison_metrics = ("recall", "precision", "f1", "roc_auc", "fbeta_score")
-        assert (
-            comparison_metric in comparison_metrics
-        ), f"Supported metrics are {comparison_metrics}. Got {comparison_metric}!"
-
-        # Check if voting rule a valid value
-        voting_rule = params["train"]["params"]["voting_rule"]
-        assert voting_rule in (
-            "soft",
-            "hard",
-        ), f"Voting rule in Voting Ensemble must be 'soft' or 'hard'. Got {voting_rule}!"
+        if (params["data"]["params"]["num_col_names"] == "none") and (
+            params["data"]["params"]["cat_col_names"] == "none"
+        ):
+            raise ValueError("Neither categorical nor numerical are specified!")

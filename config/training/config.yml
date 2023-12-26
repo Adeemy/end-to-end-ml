@@ -82,6 +82,12 @@ xgboost:
   params:
     objective: "binary:logistic"
 
+files:
+  params:
+    preprocessed_dataset_file_name: "preprocessed_dataset.parquet"
+    train_set_file_name: "train.parquet"
+    test_set_file_name: "test.parquet"
+    
 modelregistry:
   params:
     lr_registered_model_name: "logistic-regression" # Name used to register logistic regression model

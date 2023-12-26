@@ -43,13 +43,20 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
+    raw_dataset_file_name = config.params["files"]["params"]["raw_dataset_file_name"]
+    raw_dataset_target_file_name = config.params["files"]["params"][
+        "raw_dataset_target_file_name"
+    ]
+    preprocessed_dataset_file_name = config.params["files"]["params"][
+        "preprocessed_dataset_file_name"
+    ]
 
     # Get historical features and join them with target
     # Note: this join will take into account even_timestamp such that
     # a target value is joined with the latest feature values prior to
     # event_timestamp of the target. This ensures that class labels of
     # an event is attributed to the correct feature values.
-    target_data = pd.read_parquet(path=data_dir / "raw_dataset_target.parquet")
+    target_data = pd.read_parquet(path=data_dir / raw_dataset_target_file_name)
     raw_data = store.get_historical_features(
         entity_df=target_data,
         features=[
@@ -83,7 +90,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     raw_dataset = store.create_saved_dataset(
         from_=raw_data,
         name="raw_data",
-        storage=SavedDatasetFileStorage(str(data_dir) + "/raw_dataset.parquet"),
+        storage=SavedDatasetFileStorage(str(data_dir) + "/" + raw_dataset_file_name),
         allow_overwrite=True,
     ).to_df()
 
@@ -137,7 +144,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # Save preprocessed and transformed dataset to a local path
     # Note: it can be registered in a dataset versioning system in
     # a cloud platform.
-    preprocessed_data.to_parquet(data_dir / "preprocessed_data.parquet", index=False)
+    preprocessed_data.to_parquet(data_dir / preprocessed_dataset_file_name, index=False)
 
     print("\nPreprocessed dataset was created.\n")
 
