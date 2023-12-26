@@ -23,12 +23,12 @@ from typing import Literal
 
 from ucimlrepo import fetch_ucirepo
 
-sys.path.insert(0, os.getcwd() + "/src/")
+sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
 
-from feature_store.utils.config import Config
-from feature_store.utils.prep import DataSplitter
-from training.utils.path import DATA_DIR
+from src.feature_store.utils.config import Config
+from src.feature_store.utils.prep import DataSplitter
+from src.training.utils.path import DATA_DIR
 
 
 def main(
@@ -55,7 +55,7 @@ def main(
     print(
         """\n
     ----------------------------------------------------------------
-    --- Generate Initial Dataset Starts ...
+    --- Generating Initial Dataset Starts ...
     ----------------------------------------------------------------\n"""
     )
 

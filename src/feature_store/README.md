@@ -7,8 +7,8 @@
 Output:
 
     Created entity patient
-    Created feature view target_view
     Created feature view features_view
+    Created feature view target_view
 
     Created sqlite table feature_store_features_view
     Created sqlite table feature_store_target_view
@@ -28,8 +28,8 @@ output:
 output:
 
     NAME           ENTITIES     TYPE
-    target_view    {'patient'}  FeatureView
     features_view  {'patient'}  FeatureView
+    target_view    {'patient'}  FeatureView
 
 
 - To delete existing feature store registry:

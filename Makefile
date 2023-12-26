@@ -24,9 +24,9 @@ debug:
 	pytest -vvv --pdb
 
 lint:
-	pylint --disable=R,C,E1120,import-error ./src
+	pylint --disable=R,C,E1120,import-error ./src/feature_store ./src/training ./src/inference 
 
-all: install isort format test lint
+all: install isort format test test_cov lint
 
 
 # Generate and prepare initial dataset

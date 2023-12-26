@@ -9,13 +9,13 @@ import sys
 import pandas as pd
 from feast import FeatureStore
 from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
-from utils.config import Config
-from utils.prep import DataPreprocessor, DataTransformer
 
-sys.path.insert(0, os.getcwd() + "/src/")
+sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
 
-from training.utils.path import DATA_DIR
+from src.feature_store.utils.config import Config
+from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
+from src.training.utils.path import DATA_DIR
 
 
 #################################
@@ -29,7 +29,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     print(
         """\n
     ----------------------------------------------------------------
-    --- Preparing Data Imported for Feature Store Starts ...
+    --- Preparing Data Imported from Feature Store Starts ...
     ----------------------------------------------------------------\n"""
     )
 

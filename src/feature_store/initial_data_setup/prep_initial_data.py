@@ -14,11 +14,11 @@ from datetime import datetime
 import pandas as pd
 from datasets import load_dataset
 
-sys.path.insert(0, os.getcwd() + "/src/")
+sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
 
-from feature_store.utils.config import Config
-from training.utils.path import DATA_DIR
+from src.feature_store.utils.config import Config
+from src.training.utils.path import DATA_DIR
 
 #################################
 

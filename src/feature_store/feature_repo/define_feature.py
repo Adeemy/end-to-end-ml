@@ -13,9 +13,9 @@ from pathlib import Path
 from feast import Entity, FeatureView, Field, FileSource
 from feast.types import Float32, String
 
-sys.path.append(str(Path(__file__).parent.resolve().parent.parent))
+sys.path.append(str(Path(__file__).parent.resolve().parent.parent.parent))
 
-from feature_store.utils.config import Config
+from src.feature_store.utils.config import Config
 
 #################################
 # Specify required column names by data type

@@ -4,14 +4,18 @@ production data via API calls.
 """
 
 import os
+import sys
+from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv  # pylint: disable=W0611
 from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse
-from utils import _download_model, get_config_params
 
-from training.utils.path import ARTIFACTS_DIR, PARENT_DIR
+sys.path.append(str(Path(__file__).parent.resolve().parent.parent))
+
+from src.inference.utils import download_model, get_config_params
+from src.training.utils.path import ARTIFACTS_DIR, PARENT_DIR
 
 ########################################################
 # # Sample of prod data for testing
@@ -49,7 +53,7 @@ from training.utils.path import ARTIFACTS_DIR, PARENT_DIR
 )
 
 # Download champion model
-model = _download_model(
+model = download_model(
     comet_workspace=comet_ws,
     comet_api_key=os.environ["COMET_API_KEY"],
     model_name=champ_model_name,

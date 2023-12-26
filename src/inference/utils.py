@@ -9,9 +9,9 @@ from pathlib import Path, PosixPath
 import joblib
 from comet_ml import API
 
-sys.path.insert(0, str(Path(__file__).parent.resolve().parent))
+sys.path.append(str(Path(__file__).parent.resolve().parent.parent))
 
-from training.utils.config import Config
+from src.training.utils.config import Config
 
 
 ########################################################
@@ -39,7 +39,7 @@ def get_config_params(config_yaml_abs_path: str):
     )
 
 
-def _download_model(
+def download_model(
     comet_workspace: str,
     comet_api_key: str,
     model_name: str,

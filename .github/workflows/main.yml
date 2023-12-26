@@ -36,11 +36,15 @@ jobs:
         run: |
           make test
 
+      - name: Test coverage
+        run: |
+          make test_cov
+
       - name: Lint with pylint
         run: |
           make lint
 
-      # Commented because data currently are sourced from local paths not in repo
+      # Commented because data currently are sourced from local paths not commited in repo
       #     - name: Prepare data
       #       run: make prep_data
 
