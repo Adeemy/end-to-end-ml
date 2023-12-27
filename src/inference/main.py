@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-from dotenv import load_dotenv  # pylint: disable=W0611
+from dotenv import load_dotenv
 from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse
 
@@ -16,6 +16,7 @@ sys.path.append(str(Path(__file__).parent.resolve().parent.parent))
 
 from src.inference.utils import download_model, get_config_params
 from src.training.utils.path import ARTIFACTS_DIR, PARENT_DIR
+load_dotenv()
 
 ########################################################
 # # Sample of prod data for testing
