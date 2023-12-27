@@ -16,7 +16,6 @@ was selected for the project as it's real-life dataset and represents a
 meaningful application.
 """
 
-#################################
 import os
 import sys
 from typing import Literal
