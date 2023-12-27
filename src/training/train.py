@@ -3,7 +3,6 @@ This script performs hyperparameters optimization
 using Optuna Python package.
 """
 
-##########################################################
 import os
 import sys
 from datetime import datetime
@@ -11,7 +10,7 @@ from pathlib import PosixPath
 
 import comet_ml
 from comet_ml import ExistingExperiment
-from dotenv import load_dotenv  # pylint: disable=W0611
+from dotenv import load_dotenv
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -36,7 +35,7 @@ from utils.model import (
 )
 from utils.path import ARTIFACTS_DIR
 from xgboost import XGBClassifier
-
+load_dotenv()
 
 ###########################################################
 def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath):
