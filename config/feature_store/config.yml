@@ -5,13 +5,14 @@ logger:
 
 data:
   params:
-    usci_raw_data_num: 891
+    uci_raw_data_num: 891
     raw_dataset_source: "Bena345/cdc-diabetes-health-indicators"
     pk_col_name: "ID"
     class_col_name: "Diabetes_binary"
     pos_class: "Diabetic"
     date_col_names: []
     datetime_col_names: []
+    event_timestamp_col_name: "event_timestamp"
     num_col_names:
       - BMI
       - PhysHlth
@@ -39,10 +40,6 @@ data:
 files:
   params:
     raw_dataset_file_name: "raw_dataset.parquet"
-    train_set_file_name: "train.parquet"
-    test_set_file_name: "test.parquet"
     inference_set_file_name: "inference.parquet"
-    raw_dataset_features_file_name: "raw_dataset_features.parquet"
-    raw_dataset_target_file_name: "raw_dataset_target.parquet"
-    preprocessed_dataset_file_name: "preprocessed_dataset.parquet"
-    
+    preprocessed_dataset_features_file_name: "preprocessed_dataset_features.parquet" # For feature store
+    preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet" # For feature store

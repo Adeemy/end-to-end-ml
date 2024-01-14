@@ -80,7 +80,7 @@ A template for end-to-end ML project for tabular data. The repo is still under d
 
 - Generate raw dataset
 
-        make get_init_data
+        make gen_init_data
 
 - Setup feature store
 

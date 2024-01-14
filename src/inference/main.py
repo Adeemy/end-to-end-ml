@@ -16,6 +16,7 @@ sys.path.append(str(Path(__file__).parent.resolve().parent.parent))
 
 from src.inference.utils import download_model, get_config_params
 from src.training.utils.path import ARTIFACTS_DIR, PARENT_DIR
+
 load_dotenv()
 
 ########################################################

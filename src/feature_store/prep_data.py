@@ -5,10 +5,9 @@ for training.
 
 import os
 import sys
+from datetime import datetime
 
 import pandas as pd
-from feast import FeatureStore
-from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 
 sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
@@ -19,7 +18,7 @@ from src.training.utils.path import DATA_DIR
 
 
 #################################
-def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
+def main(config_yaml_abs_path: str, data_dir: PosixPath):
     """Imports data from feature store to be preprocessed and transformed.
     feast_repo_dir (str): relative path to feature store repo.
     config_yaml_abs_path (str): absolute path to config.yml file, which
@@ -29,13 +28,12 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     print(
         """\n
     ----------------------------------------------------------------
-    --- Preparing Data Imported from Feature Store Starts ...
+    --- Transforming for Feature Store Starts ...
     ----------------------------------------------------------------\n"""
     )
 
     # Get initiated FeatureStore
     # Note: repo_path is the relative path to where this script is located.
-    store = FeatureStore(repo_path=feast_repo_dir)
     config = Config(config_path=config_yaml_abs_path)
     PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
     CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
@@ -43,56 +41,20 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
+    event_timestamp_col_name = config.params["data"]["params"][
+        "event_timestamp_col_name"
+    ]
     raw_dataset_file_name = config.params["files"]["params"]["raw_dataset_file_name"]
-    raw_dataset_target_file_name = config.params["files"]["params"][
-        "raw_dataset_target_file_name"
+    preprocessed_dataset_features_file_name = config.params["files"]["params"][
+        "preprocessed_dataset_features_file_name"
     ]
-    preprocessed_dataset_file_name = config.params["files"]["params"][
-        "preprocessed_dataset_file_name"
+    preprocessed_dataset_target_file_name = config.params["files"]["params"][
+        "preprocessed_dataset_target_file_name"
     ]
 
-    # Get historical features and join them with target
-    # Note: this join will take into account even_timestamp such that
-    # a target value is joined with the latest feature values prior to
-    # event_timestamp of the target. This ensures that class labels of
-    # an event is attributed to the correct feature values.
-    target_data = pd.read_parquet(path=data_dir / raw_dataset_target_file_name)
-    raw_data = store.get_historical_features(
-        entity_df=target_data,
-        features=[
-            "features_view:BMI",
-            "features_view:PhysHlth",
-            "features_view:Age",
-            "features_view:HighBP",
-            "features_view:HighChol",
-            "features_view:CholCheck",
-            "features_view:Smoker",
-            "features_view:Stroke",
-            "features_view:HeartDiseaseorAttack",
-            "features_view:PhysActivity",
-            "features_view:Fruits",
-            "features_view:Veggies",
-            "features_view:HvyAlcoholConsump",
-            "features_view:AnyHealthcare",
-            "features_view:NoDocbcCost",
-            "features_view:GenHlth",
-            "features_view:MentHlth",
-            "features_view:DiffWalk",
-            "features_view:Sex",
-            "features_view:Education",
-            "features_view:Income",
-        ],
-    )
-
-    # Store raw dataset with class labels as a local file
-    # and register it as "raw_dataset", which will be used
-    # for training.
-    raw_dataset = store.create_saved_dataset(
-        from_=raw_data,
-        name="raw_data",
-        storage=SavedDatasetFileStorage(str(data_dir) + "/" + raw_dataset_file_name),
-        allow_overwrite=True,
-    ).to_df()
+    #################################
+    # Import raw dataset
+    raw_dataset = pd.read_parquet(path=data_dir / raw_dataset_file_name)
 
     #################################
     # Apply required preprocessing on raw dataset
@@ -141,17 +103,26 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     data_transformer.rename_class_labels(class_col_name=CLASS_COL_NAME)
     preprocessed_data = data_transformer.preprocessed_data
 
-    # Save preprocessed and transformed dataset to a local path
-    # Note: it can be registered in a dataset versioning system in
-    # a cloud platform.
-    preprocessed_data.to_parquet(data_dir / preprocessed_dataset_file_name, index=False)
+    # Save features and target in a separate parquet files
+    # Note: this is meant for patient entity in feature store.
+    preprocessed_features = raw_dataset.drop([CLASS_COL_NAME], axis=1, inplace=False)
+    preprocessed_features[event_timestamp_col_name] = datetime.now()
+    preprocessed_features.to_parquet(
+        data_dir / preprocessed_dataset_features_file_name,
+        index=False,
+    )
 
-    print("\nPreprocessed dataset was created.\n")
+    preprocessed_target = preprocessed_data[[PRIMARY_KEY] + [CLASS_COL_NAME]].copy()
+    preprocessed_target[event_timestamp_col_name] = datetime.now()
+    preprocessed_target.to_parquet(
+        data_dir / preprocessed_dataset_target_file_name,
+        index=False,
+    )
+
+    print("Preprocessed features and target were saved in feature store.")
 
 
 # python ./src/feature_store/prep_data.py src/feature_store/feature_repo/ ./config/feature_store/config.yml
 if __name__ == "__main__":
     # Preprocess and transform data
-    main(
-        feast_repo_dir=sys.argv[1], config_yaml_abs_path=sys.argv[2], data_dir=DATA_DIR
-    )
+    main(config_yaml_abs_path=sys.argv[1], data_dir=DATA_DIR)

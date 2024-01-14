@@ -35,7 +35,9 @@ from utils.model import (
 )
 from utils.path import ARTIFACTS_DIR
 from xgboost import XGBClassifier
+
 load_dotenv()
+
 
 ###########################################################
 def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath):

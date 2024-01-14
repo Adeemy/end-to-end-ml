@@ -12,7 +12,9 @@ isort:
 	isort ./tests
 
 format:
-	black .
+	black ./notebooks
+	black ./src
+	black ./tests
 
 test:	
 	pytest -vvv
@@ -31,13 +33,11 @@ all: install isort format test test_cov lint
 
 # Generate and prepare initial dataset
 gen_init_data:
-	python ./src/feature_store/initial_data_setup/generate_initial_data.py ./config/feature_store/config.yml random 123
+	python ./src/feature_store/initial_data_setup/generate_initial_data.py ./config/feature_store/config.yml
 
-prep_init_data:
-	python ./src/feature_store/initial_data_setup/prep_initial_data.py ./config/feature_store/config.yml
-
-get_init_data: gen_init_data prep_init_data
-
+# Preprocess and transform data before ingestion by feature store
+prep_data:
+	python ./src/feature_store/prep_data.py  ./config/feature_store/config.yml
 
 # Setup feature store and view entities and feature views
 teardown_feast:
@@ -60,11 +60,8 @@ setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 
 
 # Submit train experiment
-prep_data:
-	python ./src/feature_store/prep_data.py ./src/feature_store/feature_repo/  ./config/feature_store/config.yml
-
 split_data:
-	python ./src/training/split_data.py ./config/training/config.yml
+	python ./src/feature_store/feature_repo/ ./config/training/config.yml
 
 train:
 	python ./src/training/train.py ./config/training/config.yml

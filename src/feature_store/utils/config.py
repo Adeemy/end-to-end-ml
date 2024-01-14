@@ -50,3 +50,8 @@ class Config:
             params["data"]["params"]["cat_col_names"] == "none"
         ):
             raise ValueError("Neither categorical nor numerical are specified!")
+
+        if not isinstance(params["data"]["params"]["uci_raw_data_num"], int):
+            raise ValueError(
+                f"uci_dataset_id must be integer type. Got {params['data']['params']['uci_raw_data_num']}"
+            )

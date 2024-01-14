@@ -8,7 +8,9 @@ import os
 import sys
 from datetime import datetime
 
-import pandas as pd
+# import pandas as pd
+from feast import FeatureStore
+from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 
 sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
@@ -21,7 +23,7 @@ from src.feature_store.utils.prep import DataSplitter
 #################################
 
 
-def main(config_yaml_abs_path: str, data_dir: PosixPath):
+def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     """Splits dataset into train and test sets."""
 
     print(
@@ -32,9 +34,10 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
     )
 
     # Specify required column names by data type
+    store = FeatureStore(repo_path=feast_repo_dir)
     config = Config(config_path=config_yaml_abs_path)
     DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
-    DATASET_SPLIT_SEED = config.params["data"]["params"]["split_rand_seed"]
+    DATASET_SPLIT_SEED = int(config.params["data"]["params"]["split_rand_seed"])
     SPLIT_DATE_COL_NAME = config.params["data"]["params"]["split_date_col_name"]
     SPLIT_CUTOFF_DATE = config.params["data"]["params"]["train_test_split_curoff_date"]
     SPLIT_DATE_FORMAT = config.params["data"]["params"]["split_date_col_format"]
@@ -45,33 +48,11 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
-    preprocessed_dataset_file_name = config.params["files"]["params"][
-        "preprocessed_dataset_file_name"
-    ]
     train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
     test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
-
-    # Check inputs
-    try:
-        input_data_split_seed = int(DATASET_SPLIT_SEED)
-    except ValueError as e:
-        raise ValueError(
-            f"split_random_seed must be integer type. Got {DATASET_SPLIT_SEED}"
-        ) from e
-
-    try:
-        input_split_cutoff_date = None
-        if SPLIT_CUTOFF_DATE is not None:
-            input_split_cutoff_date = datetime.strptime(
-                SPLIT_CUTOFF_DATE, SPLIT_DATE_FORMAT
-            ).date()
-    except ValueError as e:
-        raise ValueError(
-            f"SPLIT_CUTOFF_DATE must be a date (format {SPLIT_DATE_FORMAT}) or None if split type is 'random'. Got {SPLIT_CUTOFF_DATE}"
-        ) from e
-
-    # Get prepared data from feature store
-    preprocessed_data = pd.read_parquet(path=data_dir / preprocessed_dataset_file_name)
+    input_split_cutoff_date = datetime.strptime(
+        SPLIT_CUTOFF_DATE, SPLIT_DATE_FORMAT
+    ).date()
 
     # Select specified features
     required_input_col_names = (
@@ -93,7 +74,7 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
     train_set, test_set = data_splitter.split_dataset(
         split_type=DATASET_SPLIT_TYPE,
         train_set_size=TRAIN_SET_SIZE,
-        split_random_seed=input_data_split_seed,
+        split_random_seed=DATASET_SPLIT_SEED,
         split_date_col_name=SPLIT_DATE_COL_NAME,
         split_cutoff_date=input_split_cutoff_date,
         split_date_col_format=SPLIT_DATE_FORMAT,
@@ -115,4 +96,6 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
 
 
 if __name__ == "__main__":
-    main(config_yaml_abs_path=sys.argv[1], data_dir=DATA_DIR)
+    main(
+        feast_repo_dir=sys.argv[1], config_yaml_abs_path=sys.argv[2], data_dir=DATA_DIR
+    )
