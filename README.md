@@ -14,7 +14,7 @@ The project follows best software engineering practices in machine learning, suc
 
 The project consists of an EDA notebook in notebooks folder and scripts in src folder, which are organized as follows:
 
-- eda.ipynb: This notebook performs exploratory data analysis (EDA) on the dataset, such as descriptive statistics, data visualization, and correlation analysis. It also builds a baseline model (logistic regression) using scikit-learn, which achieves high precision and recall scores (above 0.80) on the test set.
+- notebooks: This folder includes a notebook (eda.ipynb) that performs exploratory data analysis (EDA) on the dataset, such as descriptive statistics, data visualization, and correlation analysis. It also builds a baseline model (logistic regression) using scikit-learn, which achieves high precision and recall scores (above 0.80) on the test set.
 
 - src/feature_store: This folder contains the script (generate_initial_data.py) that imports the original dataset from the source [USC](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), and creates the inference set (5\% of the original dataset). The inference set is used to simulate production data, which is scored using the deployed model via a REST API call. The raw dataset is then preprocessed and transformed (prep_data.py) before ingesting it by feature store. See README.md in the feature_store folder for more details about feature store setup.
 
