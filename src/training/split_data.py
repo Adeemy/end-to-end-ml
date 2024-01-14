@@ -8,9 +8,10 @@ import os
 import sys
 from datetime import datetime
 
-# import pandas as pd
+import pandas as pd
 from feast import FeatureStore
-from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
+
+print(os.getcwd())
 
 sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
@@ -34,7 +35,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     )
 
     # Specify required column names by data type
-    store = FeatureStore(repo_path=feast_repo_dir)
+    feat_store = FeatureStore(repo_path=feast_repo_dir)
     config = Config(config_path=config_yaml_abs_path)
     DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
     DATASET_SPLIT_SEED = int(config.params["data"]["params"]["split_rand_seed"])
@@ -48,11 +49,54 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
+    preprocessed_dataset_target_file_name = config.params["files"]["params"][
+        "preprocessed_dataset_target_file_name"
+    ]
     train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
     test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
-    input_split_cutoff_date = datetime.strptime(
-        SPLIT_CUTOFF_DATE, SPLIT_DATE_FORMAT
-    ).date()
+
+    # Extract cut-off date for splitting train and test sets
+    input_split_cutoff_date = None
+    if DATASET_SPLIT_TYPE == "time":
+        input_split_cutoff_date = datetime.strptime(
+            SPLIT_CUTOFF_DATE, SPLIT_DATE_FORMAT
+        ).date()
+
+    # Get historical features and join them with target
+    # Note: this join will take into account even_timestamp such that
+    # a target value is joined with the latest feature values prior to
+    # event_timestamp of the target. This ensures that class labels of
+    # an event is attributed to the correct feature values.
+    target_data = pd.read_parquet(path=data_dir / preprocessed_dataset_target_file_name)
+    historical_data = feat_store.get_historical_features(
+        entity_df=target_data,
+        features=[
+            "features_view:BMI",
+            "features_view:PhysHlth",
+            "features_view:Age",
+            "features_view:HighBP",
+            "features_view:HighChol",
+            "features_view:CholCheck",
+            "features_view:Smoker",
+            "features_view:Stroke",
+            "features_view:HeartDiseaseorAttack",
+            "features_view:PhysActivity",
+            "features_view:Fruits",
+            "features_view:Veggies",
+            "features_view:HvyAlcoholConsump",
+            "features_view:AnyHealthcare",
+            "features_view:NoDocbcCost",
+            "features_view:GenHlth",
+            "features_view:MentHlth",
+            "features_view:DiffWalk",
+            "features_view:Sex",
+            "features_view:Education",
+            "features_view:Income",
+        ],
+    )
+
+    # Retrieve historical dataset into a dataframe
+    preprocessed_data = historical_data.to_df()
 
     # Select specified features
     required_input_col_names = (
@@ -97,5 +141,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
 
 if __name__ == "__main__":
     main(
-        feast_repo_dir=sys.argv[1], config_yaml_abs_path=sys.argv[2], data_dir=DATA_DIR
+        feast_repo_dir="/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/",
+        config_yaml_abs_path="/workspaces/end-to-end-tabular-ml/config/training/config.yml",
+        data_dir=DATA_DIR,
     )

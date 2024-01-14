@@ -3,7 +3,7 @@
 # Install packages, format code, sort imports, and run unit tests
 install:
 	pip install --upgrade pip &&\
-		pip install black[jupyter] pytest pylint isort &&\
+		pip install black[jupyter] pytest pylint isort pytest-cov &&\
 		pip install -r requirements.txt
 
 isort:
@@ -17,9 +17,7 @@ format:
 	black ./tests
 
 test:	
-	pytest -vvv
-
-test_cov:
+	coverage run -m pytest -vvv
 	coverage report -m
 
 debug:
@@ -28,7 +26,7 @@ debug:
 lint:
 	pylint --disable=R,C,E1120,import-error ./src/feature_store ./src/training ./src/inference 
 
-all: install isort format test test_cov lint
+all: install isort format test lint
 
 
 # Generate and prepare initial dataset
@@ -61,7 +59,7 @@ setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 
 # Submit train experiment
 split_data:
-	python ./src/feature_store/feature_repo/ ./config/training/config.yml
+	python ./src/training/split_data.py ./src/feature_store/feature_repo/  ./config/training/config.yml
 
 train:
 	python ./src/training/train.py ./config/training/config.yml

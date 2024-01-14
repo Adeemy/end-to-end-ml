@@ -25,16 +25,17 @@ config = Config(
 )
 PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
 CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
+EVENT_TIMESTAMP_COL_NAME = config.params["data"]["params"]["event_timestamp_col_name"]
 
 # TTL duration
 ttl_duration_in_days = timedelta(days=180)
 
 # Specify path to features and target
 feat_path_source = (
-    os.path.abspath("..") + "/feature_repo/data/raw_dataset_features.parquet"
+    os.path.abspath("..") + "/feature_repo/data/preprocessed_dataset_features.parquet"
 )
 target_path_source = (
-    os.path.abspath("..") + "/feature_repo/data/raw_dataset_target.parquet"
+    os.path.abspath("..") + "/feature_repo/data/preprocessed_dataset_target.parquet"
 )
 
 #################################
@@ -48,7 +49,7 @@ patient = Entity(
 # Define the source of training set features
 feat_source = FileSource(
     path=feat_path_source,
-    timestamp_field="event_timestamp",
+    timestamp_field=EVENT_TIMESTAMP_COL_NAME,
 )
 
 # Define a view for training set features
@@ -90,7 +91,7 @@ _feat_view = FeatureView(
 # Define the source of training set target
 target_source = FileSource(
     path=target_path_source,
-    timestamp_field="event_timestamp",
+    timestamp_field=EVENT_TIMESTAMP_COL_NAME,
 )
 
 # Define a view for training set target

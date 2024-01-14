@@ -119,7 +119,7 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
         index=False,
     )
 
-    print("Preprocessed features and target were saved in feature store.")
+    print("\n\nPreprocessed features and target were saved in feature store.")
 
 
 # python ./src/feature_store/prep_data.py src/feature_store/feature_repo/ ./config/feature_store/config.yml

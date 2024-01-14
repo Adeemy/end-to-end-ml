@@ -155,7 +155,7 @@ cython_debug/
 
 # data files
 *.csv
-*.parquet
+# *.parquet   # Commented to allow importing data from local directory in GitHub Actions
 *.pkl
 /notebooks/.eda_figures/*.png
 /src/training/*.png

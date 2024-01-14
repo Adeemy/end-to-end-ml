@@ -13,7 +13,6 @@ generate data for the project and it isn't part of feature or inference pipeline
 
 import os
 import sys
-from typing import Literal
 
 from ucimlrepo import fetch_ucirepo
 
