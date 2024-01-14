@@ -32,10 +32,10 @@ ttl_duration_in_days = timedelta(days=180)
 
 # Specify path to features and target
 feat_path_source = (
-    os.path.abspath("..") + "/feature_repo/data/preprocessed_dataset_features.parquet"
+    f"{os.path.abspath('..')}/feature_repo/data/preprocessed_dataset_features.parquet"
 )
 target_path_source = (
-    os.path.abspath("..") + "/feature_repo/data/preprocessed_dataset_target.parquet"
+    f"{os.path.abspath('..')}/feature_repo/data/preprocessed_dataset_target.parquet"
 )
 
 #################################

@@ -47,10 +47,9 @@ Below is the project structure.
         │   │   │   ├── data
         │   │   │   │   ├── inference.parquet
         │   │   │   │   ├── online_store.db
-        │   │   │   │   ├── preprocessed_dataset.parquet
+        │   │   │   │   ├── preprocessed_dataset_features.parquet
+        │   │   │   │   ├── preprocessed_dataset_target.parquet
         │   │   │   │   ├── raw_dataset.parquet
-        │   │   │   │   ├── raw_dataset_features.parquet
-        │   │   │   │   ├── raw_dataset_target.parquet
         │   │   │   │   ├── registry.db
         │   │   │   │   ├── test.parquet
         │   │   │   │   └── train.parquet
@@ -58,7 +57,6 @@ Below is the project structure.
         │   │   │   └── feature_store.yaml
         │   │   ├── initial_data_setup
         │   │   │   ├── generate_initial_data.py
-        │   │   │   └── prep_initial_data.py
         │   │   ├── prep_data.py
         │   │   └── utils
         │   │       ├── __init__.py
@@ -100,17 +98,17 @@ The training and deployment pipelines can be run in GitHub Actions. You can also
 
 - Generate raw dataset
 
-        make get_init_data
+        make gen_init_data
+
+- Preprocess data before ingesting it by feature store
+
+        make prep_data
 
 - Setup feature store
 
         make setup_feast
 
-- Preprocess data from feature store
-
-        make prep_data
-
-- Split dataset
+- Split dataset extracted from feature store
 
         make split_data
 

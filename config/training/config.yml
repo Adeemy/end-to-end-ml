@@ -88,6 +88,7 @@ files:
     preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
     train_set_file_name: "train.parquet"
     test_set_file_name: "test.parquet"
+    baseline_model_dir: "./notebooks/.eda_figures/basline_model.pkl"
 
 modelregistry:
   params:

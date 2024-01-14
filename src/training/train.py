@@ -11,6 +11,7 @@ from pathlib import PosixPath
 import comet_ml
 from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
+from joblib import load
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -75,6 +76,7 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
     CHAMPION_MODEL_NAME = config.params["modelregistry"]["params"][
         "champion_model_name"
     ]
+    BASELINE_MODEL_PATH = config.params["files"]["params"]["baseline_model_dir"]
 
     ########################################################
     # Dataset split configuration, feature data types, and positive class label
@@ -394,6 +396,18 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
     best_model_exp_key = best_model_exp.get_key()
 
     #############################################
+    # Load baseline model from local directory
+    # Note: a baseline model can be build in a notebook, like at the
+    # beginning of the project, and it desired to be compared with
+    # models produced in training pipeline. In that case, the model
+    # can be loaded here.
+    try:
+        baseline_model = load(BASELINE_MODEL_PATH)
+    except FileNotFoundError:
+        baseline_model = None
+        print("\nNo baseline model found!")
+
+    #############################################
     # Assess generalization capability of the best performer on test set
     # Note: test set was not exposed to any model during training or
     # evaluation to ensure all models are independent of the test set.
@@ -404,6 +418,8 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
         XGB_REGISTERED_MODEL_NAME: xgb_calibrated_pipeline,
         VOTING_ENSEMBLE_REGISTERED_MODEL_NAME: ve_calibrated_pipeline,
     }
+    if baseline_model is not None:
+        compared_pipelines.update(**{"Baseline_Model": baseline_model})
     best_model_pipeline = compared_pipelines.get(best_model_name)
 
     best_model_evaluator = ModelEvaluator(
