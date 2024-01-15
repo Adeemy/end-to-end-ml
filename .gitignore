@@ -155,12 +155,12 @@ cython_debug/
 
 # data files
 *.csv
-*.parquet
-*.pkl
+# *.parquet   # Commented to allow importing data from local directory in GitHub Actions
+# *.pkl  # Commented to allow importing data from local directory in GitHub Actions
 /notebooks/.eda_figures/*.png
 /src/training/*.png
 /src/inference/*.png
-/src/training/artifacts/*.png
+/src/training/artifacts/
 .comet.json
 .localconfig
 .DS_Store

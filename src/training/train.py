@@ -3,7 +3,6 @@ This script performs hyperparameters optimization
 using Optuna Python package.
 """
 
-##########################################################
 import os
 import sys
 from datetime import datetime
@@ -11,7 +10,7 @@ from pathlib import PosixPath
 
 import comet_ml
 from comet_ml import ExistingExperiment
-from dotenv import load_dotenv  # pylint: disable=W0611
+from dotenv import load_dotenv
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -36,6 +35,8 @@ from utils.model import (
 )
 from utils.path import ARTIFACTS_DIR
 from xgboost import XGBClassifier
+
+load_dotenv()
 
 
 ###########################################################
@@ -73,6 +74,9 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
     ]
     CHAMPION_MODEL_NAME = config.params["modelregistry"]["params"][
         "champion_model_name"
+    ]
+    DEPLOYMENT_SCORE_THRESH = config.params["train"]["params"][
+        "deployment_score_thresh"
     ]
 
     ########################################################
@@ -436,17 +440,20 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
     )
     best_model_exp_obj.log_metrics(test_scores)
 
-    # Log and register model (in Comet, model must be logged first)
-    log_and_register_champ_model(
-        local_path=artifacts_dir,
-        champ_model_name=CHAMPION_MODEL_NAME,
-        pipeline=best_model_pipeline,
-        exp_obj=best_model_exp_obj,
-    )
+    # Log and register champion model (in Comet, model must be logged first)
+    # Note: the best model should not be deployed in production if its score
+    # on the test set is below minimum score.
+    BEST_MODEL_TEST_SCORE = test_scores.get(f"test_{COMPARISON_METRIC}")
+    if BEST_MODEL_TEST_SCORE >= DEPLOYMENT_SCORE_THRESH:
+        log_and_register_champ_model(
+            local_path=artifacts_dir,
+            champ_model_name=CHAMPION_MODEL_NAME,
+            pipeline=best_model_pipeline,
+            exp_obj=best_model_exp_obj,
+        )
 
 
 ###########################################################
-# python ./src/training/train.py ./config/training/config.yml
 if __name__ == "__main__":
     # Submit training experiment
     main(

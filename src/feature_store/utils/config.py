@@ -27,6 +27,10 @@ class Config:
         assert config_path.endswith(".yml")
         self.config_path = config_path
 
+        print(
+            f"\n\nDirectory of data perprocessing and transformation config file: {self.config_path}\n\n"
+        )
+
         try:
             with open(self.config_path, "r", encoding="UTF-8") as f:
                 self.params = yaml.load(f, Loader=PrettySafeLoader)
@@ -50,3 +54,8 @@ class Config:
             params["data"]["params"]["cat_col_names"] == "none"
         ):
             raise ValueError("Neither categorical nor numerical are specified!")
+
+        if not isinstance(params["data"]["params"]["uci_raw_data_num"], int):
+            raise ValueError(
+                f"uci_dataset_id must be integer type. Got {params['data']['params']['uci_raw_data_num']}"
+            )

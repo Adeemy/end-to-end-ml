@@ -1,9 +1,9 @@
-# Run this file in root path path
+# Run this file in project root directory
 
 # Install packages, format code, sort imports, and run unit tests
 install:
 	pip install --upgrade pip &&\
-		pip install black[jupyter] pytest pylint isort &&\
+		pip install black[jupyter] pytest pylint isort pytest-cov &&\
 		pip install -r requirements.txt
 
 isort:
@@ -12,12 +12,12 @@ isort:
 	isort ./tests
 
 format:
-	black .
+	black ./notebooks
+	black ./src
+	black ./tests
 
 test:	
-	pytest -vvv
-
-test_cov:
+	coverage run -m pytest -vvv
 	coverage report -m
 
 debug:
@@ -26,18 +26,16 @@ debug:
 lint:
 	pylint --disable=R,C,E1120,import-error ./src/feature_store ./src/training ./src/inference 
 
-all: install isort format test test_cov lint
+all: install isort format test lint
 
 
-# Generate and prepare initial dataset
-gen_init_data:
-	python ./src/feature_store/initial_data_setup/generate_initial_data.py ./config/feature_store/config.yml random 123
+# Import raw dataset from source
+get_init_data:
+	python ./src/feature_store/initial_data_setup/generate_initial_data.py ./config/feature_store/config.yml
 
-prep_init_data:
-	python ./src/feature_store/initial_data_setup/prep_initial_data.py ./config/feature_store/config.yml
-
-get_init_data: gen_init_data prep_init_data
-
+# Preprocess and transform data before ingestion by feature store
+prep_data:
+	python ./src/feature_store/prep_data.py  ./config/feature_store/config.yml
 
 # Setup feature store and view entities and feature views
 teardown_feast:
@@ -56,15 +54,16 @@ show_feast_views:
 	cd ./src/feature_store/feature_repo &&\
 	feast feature-views list
 
+show_feast_ui:
+	cd ./src/feature_store/feature_repo &&\
+	feast ui
+
 setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 
 
 # Submit train experiment
-prep_data:
-	python ./src/feature_store/prep_data.py ./src/feature_store/feature_repo/  ./config/feature_store/config.yml
-
 split_data:
-	python ./src/training/split_data.py ./config/training/config.yml
+	python ./src/training/split_data.py ./src/feature_store/feature_repo/  ./config/training/config.yml
 
 train:
 	python ./src/training/train.py ./config/training/config.yml

@@ -6,15 +6,15 @@ logger:
 data:
   params:
     raw_dataset_source: "Bena345/cdc-diabetes-health-indicators"
-    split_type: "random" # Can be either random or "time"
+    split_type: "random" # Can be either "random" or "time"
     split_rand_seed: 100 # Seed for random number generator for random split
-    split_date_col_name: null # Name of date column to split dataset based on time (e.g., datetime.strptime("2023-15-11", "%Y-%d-%m").date()).
-    train_test_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is test set).
-    train_valid_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is validation set).
+    split_date_col_name: null # Name of date column to split dataset based on time (e.g., datetime.strptime("2023-15-11", "%Y-%d-%m").date())
+    train_test_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is test set)
+    train_valid_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is validation set)
     split_date_col_format: "%Y-%m-%d %H:%M:%S"
     cat_features_nan_replacement: "Unspecified"
-    train_set_size: 0.8 # What is the % of train set after splitting original training set into train and validation sets.
-    pk_col_name: "ID"
+    train_set_size: 0.8 # % of train set when splitting data imported from feature store
+    pk_col_name: "ID" # Primary key that uniquely identifies every row in dataset
     class_col_name: "Diabetes_binary"
     pos_class: "Diabetic"
     date_col_names: []
@@ -26,15 +26,15 @@ data:
       - Age
       - HighBP
       - HighChol
-      - CholCheck  # Near-zero variance
+      - CholCheck # Near-zero variance
       - Smoker
-      - Stroke  # Near-zero variance
+      - Stroke # Near-zero variance
       - HeartDiseaseorAttack
       - PhysActivity
       - Fruits
       - Veggies
-      - HvyAlcoholConsump  # Near-zero variance
-      - AnyHealthcare  # Near-zero variance
+      - HvyAlcoholConsump # Near-zero variance
+      - AnyHealthcare # Near-zero variance
       - NoDocbcCost
       - GenHlth
       - MentHlth
@@ -48,13 +48,14 @@ train:
     initiate_comet_project: False # Should be True if new Comet project should be created
     comet_project_name: "end-to-end-tabular-ml"
     comet_workspace_name: "6bmod5d8"
-    search_max_iters: 2
-    parallel_jobs_count: 1 # 1 if training not in parallel, possible value: # int(0.9 * os.cpu_count())
-    exp_timout_secs: 3600
+    search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization
+    parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
+    exp_timout_secs: 3600 # Experiment timeout
     cross_val_folds: 5
-    fbeta_score_beta_val: 0.5
-    comparison_metric: "fbeta_score" #  (recall, precision, roc_auc, f1, fbeta_score)
+    fbeta_score_beta_val: 0.5 # Value of beta in f_beta_score, which is a metric used for hyperparams optimization
+    comparison_metric: "fbeta_score" # Metric name to compare models. Must be: recall, precision, roc_auc, f1, or fbeta_score
     voting_rule: "soft" # Voting strategy in voting ensemble
+    deployment_score_thresh: 0.8 # Min. score for the best model acheive to be deployed in production
 
 logisticregression:
   params:
@@ -72,11 +73,11 @@ randomforest:
 lgbm:
   params:
     objective: "binary"
-    n_jobs: -1  # -1 means use all threads
-    min_data_in_leaf: 100  # Larger values speeds up training.
-    num_leaves: 80  # Lower values speeds up training.
-    min_split_gain: 1e-8  # Larger values speeds up training.
-    class_weight: "balanced"  # Adjusts weights inversely proportional to class freqs
+    n_jobs: -1 # -1 means use all threads
+    min_data_in_leaf: 100 # Larger values speeds up training.
+    num_leaves: 80 # Lower values speeds up training.
+    min_split_gain: 1e-8 # Larger values speeds up training.
+    class_weight: "balanced" # Adjusts weights inversely proportional to class freqs
 
 xgboost:
   params:
@@ -85,9 +86,10 @@ xgboost:
 files:
   params:
     preprocessed_dataset_file_name: "preprocessed_dataset.parquet"
+    preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
     train_set_file_name: "train.parquet"
     test_set_file_name: "test.parquet"
-    
+
 modelregistry:
   params:
     lr_registered_model_name: "logistic-regression" # Name used to register logistic regression model
