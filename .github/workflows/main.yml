@@ -4,11 +4,11 @@ name: CI/CD
 on:
   #  push:
   #    branches: [ "main" ]
-  #  pull_request:
-  #    branches: [ "main" ]
+  pull_request:
+    branches: ["main"]
 
   # Run workflow manually from the Actions tab
-  workflow_dispatch:
+  # workflow_dispatch:
 
 jobs:
   train:
@@ -44,12 +44,11 @@ jobs:
         run: |
           make lint
 
-      # Commented because data currently are sourced from local paths not commited in repo
-      #     - name: Prepare data
-      #       run: make prep_data
+      - name: Prepare data
+        run: make prep_data
 
-      #     - name: Split data
-      #       run: make split_data
+      - name: Split data
+        run: make split_data
 
       # Data splits were already saved in Hugging Face repo
       - name: Train

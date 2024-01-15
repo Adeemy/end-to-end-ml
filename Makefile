@@ -17,8 +17,9 @@ format:
 	black ./tests
 
 test:	
-	coverage run -m pytest -vvv
-	coverage report -m
+	pytest -vvv
+# coverage run -m pytest -vvv
+# coverage report -m
 
 debug:
 	pytest -vvv --pdb
