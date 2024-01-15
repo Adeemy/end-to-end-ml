@@ -87,6 +87,7 @@ files:
   params:
     preprocessed_dataset_file_name: "preprocessed_dataset.parquet"
     preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
+    preprocessed_dataset_features_file_name: "preprocessed_dataset_features.parquet"
     train_set_file_name: "train.parquet"
     test_set_file_name: "test.parquet"
 

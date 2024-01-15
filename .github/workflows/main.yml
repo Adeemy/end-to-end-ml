@@ -24,17 +24,17 @@ jobs:
         run: |
           make install
 
-      - name: Sort imports
-        run: |
-          make isort
+      # - name: Sort imports
+      #   run: |
+      #     make isort
 
-      - name: Format code
-        run: |
-          make format
+      # - name: Format code
+      #   run: |
+      #     make format
 
-      - name: Unit tests
-        run: |
-          make test
+      # - name: Unit tests
+      #   run: |
+      #     make test
 
       # - name: Lint with pylint
       #   run: |

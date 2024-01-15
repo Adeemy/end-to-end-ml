@@ -14,11 +14,11 @@ from feast import FeatureStore
 sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
 
+from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 from utils.config import Config
 from utils.path import DATA_DIR, FEATURE_REPO_DIR
 
 from src.feature_store.utils.prep import DataSplitter
-from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 
 #################################
 
@@ -51,6 +51,9 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     preprocessed_dataset_target_file_name = config.params["files"]["params"][
         "preprocessed_dataset_file_name"
     ]
+    preprocessed_dataset_features_file_name = config.params["files"]["params"][
+        "preprocessed_dataset_features_file_name"
+    ]
     preprocessed_dataset_target_file_name = config.params["files"]["params"][
         "preprocessed_dataset_target_file_name"
     ]
@@ -70,6 +73,10 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # event_timestamp of the target. This ensures that class labels of
     # an event is attributed to the correct feature values.
     target_data = pd.read_parquet(path=data_dir / preprocessed_dataset_target_file_name)
+    historical_features = pd.read_parquet(
+        path=data_dir / preprocessed_dataset_features_file_name
+    )
+    historical_features.to_parquet(data_dir / preprocessed_dataset_features_file_name)
     historical_data = feat_store.get_historical_features(
         entity_df=target_data,
         features=[
@@ -98,10 +105,13 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     )
 
     # Retrieve historical dataset into a dataframe
+    # Note: this saves exact version of data used to train model for reproducibility.
     preprocessed_data = feat_store.create_saved_dataset(
         from_=historical_data,
         name="preprocessed_data",
-        storage=SavedDatasetFileStorage(str(data_dir) + "/" + preprocessed_dataset_target_file_name),
+        storage=SavedDatasetFileStorage(
+            str(data_dir) + "/" + preprocessed_dataset_target_file_name
+        ),
         allow_overwrite=True,
     ).to_df()
     # preprocessed_data = historical_data.to_df()
