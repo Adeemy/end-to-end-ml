@@ -33,7 +33,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     )
 
     # Specify required column names by data type
-    feat_store = FeatureStore(repo_path=feast_repo_dir)
+    feat_store = FeatureStore(repo_path=str(feast_repo_dir))
     config = Config(config_path=config_yaml_abs_path)
     DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
     DATASET_SPLIT_SEED = int(config.params["data"]["params"]["split_rand_seed"])
@@ -59,6 +59,10 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
         input_split_cutoff_date = datetime.strptime(
             SPLIT_CUTOFF_DATE, SPLIT_DATE_FORMAT
         ).date()
+
+
+    print(f"str(feast_repo_dir): {str(feast_repo_dir)}")
+
 
     # Get historical features and join them with target
     # Note: this join will take into account even_timestamp such that
