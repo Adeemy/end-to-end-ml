@@ -18,6 +18,7 @@ from utils.config import Config
 from utils.path import DATA_DIR, FEATURE_REPO_DIR
 
 from src.feature_store.utils.prep import DataSplitter
+from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 
 #################################
 
@@ -48,6 +49,9 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
     preprocessed_dataset_target_file_name = config.params["files"]["params"][
+        "preprocessed_dataset_file_name"
+    ]
+    preprocessed_dataset_target_file_name = config.params["files"]["params"][
         "preprocessed_dataset_target_file_name"
     ]
     train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
@@ -59,10 +63,6 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
         input_split_cutoff_date = datetime.strptime(
             SPLIT_CUTOFF_DATE, SPLIT_DATE_FORMAT
         ).date()
-
-
-    print(f"str(feast_repo_dir): {str(feast_repo_dir)}")
-
 
     # Get historical features and join them with target
     # Note: this join will take into account even_timestamp such that
@@ -98,7 +98,13 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     )
 
     # Retrieve historical dataset into a dataframe
-    preprocessed_data = historical_data.to_df()
+    preprocessed_data = feat_store.create_saved_dataset(
+        from_=historical_data,
+        name="preprocessed_data",
+        storage=SavedDatasetFileStorage(str(data_dir) + "/" + preprocessed_dataset_target_file_name),
+        allow_overwrite=True,
+    ).to_df()
+    # preprocessed_data = historical_data.to_df()
 
     # # The following lines added to create preprocessed dataset instead of retrieving it from Feast
     # # due to an error in Feast related to not finding features file path.
