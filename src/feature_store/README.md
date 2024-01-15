@@ -4,25 +4,15 @@ Feature store is a centralized place to store and serve features for machine lea
 
 Feast can handle the ingestion of feature data from both batch and streaming sources. It also manages both warehouse and serving databases for historical and the latest data.
 
-<!-- <figure>
-<img
-  src="./img/feast_workflow.png"
-  alt="feast workflow"
-  title="feast workflow"
-  style="display: inline-block; margin: 0 auto; max-width: 600px">
-<figcaption align = "center">Source: [Feast](https://feast.dev/)</figcaption>
-</figure> -->
-
-
-
 <figure>
 <img
   src="../../img/feast_workflow.png"
   alt="feast workflow"
   title="feast workflow"
-  style="display: inline-block; margin: 0 auto; max-width: 600px">
-<figcaption align = "center">Source: [Feast](https://feast.dev/)</figcaption>
+  style="display: inline-block; margin: 0 auto; max-width: 450px">
 </figure>
+
+Source: [Feast](https://feast.dev/)
 
 
 ## Data Transformation
