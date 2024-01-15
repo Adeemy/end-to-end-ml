@@ -9,7 +9,7 @@ Feast can handle the ingestion of feature data from both batch and streaming sou
   src="../../img/feast_workflow.png"
   alt="feast workflow"
   title="feast workflow"
-  style="display: inline-block; margin: 0 auto; max-width: 450px">
+  style="display: inline-block; margin: 0 auto; max-width: 250px">
 </figure>
 
 Source: [Feast](https://feast.dev/)
