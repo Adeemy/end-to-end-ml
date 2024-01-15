@@ -42,10 +42,9 @@ jobs:
 
       - name: Prepare data
         run: make prep_data
-      
-      # Commented as files are not in repo
-      # - name: Split data
-      #   run: make split_data
+
+      - name: Split data
+        run: make split_data
 
       # Data splits were already saved in Hugging Face repo
       - name: Train
