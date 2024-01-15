@@ -139,6 +139,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     print("\nTrain and test sets were created.\n")
 
 
+###########################################################
 if __name__ == "__main__":
     main(
         feast_repo_dir="/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/",

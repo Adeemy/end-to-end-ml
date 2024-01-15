@@ -454,7 +454,6 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
 
 
 ###########################################################
-# python ./src/training/train.py ./config/training/config.yml
 if __name__ == "__main__":
     # Submit training experiment
     main(

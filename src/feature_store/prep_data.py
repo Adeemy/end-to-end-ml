@@ -122,7 +122,7 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
     print("\n\nPreprocessed features and target were saved in feature store.")
 
 
-# python ./src/feature_store/prep_data.py src/feature_store/feature_repo/ ./config/feature_store/config.yml
+###########################################################
 if __name__ == "__main__":
     # Preprocess and transform data
     main(config_yaml_abs_path=sys.argv[1], data_dir=DATA_DIR)
