@@ -4,23 +4,37 @@
 
 # End-to-end ML Project
 
-This project is an end-to-end ML project on tabular data that applies software engineering practices in machine learning. It covers the entire lifecycle of a ML model from data exploration, preprocessing, feature engineering, model selection, training, evaluation, to deployment.
+This project is an end-to-end ML project on tabular data that incorporates software engineering principles in machine learning. It spans the whole lifecycle of a ML model, from data exploration, preprocessing, feature engineering, model selection, training, evaluation, to deployment.
 
-The project uses the Diabetes Health Indicators public dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), which was originally published by CDC. The dataset contains various information about patients such as demographics, lab results, and self-reported health history. The objective is to build a classifier that can predict whether a patient has diabetes, is pre-diabetic, or healthy.
+The project leverages the Diabetes Health Indicators public dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), which was originally sourced from CDC. The dataset comprises various information about patients, such as demographics, lab results, and self-reported health history. The goal is to develop a classifier that can discern whether a patient has diabetes, is pre-diabetic, or healthy. This project, however, does not focus on achieving higher accuracy, as that is beyond the scope of this project.
 
-The project follows best software engineering practices in machine learning, such as modular code, documentation, testing, logging, configuration, and version control. The project also demonstrates how to use various tools and frameworks, such as pandas, scikit-learn, [feast](https://feast.dev), [optuna](https://optuna.org), experiment tracking using [Comet](https://www.comet.com/site/), and Docker, to streamline the ML workflow and improve the model performance.
+The project adheres to best software engineering practices in machine learning, such as modular code, documentation, testing, logging, configuration, and version control. The project also demonstrates how to utilize various tools and frameworks, such as pandas, scikit-learn, [feast](https://feast.dev), [optuna](https://optuna.org), experiment tracking using [Comet](https://www.comet.com/site/), and Docker, to facilitate the ML workflow and enhance the model performance.
+
+Some of the notable features of the project are:
+
+- The repo is **configurable** using config files, which allow the user to easily change the dataset, model, hyperparameters, and other settings without modifying the code.
+
+- The project uses **hyperparameters optimization** using optuna, which is a hyperparameters optimization framework that offers several advantages, such as efficient search algorithms, parallel and distributed optimization, and visualization of the optimization process.
+
+- The project uses the **f_beta score** as the optimization metric, which is a generalization of the f1 score (i.e., beta = 1) that can be adjusted to give more weights to precision or recall. The use of f_beta score is appropriate in many practical use cases, as in reality precision and recall are rarely equally important.
+
+- The project ensures **reproducibility** using Docker, which is a tool that creates isolated environments for running applications. The project containerizes the model with its dependencies, and provides a devcontainer configuration that allows the user to recreate the dev environment in VS code.
+
+- The project uses **experiment tracking and logging** using Comet, which is a platform for managing and comparing ML experiments. The project logs the model performance, hyperparameters, and artifacts to Comet, which can be accessed through a web dashboard. The user can also visualize and compare different experiments using Comet.
 
 ### Project structure
 
-The project consists of an EDA notebook in notebooks folder and scripts in src folder, which are organized as follows:
+The project consists of the following folders and files:
 
-- notebooks: This folder includes a notebook (eda.ipynb) that performs exploratory data analysis (EDA) on the dataset, such as descriptive statistics, data visualization, and correlation analysis. It also builds a baseline model (logistic regression) using scikit-learn, which achieves high precision and recall scores (above 0.80) on the test set.
+- config: contains configuration files that includes parameters for data preprocessing and transformation, and model training.
 
-- src/feature_store: This folder contains the script (generate_initial_data.py) that imports the original dataset from the source [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), and creates the inference set (5\% of the original dataset). The inference set is used to simulate production data, which is scored using the deployed model via a REST API call. The raw dataset is then preprocessed and transformed (prep_data.py) before ingesting it by feature store. See README.md in the feature_store folder for more details about feature store setup.
+- notebooks: contains a notebook (eda.ipynb) that conducts exploratory data analysis (EDA) on the dataset, such as descriptive statistics, data visualization, and correlation analysis. It also establishes a baseline model (logistic regression) using scikit-learn, which achieves high precision and recall scores (above 0.80) on the test set. Other notebooks can be added to this folder if needed.
 
-- src/training: This folder contains the scripts for data splitting, model training, evaluation, and selection. The train set is split into a training set, to train models, and a validation set for model selection. The test set is used to assess the generalization capability of the best model (used only once). It applies data preprocessing on the training set using a sklearn pipeline, such as handling missing values, feature scaling, feature engineering, feature selection, and categorical features encoding. It also implements hyperparameter optimization (train.py) using the optuna framework, and compares the results with the baseline model. The training pipeline is tracked and managed by [Comet](https://www.comet.com/site/), which records the model parameters, metrics, and artifacts. Once the best challenger model is selected, it is registered in the Comet workspace.
+- src/feature_store: contains the scripts for data ingestion and transformation. The script (generate_initial_data.py) imports the original dataset from the source [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), and creates the inference set (5% of the original dataset). The inference set is used to simulate production data, which is scored using the deployed model via a REST API call. The script (prep_data.py) preprocesses and transforms the raw dataset before ingesting it by feature store. For more details about feature store setup, see README.md in the feature_store folder.
 
-- src/inference: This folder contains the script for scoring new data via REST API using containerized model, which is deployed using GitHub Actions CI/CD pipeline.
+- src/training: contains the scripts for data splitting, model training, evaluation, and selection. The script (split_data.py) splits the train set into a training set, to train models, and a validation set for model selection. The test set is used to assess the generalization capability of the best model (used only once). The script (train.py) applies data preprocessing on the training set using a sklearn pipeline, such as handling missing values, feature scaling, feature engineering, feature selection, and categorical features encoding. It also implements hyperparameter optimization using the optuna framework, and compares the results with the baseline model. The training pipeline is tracked and managed by [Comet](https://www.comet.com/site/), which records the model parameters, metrics, and artifacts. Once the best model is selected, it is registered in the Comet workspace as champion model.
+
+- src/inference: contains the script for scoring new data via REST API using containerized model, which is deployed using GitHub Actions CI/CD pipeline.
 
 Below is the project structure.
 
@@ -84,7 +98,7 @@ Below is the project structure.
         └── tests
         └── test_feature_utils.py
 
-### Setup environment
+### Setup environment & Usage
 
 This project uses a devcontainer to set up a full-featured development environment and install required dependencies in addition to some useful VS Code extensions. It allows isolating the tools, libraries, and runtimes needed for working with this project codebase, and to use VS Code’s full feature set inside the container. A devcontainer requires [Docker](https://docs.docker.com/engine/install/) to be up and running. It's recommended to use the devcontainer for this project to ensure consistency and reproducibility across different machines and platforms, but if you prefer not to, for whatever reason, you can create a virtual environment and install the python dependencies by running the following commands from the project root:
 
@@ -92,13 +106,11 @@ This project uses a devcontainer to set up a full-featured development environme
     source .venv/bin/activate
     pip install -r requirements.txt
 
-### Usage
-
 The training and deployment pipelines can be run in GitHub Actions. You can also run the following commands in CLI to implement all steps from generating raw dataset to pulling packaged model:
 
-- Generate raw dataset
+- Import raw dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators)
 
-        make gen_init_data
+        make get_init_data
 
 - Preprocess data before ingesting it by feature store
 
