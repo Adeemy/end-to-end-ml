@@ -15,7 +15,7 @@ sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
 
 from utils.config import Config
-from utils.path import DATA_DIR
+from utils.path import DATA_DIR, FEATURE_REPO_DIR
 
 from src.feature_store.utils.prep import DataSplitter
 
@@ -66,45 +66,45 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # event_timestamp of the target. This ensures that class labels of
     # an event is attributed to the correct feature values.
     target_data = pd.read_parquet(path=data_dir / preprocessed_dataset_target_file_name)
-    # historical_data = feat_store.get_historical_features(
-    #     entity_df=target_data,
-    #     features=[
-    #         "features_view:BMI",
-    #         "features_view:PhysHlth",
-    #         "features_view:Age",
-    #         "features_view:HighBP",
-    #         "features_view:HighChol",
-    #         "features_view:CholCheck",
-    #         "features_view:Smoker",
-    #         "features_view:Stroke",
-    #         "features_view:HeartDiseaseorAttack",
-    #         "features_view:PhysActivity",
-    #         "features_view:Fruits",
-    #         "features_view:Veggies",
-    #         "features_view:HvyAlcoholConsump",
-    #         "features_view:AnyHealthcare",
-    #         "features_view:NoDocbcCost",
-    #         "features_view:GenHlth",
-    #         "features_view:MentHlth",
-    #         "features_view:DiffWalk",
-    #         "features_view:Sex",
-    #         "features_view:Education",
-    #         "features_view:Income",
-    #     ],
-    # )
-
-    # # Retrieve historical dataset into a dataframe
-    # preprocessed_data = historical_data.to_df()
-
-    # The following lines added to create preprocessed dataset instead of retrieving it from Feast
-    # due to an error in Feast related to not finding features file path.
-    historical_features = pd.read_parquet(
-        path=data_dir / "preprocessed_dataset_features.parquet"
+    historical_data = feat_store.get_historical_features(
+        entity_df=target_data,
+        features=[
+            "features_view:BMI",
+            "features_view:PhysHlth",
+            "features_view:Age",
+            "features_view:HighBP",
+            "features_view:HighChol",
+            "features_view:CholCheck",
+            "features_view:Smoker",
+            "features_view:Stroke",
+            "features_view:HeartDiseaseorAttack",
+            "features_view:PhysActivity",
+            "features_view:Fruits",
+            "features_view:Veggies",
+            "features_view:HvyAlcoholConsump",
+            "features_view:AnyHealthcare",
+            "features_view:NoDocbcCost",
+            "features_view:GenHlth",
+            "features_view:MentHlth",
+            "features_view:DiffWalk",
+            "features_view:Sex",
+            "features_view:Education",
+            "features_view:Income",
+        ],
     )
 
-    preprocessed_data = historical_features.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1).join(
-        target_data.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1), how="inner"
-    ).reset_index()
+    # Retrieve historical dataset into a dataframe
+    preprocessed_data = historical_data.to_df()
+
+    # # The following lines added to create preprocessed dataset instead of retrieving it from Feast
+    # # due to an error in Feast related to not finding features file path.
+    # historical_features = pd.read_parquet(
+    #     path=data_dir / "preprocessed_dataset_features.parquet"
+    # )
+
+    # preprocessed_data = historical_features.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1).join(
+    #     target_data.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1), how="inner"
+    # ).reset_index()
 
     # Select specified features
     required_input_col_names = (
@@ -150,7 +150,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
 ###########################################################
 if __name__ == "__main__":
     main(
-        feast_repo_dir=sys.argv[1],
-        config_yaml_abs_path=sys.argv[2],
+        config_yaml_abs_path=sys.argv[1],
+        feast_repo_dir=FEATURE_REPO_DIR,
         data_dir=DATA_DIR,
     )
