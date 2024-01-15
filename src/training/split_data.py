@@ -34,6 +34,9 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
 
     # Specify required column names by data type
     feat_store = FeatureStore(repo_path=feast_repo_dir)
+
+    print(f"\nfeat_store: {feat_store}\n")
+
     config = Config(config_path=config_yaml_abs_path)
     DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
     DATASET_SPLIT_SEED = int(config.params["data"]["params"]["split_rand_seed"])
@@ -66,10 +69,6 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # event_timestamp of the target. This ensures that class labels of
     # an event is attributed to the correct feature values.
     target_data = pd.read_parquet(path=data_dir / preprocessed_dataset_target_file_name)
-
-    target_data.head()
-    print("target_data was imported.")
-
     historical_data = feat_store.get_historical_features(
         entity_df=target_data,
         features=[
@@ -96,8 +95,6 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
             "features_view:Income",
         ],
     )
-
-    print("Before converting retrieved features to df.")
 
     # Retrieve historical dataset into a dataframe
     preprocessed_data = historical_data.to_df()
