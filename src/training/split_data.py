@@ -99,6 +99,8 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # # Retrieve historical dataset into a dataframe
     # preprocessed_data = historical_data.to_df()
 
+    # TODO: The following lines added to create preprocessed dataset instead of retrieving it from Feast
+    # due to an error in Feast related to not finding features file path.
     historical_features = pd.read_parquet(
         path=data_dir
         / "./src/feature_store/feature_repo/data/preprocessed_dataset_features.parquet"
