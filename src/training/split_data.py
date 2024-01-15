@@ -106,7 +106,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     )
 
     preprocessed_data = historical_features.set_index(PRIMARY_KEY).join(
-        target_data.set_index(PRIMARY_KEY), how="inner"
+        target_data.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1), how="inner"
     )
 
     # Select specified features
