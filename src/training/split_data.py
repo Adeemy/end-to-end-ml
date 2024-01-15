@@ -48,11 +48,8 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
-    preprocessed_dataset_target_file_name = config.params["files"]["params"][
+    preprocessed_dataset_file_name = config.params["files"]["params"][
         "preprocessed_dataset_file_name"
-    ]
-    preprocessed_dataset_features_file_name = config.params["files"]["params"][
-        "preprocessed_dataset_features_file_name"
     ]
     preprocessed_dataset_target_file_name = config.params["files"]["params"][
         "preprocessed_dataset_target_file_name"
@@ -73,10 +70,6 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # event_timestamp of the target. This ensures that class labels of
     # an event is attributed to the correct feature values.
     target_data = pd.read_parquet(path=data_dir / preprocessed_dataset_target_file_name)
-    historical_features = pd.read_parquet(
-        path=data_dir / preprocessed_dataset_features_file_name
-    )
-    historical_features.to_parquet(data_dir / preprocessed_dataset_features_file_name)
     historical_data = feat_store.get_historical_features(
         entity_df=target_data,
         features=[
@@ -108,9 +101,9 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # Note: this saves exact version of data used to train model for reproducibility.
     preprocessed_data = feat_store.create_saved_dataset(
         from_=historical_data,
-        name="preprocessed_data",
+        name="historical_data",
         storage=SavedDatasetFileStorage(
-            str(data_dir) + "/" + preprocessed_dataset_target_file_name
+            str(data_dir) + "/" + preprocessed_dataset_file_name
         ),
         allow_overwrite=True,
     ).to_df()
