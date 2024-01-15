@@ -85,7 +85,7 @@ xgboost:
 
 files:
   params:
-    preprocessed_dataset_file_name: "preprocessed_dataset.parquet"
+    historical_data_file_name: "historical_data.parquet"
     preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
     preprocessed_dataset_features_file_name: "preprocessed_dataset_features.parquet"
     train_set_file_name: "train.parquet"
