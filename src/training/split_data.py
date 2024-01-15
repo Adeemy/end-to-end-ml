@@ -140,7 +140,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
 ###########################################################
 if __name__ == "__main__":
     main(
-        feast_repo_dir=sys.argv[1],
+        feast_repo_dir="./src/feature_store/feature_repo",
         config_yaml_abs_path=sys.argv[2],
         data_dir=DATA_DIR,
     )
