@@ -66,6 +66,10 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # event_timestamp of the target. This ensures that class labels of
     # an event is attributed to the correct feature values.
     target_data = pd.read_parquet(path=data_dir / preprocessed_dataset_target_file_name)
+
+    target_data.head()
+    print("target_data was imported.")
+
     historical_data = feat_store.get_historical_features(
         entity_df=target_data,
         features=[
@@ -92,6 +96,8 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
             "features_view:Income",
         ],
     )
+
+    print("Before converting retrieved features to df.")
 
     # Retrieve historical dataset into a dataframe
     preprocessed_data = historical_data.to_df()
@@ -140,7 +146,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
 ###########################################################
 if __name__ == "__main__":
     main(
-        feast_repo_dir="./src/feature_store/feature_repo",
+        feast_repo_dir=sys.argv[1],
         config_yaml_abs_path=sys.argv[2],
         data_dir=DATA_DIR,
     )
