@@ -12,15 +12,17 @@ The project adheres to best software engineering practices in machine learning, 
 
 Some of the notable features of the project are:
 
-- The repo is **configurable** using config files, which allow the user to easily change the dataset, model, hyperparameters, and other settings without modifying the code.
+1. The repo is **configurable** using config files, which allow the user to easily change the dataset, model, hyperparameters, and other settings without modifying the code.
 
-- The project uses **hyperparameters optimization** using optuna, which is a hyperparameters optimization framework that offers several advantages, such as efficient search algorithms, parallel and distributed optimization, and visualization of the optimization process.
+2. The project uses **hyperparameters optimization** using optuna, which is a hyperparameters optimization framework that offers several advantages, such as efficient search algorithms, parallel and distributed optimization, and visualization of the optimization process.
 
-- The project uses the **f_beta score** as the optimization metric, which is a generalization of the f1 score (i.e., beta = 1) that can be adjusted to give more weights to precision or recall. The use of f_beta score is appropriate in many practical use cases, as in reality precision and recall are rarely equally important.
+3. The project uses the **f_beta score** as the optimization metric, which is a generalization of the f1 score (i.e., beta = 1) that can be adjusted to give more weights to precision or recall. The use of f_beta score is appropriate in many practical use cases, as in reality precision and recall are rarely equally important.
 
-- The project ensures **reproducibility** using Docker, which is a tool that creates isolated environments for running applications. The project containerizes the model with its dependencies, and provides a devcontainer configuration that allows the user to recreate the dev environment in VS code.
+4. The project ensures **reproducibility** using Docker, which is a tool that creates isolated environments for running applications. The project containerizes the model with its dependencies, and provides a devcontainer configuration that allows the user to recreate the dev environment in VS code.
 
-- The project uses **experiment tracking and logging** using Comet, which is a platform for managing and comparing ML experiments. The project logs the model performance, hyperparameters, and artifacts to Comet, which can be accessed through a web dashboard. The user can also visualize and compare different experiments using Comet.
+5. The project uses **experiment tracking and logging** using Comet, which is a platform for managing and comparing ML experiments. The project logs the model performance, hyperparameters, and artifacts to Comet, which can be accessed through a web dashboard. The user can also visualize and compare different experiments using Comet.
+
+6. This project uses a makefile to provide convenient CLI commands to improve the efficiency, reliability, and quality of development, testing, and deployment. For instance, running the command `make prep_data` will transform the raw data into features and stores them in local file to be ingested by feature store, whereas running `make setup_feast` will apply the feature definitions to the feature store.
 
 ### Project structure
 
@@ -128,6 +130,6 @@ The training and deployment pipelines can be run in GitHub Actions. You can also
 
         make train
 
-- Pull packaged model
+- Pull containerized model
 
         docker pull ghcr.io/adeemy/end-to-end-tabular-ml:9c670633e181da234e0c57639d72a4b2834c7809

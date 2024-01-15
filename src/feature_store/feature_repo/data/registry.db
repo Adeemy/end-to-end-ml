@@ -1,55 +1,50 @@
 
-B
+J
+*
+patient
+Patient ID"IDJfeature_store
+ßŸ“­Àž”ßŸ“­Àž”
+D
 $
 __dummy"
-__dummy_idJfeature_store
-ØÖŽ­ðßölØÖŽ­ðßöl
-F
-(
-patient
-Patient ID"IDJfeature_store
-ØÖŽ­ˆÏùlØÖŽ­ˆÏùl1"$6ca04eef-df27-44df-b083-db533a170d55*ØÖŽ­ˆ× m2ã
-Ä
-features_viewfeature_storepatient"
-BMI"
-PhysHlth"
-Age"
-
-HighBP"
-HighChol"
-	CholCheck"
-
-Smoker"
-
-Stroke"
-HeartDiseaseorAttack"
-PhysActivity"
-
-Fruits"
-Veggies"
-HvyAlcoholConsump"
-AnyHealthcare"
-NoDocbcCost"
-GenHlth"
-MentHlth"
-DiffWalk"
-Sex"
-	Education"
-
-Income*
-patientpopulation_health2€œµ:¤event_timestampZmk/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢k/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_features.parquet@RPatient level features.b
-ID
-ØÖŽ­˜—ülØÖŽ­˜—ül2È
+__dummy_idJfeature_store
+ßŸ“­˜Ì“”ßŸ“­˜Ì“”1"$a66a23c4-0502-4d85-8841-9381a86b5d22*ßŸ“­€â¸”2Ê
 ©
 target_viewfeature_storepatient"
 Diabetes_binary*
 patientpopulation_health2€œµ: event_timestampZki/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_target.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢i/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_target.parquet@RPatient level target value.b
-ID
-ØÖŽ­¸ß˜mØÖŽ­¸ß˜mRÌ
+ID
+ßŸ“­˜Æ•”ßŸ“­˜Æ•”2¤
+ƒ
+features_viewfeature_storepatient"!
+BMI"Patient Body Mass Index."Á
+PhysHlth"²Now thinking about your physical health, which includes physical illness and injury, for how many days during the past 30 days was your physical health not good? scale 1-30 days."\
+Age"S13-level age category (_AGEG5YR see codebook) 1 = 18-24 9 = 60-64 13 = 80 or older.")
+HighBP"High blood pressure (Yes/No)."'
+HighChol"High cholestrol (Yes/No)."5
+	CholCheck"&cholesterol check in 5 years (Yes/No)."s
+Smoker"gHave you smoked at least 100 cigarettes in your entire life? [Note: 5 packs = 100 cigarettes] (Yes/No)."2
+Stroke"&(Ever told) you had a stroke (Yes/No)."^
+HeartDiseaseorAttack"DCoronary heart disease (CHD) or myocardial infarction (MI) (Yes/No)."P
+PhysActivity">Physical activity in past 30 days - not including job (Yes/No)":
+Fruits".Consume Fruit 1 or more times per day (Yes/No)"A
+Veggies"4Consume vegetables 1 or more times per day (Yes/No)."’
+HvyAlcoholConsump"{Heavy drinkers (adult men having more than 14 drinks per week and adult women having more than 7 drinks per week) (Yes/No)."
+AnyHealthcare"lHave any kind of health care coverage, including health insurance, prepaid plans such as HMO, etc. (Yes/No)."€
+NoDocbcCost"oWas there a time in the past 12 months when you needed to see a doctor but could not because of cost? (Yes/No)."|
+GenHlth"oWould you say that in general your health is: scale 1-5 1 = excellent 2 = very good 3 = good 4 = fair 5 = poor."Ð
+MentHlth"ÁNow thinking about your mental health, which includes stress, depression, and problems with emotions, for how many days during the past 30 days was your mental health not good? scale 1-30 days."Á
+DiffWalk"²Now thinking about your physical health, which includes physical illness and injury, for how many days during the past 30 days was your physical health not good? scale 1-30 days."
+Sex"0 = female 1 = male."Ø
+	Education"ÈEducation level (EDUCA see codebook) scale 1-6 1 = Never attended school or only kindergarten 2 = Grades 1 through 8 (Elementary) 3 = Grades 9 through 11 (Some high school) 4 = Grade 12 or GED (High school graduate) 5 = College 1 year to 3 years (Some college or technical school) 6 = College 4 years or more (College graduate)."z
+Income"nIncome scale (INCOME2 see codebook) scale 1-8 1 = less than $10,000 5 = less than $35,000 8 = $75,000 or more.*
+patientpopulation_health2€œµ:¤event_timestampZmk/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢k/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_features.parquet@RPatient level features.b%
+ID"Uniquely identifies each row.
+ßŸ“­¸Ðœ”ßŸ“­¸Ðœ”RÌ
 ¤
 ,feast.infra.online_stores.sqlite.SqliteTable"t
 U/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/online_store.dbfeature_store_features_view
 ¢
 ,feast.infra.online_stores.sqlite.SqliteTable"r
-U/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/online_store.dbfeature_store_target_viewb´event_timestampZmk/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢k/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_features.parquetªfeature_storeb°event_timestampZki/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_target.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢i/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_target.parquetªfeature_storez5
-feature_store$2aa3acbb-a5d6-4eef-9dad-3599a3917d1e
+U/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/online_store.dbfeature_store_target_viewb°event_timestampZki/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_target.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢i/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_target.parquetªfeature_storeb´event_timestampZmk/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢k/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/data/preprocessed_dataset_features.parquetªfeature_storez5
+feature_store$8dcf6c0f-7041-4388-9b5c-5d2294429298

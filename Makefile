@@ -1,4 +1,4 @@
-# Run this file in root path path
+# Run this file in project root directory
 
 # Install packages, format code, sort imports, and run unit tests
 install:
@@ -53,6 +53,10 @@ show_feast_entities:
 show_feast_views:
 	cd ./src/feature_store/feature_repo &&\
 	feast feature-views list
+
+show_feast_ui:
+	cd ./src/feature_store/feature_repo &&\
+	feast ui
 
 setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 
