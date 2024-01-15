@@ -7,9 +7,9 @@ install:
 		pip install -r requirements.txt
 
 isort:
-	isort ./notebooks
-	isort ./src
-	isort ./tests
+	isort --profile black ./notebooks
+	isort --profile black ./src
+	isort --profile black ./tests
 
 format:
 	black ./notebooks
