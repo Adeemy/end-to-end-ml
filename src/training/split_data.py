@@ -69,6 +69,9 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # event_timestamp of the target. This ensures that class labels of
     # an event is attributed to the correct feature values.
     target_data = pd.read_parquet(path=data_dir / preprocessed_dataset_target_file_name)
+
+    print(target_data.head())
+
     # historical_data = feat_store.get_historical_features(
     #     entity_df=target_data,
     #     features=[
@@ -99,7 +102,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     # # Retrieve historical dataset into a dataframe
     # preprocessed_data = historical_data.to_df()
 
-    # TODO: The following lines added to create preprocessed dataset instead of retrieving it from Feast
+    # The following lines added to create preprocessed dataset instead of retrieving it from Feast
     # due to an error in Feast related to not finding features file path.
     historical_features = pd.read_parquet(
         path=data_dir
