@@ -6,12 +6,14 @@ Feast can handle the ingestion of feature data from both batch and streaming sou
 
 <figure>
 <img
-  src="/workspaces/end-to-end-tabular-ml/img/feast_workflow.png"
+  src="./img/feast_workflow.png"
   alt="feast workflow"
   title="feast workflow"
   style="display: inline-block; margin: 0 auto; max-width: 600px">
 <figcaption align = "center">Source: [Feast](https://feast.dev/)</figcaption>
 </figure>
+
+![feast workflow] (./img/feast_workflow.png)
 
 ## Data Transformation
 
