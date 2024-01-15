@@ -36,10 +36,6 @@ jobs:
         run: |
           make test
 
-      - name: Test coverage
-        run: |
-          make test_cov
-
       - name: Lint with pylint
         run: |
           make lint
