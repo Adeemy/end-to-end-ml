@@ -55,6 +55,7 @@ train:
     fbeta_score_beta_val: 0.5 # Value of beta in f_beta_score, which is a metric used for hyperparams optimization
     comparison_metric: "fbeta_score" # Metric name to compare models. Must be: recall, precision, roc_auc, f1, or fbeta_score
     voting_rule: "soft" # Voting strategy in voting ensemble
+    deployment_score_thresh: 0.8 # Min. score for the best model acheive to be deployed in production
 
 logisticregression:
   params:
@@ -88,7 +89,6 @@ files:
     preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
     train_set_file_name: "train.parquet"
     test_set_file_name: "test.parquet"
-    baseline_model_dir: "./notebooks/.eda_figures/basline_model.pkl"
 
 modelregistry:
   params:
