@@ -13,7 +13,7 @@ Feast can handle the ingestion of feature data from both batch and streaming sou
 <figcaption align = "center">Source: [Feast](https://feast.dev/)</figcaption>
 </figure>
 
-![feast workflow] (./img/feast_workflow.png)
+![feast workflow] (img/feast_workflow.png)
 
 ## Data Transformation
 
