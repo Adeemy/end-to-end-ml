@@ -64,7 +64,7 @@ setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 
 # Submit train experiment
 split_data:
-	python ./src/training/split_data.py ./src/feature_store/feature_repo/  ./config/training/config.yml
+	python ./src/training/split_data.py ./src/feature_store/feature_repo  ./config/training/config.yml
 
 train:
 	python ./src/training/train.py ./config/training/config.yml
