@@ -17,8 +17,9 @@ format:
 	black ./tests
 
 test:	
-	coverage run -m pytest -vvv
-	coverage report -m
+	pytest -vvv
+# coverage run -m pytest -vvv
+# coverage report -m
 
 debug:
 	pytest -vvv --pdb
@@ -37,7 +38,7 @@ get_init_data:
 prep_data:
 	python ./src/feature_store/prep_data.py  ./config/feature_store/config.yml
 
-# Setup feature store and view entities and feature views
+# Setup feature store, view entities and feature views
 teardown_feast:
 	cd ./src/feature_store/feature_repo &&\
 	feast teardown

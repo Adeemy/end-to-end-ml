@@ -11,8 +11,6 @@ from datetime import datetime
 import pandas as pd
 from feast import FeatureStore
 
-print(os.getcwd())
-
 sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
 
@@ -142,7 +140,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
 ###########################################################
 if __name__ == "__main__":
     main(
-        feast_repo_dir="/workspaces/end-to-end-tabular-ml/src/feature_store/feature_repo/",
-        config_yaml_abs_path="/workspaces/end-to-end-tabular-ml/config/training/config.yml",
+        feast_repo_dir=sys.argv[1],
+        config_yaml_abs_path=sys.argv[2],
         data_dir=DATA_DIR,
     )
