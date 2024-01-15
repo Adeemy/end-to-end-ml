@@ -34,9 +34,6 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
 
     # Specify required column names by data type
     feat_store = FeatureStore(repo_path=feast_repo_dir)
-
-    print(f"\nfeat_store: {feat_store}\n")
-
     config = Config(config_path=config_yaml_abs_path)
     DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
     DATASET_SPLIT_SEED = int(config.params["data"]["params"]["split_rand_seed"])
@@ -105,9 +102,9 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
         path=data_dir / "preprocessed_dataset_features.parquet"
     )
 
-    preprocessed_data = historical_features.set_index(PRIMARY_KEY).join(
+    preprocessed_data = historical_features.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1).join(
         target_data.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1), how="inner"
-    )
+    ).reset_index()
 
     # Select specified features
     required_input_col_names = (
