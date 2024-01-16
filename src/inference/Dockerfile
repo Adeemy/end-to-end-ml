@@ -2,6 +2,8 @@ FROM python:3.10
 
 COPY ./requirements.txt /src/inference/requirements.txt
 
+COPY src/training/artifacts/champion_model.pkl /src/inference/champion_model.pkl
+
 WORKDIR /src/inference
 
 RUN pip install -r requirements.txt

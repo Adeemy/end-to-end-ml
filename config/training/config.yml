@@ -99,3 +99,11 @@ modelregistry:
     xgb_registered_model_name: "xgboost" # Name used to register xgboost model
     voting_ensemble_registered_model_name: "voting-ensemble" # Name used to register voting ensemble model
     champion_model_name: "champion_model" # Name used to register champion model
+
+includedmodels:
+  params:
+    include_logistic_regression: true # Should Logisitic Regression be included in training
+    include_random_forest: true # Should Random Forest model be included in training
+    include_lightgbm: true # Should LightGBM model be included in training
+    include_xgboost: true # Should XGBoost model be included in training
+    include_voting_ensemble: true # Should Voting Ensemble model be included in training
