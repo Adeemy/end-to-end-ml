@@ -8,7 +8,7 @@ on:
     branches: ["main"]
 
   # Run workflow manually from the Actions tab
-  # workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   train:
@@ -25,24 +25,24 @@ jobs:
         run: |
           make install
 
-      # - name: Sort imports
-      #   run: |
-      #     make isort
+      - name: Sort imports
+        run: |
+          make isort
 
-      # - name: Format code
-      #   run: |
-      #     make format
+      - name: Format code
+        run: |
+          make format
 
-      # - name: Unit tests
-      #   run: |
-      #     make test
+      - name: Unit tests
+        run: |
+          make test
 
-      # - name: Lint with pylint
-      #   run: |
-      #     make lint
+      - name: Lint with pylint
+        run: |
+          make lint
 
-      # - name: Prepare data
-      #   run: make prep_data
+      - name: Prepare data
+        run: make prep_data
 
       # - name: Split data
       #   run: make split_data
