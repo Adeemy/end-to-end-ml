@@ -47,12 +47,12 @@ jobs:
       # - name: Split data
       #   run: make split_data
 
-      # # Data splits were already saved in Hugging Face repo
-      # - name: Train
-      #   env:
-      #     COMET_API_KEY: ${{secrets.COMET_API_KEY}}
-      #   run: |
-      #     make train
+      # Data splits were already saved in Hugging Face repo
+      - name: Train
+        env:
+          COMET_API_KEY: ${{secrets.COMET_API_KEY}}
+        run: |
+          make train
 
   build:
     runs-on: ubuntu-latest
