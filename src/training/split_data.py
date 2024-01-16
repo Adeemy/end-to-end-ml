@@ -14,8 +14,9 @@ from feast import FeatureStore
 sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
 
+from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 from utils.config import Config
-from utils.path import DATA_DIR
+from utils.path import DATA_DIR, FEATURE_REPO_DIR
 
 from src.feature_store.utils.prep import DataSplitter
 
@@ -33,7 +34,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     )
 
     # Specify required column names by data type
-    feat_store = FeatureStore(repo_path=feast_repo_dir)
+    feat_store = FeatureStore(repo_path=str(feast_repo_dir))
     config = Config(config_path=config_yaml_abs_path)
     DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
     DATASET_SPLIT_SEED = int(config.params["data"]["params"]["split_rand_seed"])
@@ -49,6 +50,9 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
     preprocessed_dataset_target_file_name = config.params["files"]["params"][
         "preprocessed_dataset_target_file_name"
+    ]
+    historical_data_file_name = config.params["files"]["params"][
+        "historical_data_file_name"
     ]
     train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
     test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
@@ -94,7 +98,26 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     )
 
     # Retrieve historical dataset into a dataframe
-    preprocessed_data = historical_data.to_df()
+    # Note: this saves exact version of data used to train model for reproducibility.
+    preprocessed_data = feat_store.create_saved_dataset(
+        from_=historical_data,
+        name="historical_data",
+        storage=SavedDatasetFileStorage(
+            str(data_dir) + "/" + historical_data_file_name
+        ),
+        allow_overwrite=True,
+    ).to_df()
+    # preprocessed_data = historical_data.to_df()
+
+    # # The following lines added to create preprocessed dataset instead of retrieving it from Feast
+    # # due to an error in Feast related to not finding features file path.
+    # historical_features = pd.read_parquet(
+    #     path=data_dir / "preprocessed_dataset_features.parquet"
+    # )
+
+    # preprocessed_data = historical_features.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1).join(
+    #     target_data.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1), how="inner"
+    # ).reset_index()
 
     # Select specified features
     required_input_col_names = (
@@ -140,7 +163,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
 ###########################################################
 if __name__ == "__main__":
     main(
-        feast_repo_dir=sys.argv[1],
-        config_yaml_abs_path=sys.argv[2],
+        config_yaml_abs_path=sys.argv[1],
+        feast_repo_dir=FEATURE_REPO_DIR,
         data_dir=DATA_DIR,
     )

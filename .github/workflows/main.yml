@@ -1,21 +1,21 @@
-# Train model, build container, and deploy model
+# Train model, build containerized model, and deploy model
 name: CI/CD
 
 on:
-  #  push:
-  #    branches: [ "main" ]
+  push:
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
   # Run workflow manually from the Actions tab
-  # workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   train:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       - name: Set up Python 3.10.*
         uses: actions/setup-python@v1
         with:
@@ -42,12 +42,11 @@ jobs:
 
       - name: Prepare data
         run: make prep_data
-      
-      # Commented as files are not in repo
+
+      # TODO: commented due to error in retrieving data from feature store 
       # - name: Split data
       #   run: make split_data
 
-      # Data splits were already saved in Hugging Face repo
       - name: Train
         env:
           COMET_API_KEY: ${{secrets.COMET_API_KEY}}

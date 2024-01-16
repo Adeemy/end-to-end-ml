@@ -21,8 +21,8 @@ from utils.data import (
     create_validation_set,
     drop_primary_key,
     encode_class_labels,
+    enforce_data_types,
     import_datasets,
-    preprocess_datasets,
     replace_nans_in_cat_features,
     select_relevant_columns,
     seperate_features_from_class_labels,
@@ -117,7 +117,7 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
     )
 
     # Preprocess train and test sets by enforcing data types of numerical and categorical features
-    train_set, test_set = preprocess_datasets(
+    train_set, test_set = enforce_data_types(
         train_set=train_set,
         test_set=test_set,
         numerical_feature_names=num_feature_names,
@@ -442,7 +442,8 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
 
     # Log and register champion model (in Comet, model must be logged first)
     # Note: the best model should not be deployed in production if its score
-    # on the test set is below minimum score.
+    # on the test set is below minimum score. Otherwise, prevent deploying
+    # the model by raising error preventing build job.
     BEST_MODEL_TEST_SCORE = test_scores.get(f"test_{COMPARISON_METRIC}")
     if BEST_MODEL_TEST_SCORE >= DEPLOYMENT_SCORE_THRESH:
         log_and_register_champ_model(
@@ -450,6 +451,10 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
             champ_model_name=CHAMPION_MODEL_NAME,
             pipeline=best_model_pipeline,
             exp_obj=best_model_exp_obj,
+        )
+    else:
+        raise ValueError(
+            f"Best model score is {BEST_MODEL_TEST_SCORE}, which is lower than deployment threshold {DEPLOYMENT_SCORE_THRESH}."
         )
 
 

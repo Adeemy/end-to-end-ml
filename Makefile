@@ -7,9 +7,9 @@ install:
 		pip install -r requirements.txt
 
 isort:
-	isort ./notebooks
-	isort ./src
-	isort ./tests
+	isort --profile black ./notebooks
+	isort --profile black ./src
+	isort --profile black ./tests
 
 format:
 	black ./notebooks
@@ -25,7 +25,7 @@ debug:
 	pytest -vvv --pdb
 
 lint:
-	pylint --disable=R,C,E1120,import-error ./src/feature_store ./src/training ./src/inference 
+	pylint --disable=R,C,E1120 ./src/feature_store ./src/training ./src/inference 
 
 all: install isort format test lint
 
@@ -64,7 +64,7 @@ setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 
 # Submit train experiment
 split_data:
-	python ./src/training/split_data.py ./src/feature_store/feature_repo/  ./config/training/config.yml
+	python ./src/training/split_data.py ./config/training/config.yml
 
 train:
 	python ./src/training/train.py ./config/training/config.yml

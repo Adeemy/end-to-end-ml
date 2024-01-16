@@ -241,7 +241,7 @@ def select_relevant_columns(
     return train_set, test_set, numerical_feature_names, categorical_feature_names
 
 
-def preprocess_datasets(
+def enforce_data_types(
     train_set: pd.DataFrame,
     test_set: pd.DataFrame,
     numerical_feature_names: list = None,
