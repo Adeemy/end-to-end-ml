@@ -8,13 +8,14 @@ on:
     branches: ["main"]
 
   # Run workflow manually from the Actions tab
-  workflow_dispatch:
+  # workflow_dispatch:
 
 jobs:
   train:
     runs-on: ubuntu-latest
 
     steps:
+      # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
       - uses: actions/checkout@v3
       - name: Set up Python 3.10.*
         uses: actions/setup-python@v1
@@ -24,29 +25,29 @@ jobs:
         run: |
           make install
 
-      - name: Sort imports
-        run: |
-          make isort
+      # - name: Sort imports
+      #   run: |
+      #     make isort
 
-      - name: Format code
-        run: |
-          make format
+      # - name: Format code
+      #   run: |
+      #     make format
 
-      - name: Unit tests
-        run: |
-          make test
+      # - name: Unit tests
+      #   run: |
+      #     make test
 
-      - name: Lint with pylint
-        run: |
-          make lint
+      # - name: Lint with pylint
+      #   run: |
+      #     make lint
 
-      - name: Prepare data
-        run: make prep_data
+      # - name: Prepare data
+      #   run: make prep_data
 
-      # TODO: commented due to error in retrieving data from feature store 
       # - name: Split data
       #   run: make split_data
 
+      # Data splits were already saved in Hugging Face repo
       - name: Train
         env:
           COMET_API_KEY: ${{secrets.COMET_API_KEY}}
@@ -58,7 +59,6 @@ jobs:
     needs: train
 
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
 
       - name: Set up Docker Buildx

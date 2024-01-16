@@ -14,6 +14,7 @@ data:
     split_date_col_format: "%Y-%m-%d %H:%M:%S"
     cat_features_nan_replacement: "Unspecified"
     train_set_size: 0.8 # % of train set when splitting data imported from feature store
+    variance_threshold_val: 0.05 # Thresh. value to remove low variance features in VarianceThreshold
     pk_col_name: "ID" # Primary key that uniquely identifies every row in dataset
     class_col_name: "Diabetes_binary"
     pos_class: "Diabetic"
@@ -99,3 +100,11 @@ modelregistry:
     xgb_registered_model_name: "xgboost" # Name used to register xgboost model
     voting_ensemble_registered_model_name: "voting-ensemble" # Name used to register voting ensemble model
     champion_model_name: "champion_model" # Name used to register champion model
+
+includedmodels:
+  params:
+    include_logistic_regression: true # Should Logisitic Regression be included in training
+    include_random_forest: true # Should Random Forest model be included in training
+    include_lightgbm: false # Should LightGBM model be included in training
+    include_xgboost: false # Should XGBoost model be included in training
+    include_voting_ensemble: false # Should Voting Ensemble model be included in training

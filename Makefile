@@ -72,8 +72,8 @@ train:
 submit_train: prep_data split_data train
 
 
-# Test containerized model
+# Test model locally (go to http://localhost:8000/docs page to test sample)
 test_container:
-	cd /workspaces/end-to-end-ml/src/inference &&\
+	cd ./src/inference &&\
 	uvicorn --host 0.0.0.0 main:app
 
