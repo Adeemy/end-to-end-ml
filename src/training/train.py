@@ -334,6 +334,11 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
         key: value for key, value in exp_objects.items() if value is not None
     }
 
+    if len(exp_objects) == 0:
+        raise ValueError(
+            "No model was selected to be trained. Select at least one model!"
+        )
+
     # Rename comparison metric if it's fbeta_score to include beta value
     if COMPARISON_METRIC == "fbeta_score":
         COMPARISON_METRIC = f"f_{F_BETA_SCORE_BETA_VAL}_score"
