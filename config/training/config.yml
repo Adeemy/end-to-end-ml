@@ -14,6 +14,7 @@ data:
     split_date_col_format: "%Y-%m-%d %H:%M:%S"
     cat_features_nan_replacement: "Unspecified"
     train_set_size: 0.8 # % of train set when splitting data imported from feature store
+    variance_threshold_val: 0.05 # Thresh. value to remove low variance features in VarianceThreshold
     pk_col_name: "ID" # Primary key that uniquely identifies every row in dataset
     class_col_name: "Diabetes_binary"
     pos_class: "Diabetic"
