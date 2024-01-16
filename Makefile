@@ -72,7 +72,7 @@ train:
 submit_train: prep_data split_data train
 
 
-# Test model locally (go to /docs page to test sample)
+# Test model locally (go to http://localhost:8000/docs page to test sample)
 test_container:
 	cd ./src/inference &&\
 	uvicorn --host 0.0.0.0 main:app
