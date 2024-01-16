@@ -3,7 +3,7 @@ name: CI/CD
 
 on:
   push:
-    branches: ["update_docs"]
+    branches: ["fix_split_data"]
   pull_request:
     branches: ["main"]
 

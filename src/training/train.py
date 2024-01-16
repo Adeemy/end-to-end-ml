@@ -22,7 +22,7 @@ from utils.data import (
     drop_primary_key,
     encode_class_labels,
     import_datasets,
-    preprocess_datasets,
+    enforce_data_types,
     replace_nans_in_cat_features,
     select_relevant_columns,
     seperate_features_from_class_labels,
@@ -117,7 +117,7 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
     )
 
     # Preprocess train and test sets by enforcing data types of numerical and categorical features
-    train_set, test_set = preprocess_datasets(
+    train_set, test_set = enforce_data_types(
         train_set=train_set,
         test_set=test_set,
         numerical_feature_names=num_feature_names,

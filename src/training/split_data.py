@@ -48,11 +48,11 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
-    preprocessed_dataset_file_name = config.params["files"]["params"][
-        "preprocessed_dataset_file_name"
-    ]
     preprocessed_dataset_target_file_name = config.params["files"]["params"][
         "preprocessed_dataset_target_file_name"
+    ]
+    historical_data_file_name = config.params["files"]["params"][
+        "historical_data_file_name"
     ]
     train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
     test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
@@ -103,7 +103,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
         from_=historical_data,
         name="historical_data",
         storage=SavedDatasetFileStorage(
-            str(data_dir) + "/" + preprocessed_dataset_file_name
+            str(data_dir) + "/" + historical_data_file_name
         ),
         allow_overwrite=True,
     ).to_df()
