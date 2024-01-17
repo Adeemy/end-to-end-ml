@@ -3,7 +3,6 @@ This utility module includes functions for
 model optimization and evaluation.
 """
 
-##########################
 import os
 from typing import Callable, Union
 
@@ -18,7 +17,7 @@ from comet_ml import ExistingExperiment, Experiment
 from dask.distributed import Client
 from matplotlib.figure import Figure
 from numpy.typing import ArrayLike
-from sklearn.calibration import CalibratedClassifierCV, CalibrationDisplay
+from sklearn.calibration import CalibrationDisplay
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.metrics import (
@@ -27,14 +26,12 @@ from sklearn.metrics import (
     confusion_matrix,
     f1_score,
     fbeta_score,
-    make_scorer,
     precision_recall_curve,
     precision_score,
     recall_score,
     roc_auc_score,
     roc_curve,
 )
-from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
@@ -66,7 +63,6 @@ class ModelOptimizer:
         valid_class: np.ndarray,
         n_features: int,
         model: Callable,
-        cv_folds: int = 5,
         fbeta_score_beta: float = 1.0,
         encoded_pos_class_label: int = 1,
         is_voting_ensemble: bool = False,
@@ -78,7 +74,6 @@ class ModelOptimizer:
         self.valid_class = valid_class
         self.n_features = n_features
         self.model = model
-        self.cv_folds = cv_folds
         self.fbeta_score_beta = fbeta_score_beta
         self.encoded_pos_class_label = encoded_pos_class_label
         self.is_voting_ensemble = is_voting_ensemble
@@ -213,36 +208,6 @@ class ModelOptimizer:
 
         return performance_metrics
 
-    # Define a custom scorer function that uses fbeta_score
-    def custom_cross_val_score(
-        self,
-        model: Callable,
-        features: pd.DataFrame,
-        class_labels: ArrayLike,
-        cv_folds: int = 5,
-    ):
-        """Creates a custom scorer for fbeta score."""
-
-        def fbeta_scorer(y_true, y_pred):
-            return fbeta_score(
-                y_true,
-                y_pred,
-                beta=self.fbeta_score_beta,
-            )
-
-        # Create a custom scorer object that uses the fbeta_scorer function
-        fbeta_scorer = make_scorer(fbeta_scorer)
-
-        scores = cross_val_score(
-            model,
-            X=features,
-            y=class_labels,
-            cv=cv_folds,
-            scoring=fbeta_scorer,
-        )
-
-        return scores
-
     def objective_function(
         self,
         trial: optuna.trial.Trial,
@@ -256,36 +221,24 @@ class ModelOptimizer:
         # Fit model and calculate training score
         self.model.set_params(**params)
         self.model.fit(self.train_features_preprocessed, self.train_class)
-        train_score = self.custom_cross_val_score(
-            self.model,
-            features=self.train_features_preprocessed,
-            class_labels=self.train_class,
-            cv_folds=self.cv_folds,
-        ).mean()
 
-        # Fit calibrator on validation set
-        # Note: isotonic regression is suitable when validation data size > 1000
-        # to avoid overfitting, otherwise sigmoid method should be used.
-        calibrated_model = CalibratedClassifierCV(
-            self.model,
-            method="isotonic" if len(self.valid_class) > 1000 else "sigmoid",
-            cv="prefit",
-        )
-        calibrated_model.fit(self.valid_features_preprocessed, self.valid_class)
-
-        # Evaluate model on validation set
+        # Evaluate model on training and validation set
         # Note: default threshold of 0.5 is used for positive class but
         # other htreshold values can be used, which is problem-dependent.
-        pred_valid_probs = calibrated_model.predict_proba(
-            self.valid_features_preprocessed
+        pred_train_preds = self.model.predict(self.train_features_preprocessed)
+        pred_valid_preds = self.model.predict(self.valid_features_preprocessed)
+        train_scores = self.calculate_performance_metrics(
+            true_class=self.train_class,
+            pred_class=pred_train_preds,
         )
-        pos_class_index = list(self.model.classes_).index(self.encoded_pos_class_label)
-        pred_valid_probs = pred_valid_probs[:, pos_class_index]
-        pred_valid_class = np.where(pred_valid_probs > 0.5, 1, 0)
         valid_scores = self.calculate_performance_metrics(
             true_class=self.valid_class,
-            pred_class=pred_valid_class,
+            pred_class=pred_valid_preds,
         )
+
+        train_score = train_scores.loc[
+            train_scores["Metric"] == f"f_{self.fbeta_score_beta}_score", "Score"
+        ]
         valid_score = valid_scores.loc[
             valid_scores["Metric"] == f"f_{self.fbeta_score_beta}_score", "Score"
         ]
@@ -400,49 +353,21 @@ class ModelOptimizer:
     def fit_pipeline(
         self,
         train_features: pd.DataFrame,
-        valid_features: pd.DataFrame,
         preprocessor_step: ColumnTransformer,
         selector_step: VarianceThreshold,
         model: Callable,
-    ) -> Union[Pipeline, Pipeline]:
-        """Fits two pipelines: a pipeline with calibrated model and another
-        with uncalibrated model. Calibrated model should be registered and
-        unclaibrated model can be used to extract feature importance."""
+    ) -> Pipeline:
+        """Fits a pipeline including model with data preprocessing steps."""
 
-        # Fit a pipeline with a calibrated model
-        calib_pipeline = self.create_pipeline(
-            preprocessor_step=preprocessor_step,
-            selector_step=selector_step,
-            model=CalibratedClassifierCV(
-                estimator=model,
-                method="isotonic" if len(self.valid_class) > 1000 else "sigmoid",
-                cv=self.cv_folds,
-            ),
-        )
-
-        # Fit a pipeline with a uncalibrated model
-        uncalib_pipeline = self.create_pipeline(
+        # Fit a pipeline
+        pipeline = self.create_pipeline(
             preprocessor_step=preprocessor_step,
             selector_step=selector_step,
             model=model,
         )
+        pipeline.fit(train_features, self.train_class)
 
-        # Fit pipelines
-        calib_pipeline.fit(train_features, self.train_class)
-        uncalib_pipeline.fit(train_features, self.train_class)
-
-        # Calibrate model
-        calib_set_features = calib_pipeline.named_steps["preprocessor"].transform(
-            valid_features
-        )
-        calib_set_features = calib_pipeline.named_steps["selector"].transform(
-            calib_set_features
-        )
-        calib_pipeline.named_steps["classifier"].fit(
-            calib_set_features, self.valid_class
-        )
-
-        return calib_pipeline, uncalib_pipeline
+        return pipeline
 
 
 class ModelEvaluator(ModelOptimizer):
@@ -470,7 +395,7 @@ class ModelEvaluator(ModelOptimizer):
             n_features=None,
             model=pipeline.named_steps["classifier"]
             if is_voting_ensemble
-            else pipeline.named_steps["classifier"].estimator,
+            else pipeline.named_steps["classifier"],
             is_voting_ensemble=is_voting_ensemble,
         )
 

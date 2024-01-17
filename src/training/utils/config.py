@@ -3,9 +3,11 @@ from typing import Dict
 
 import yaml
 
+##########################################################
+
 
 class PrettySafeLoader(yaml.SafeLoader):
-    """Custom loader for reading YAML files"""
+    """Custom loader for reading YAML files."""
 
     def construct_python_tuple(self, node):
         return tuple(self.construct_sequence(node))

@@ -47,7 +47,7 @@ data:
 train:
   params:
     initiate_comet_project: False # Should be True if new Comet project should be created
-    comet_project_name: "end-to-end-tabular-ml"
+    comet_project_name: "end-to-end-ml"
     comet_workspace_name: "6bmod5d8"
     search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization
     parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())

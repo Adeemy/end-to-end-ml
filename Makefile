@@ -27,7 +27,7 @@ debug:
 lint:
 	pylint --disable=R,C,E1120 ./src/feature_store ./src/training ./src/inference 
 
-all: install isort format test lint
+check_code: install isort format test lint
 
 
 # Import raw dataset from source
