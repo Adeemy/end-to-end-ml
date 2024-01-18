@@ -30,6 +30,13 @@ def main(
     data_dir: PosixPath,
     artifacts_dir: PosixPath,
 ):
+    print(
+        """\n
+    ---------------------------------------------------------------------
+    --- Hyperparameters Optimization Experiments Starts ...
+    ---------------------------------------------------------------------\n"""
+    )
+
     # Experiment settings
     config = Config(config_path=config_yaml_abs_path)
     INITIATE_COMET_PROJECT = bool(
@@ -38,6 +45,10 @@ def main(
     COMET_API_KEY = comet_api_key
     COMET_PROJECT_NAME = config.params["train"]["params"]["comet_project_name"]
     COMET_WORKSPACE_NAME = config.params["train"]["params"]["comet_workspace_name"]
+    PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
+    CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
+    num_col_names = config.params["data"]["params"]["num_col_names"]
+    cat_col_names = config.params["data"]["params"]["cat_col_names"]
     MAX_SEARCH_ITERS = config.params["train"]["params"]["search_max_iters"]
     PARALLEL_JOBS_COUNT = config.params["train"]["params"]["parallel_jobs_count"]
     EXP_TIMEOUT_SECS = config.params["train"]["params"]["exp_timout_secs"]
@@ -45,6 +56,7 @@ def main(
     F_BETA_SCORE_BETA_VAL = config.params["train"]["params"]["fbeta_score_beta_val"]
     VOTING_RULE = config.params["train"]["params"]["voting_rule"]
     TRAIN_FILE_NAME = config.params["files"]["params"]["train_set_file_name"]
+    VALID_FILE_NAME = config.params["files"]["params"]["valid_set_file_name"]
     TEST_FILE_NAME = config.params["files"]["params"]["test_set_file_name"]
     EXP_KEY_FILE_NAME = config.params["files"]["params"]["experiments_keys_file_name"]
     LR_REGISTERED_MODEL_NAME = config.params["modelregistry"]["params"][
@@ -62,55 +74,37 @@ def main(
     VOTING_ENSEMBLE_REGISTERED_MODEL_NAME = config.params["modelregistry"]["params"][
         "voting_ensemble_registered_model_name"
     ]
-
-    # Dataset split configuration, feature data types, and positive class label
-    HUGGINGFACE_SOURCE = config.params["data"]["params"]["raw_dataset_source"]
-    PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
-    CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
     POS_CLASS_LABEL = config.params["data"]["params"]["pos_class"]
-    num_col_names = config.params["data"]["params"]["num_col_names"]
-    cat_col_names = config.params["data"]["params"]["cat_col_names"]
-    DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
-    DATASET_SPLIT_SEED = config.params["data"]["params"]["split_rand_seed"]
-    SPLIT_DATE_COL_NAME = config.params["data"]["params"]["split_date_col_name"]
-    SPLIT_CUTOFF_DATE = config.params["data"]["params"]["train_valid_split_curoff_date"]
-    SPLIT_DATE_FORMAT = config.params["data"]["params"]["split_date_col_format"]
-    CAT_FEAT_NAN_REPLACEMENT = config.params["data"]["params"][
-        "cat_features_nan_replacement"
-    ]
-    TRAIN_SIZE = config.params["data"]["params"]["train_set_size"]
     VAR_THRESH_VAL = config.params["data"]["params"]["variance_threshold_val"]
 
-    # Import dataset and prepare it for training
+    # Import data splits
+    training_set = pd.read_parquet(
+        data_dir / TRAIN_FILE_NAME,
+    )
+
+    validation_set = pd.read_parquet(
+        data_dir / VALID_FILE_NAME,
+    )
+
+    testing_set = pd.read_parquet(
+        data_dir / TEST_FILE_NAME,
+    )
+
+    # Ensure that columns provided in config files exists in training data
+    num_col_names = [col for col in num_col_names if col in training_set.columns]
+    cat_col_names = [col for col in cat_col_names if col in training_set.columns]
+
+    # Prepare data for training
     data_prep = PrepTrainingData(
+        train_set=training_set,
+        test_set=testing_set,
         primary_key=PRIMARY_KEY,
         class_col_name=CLASS_COL_NAME,
         numerical_feature_names=num_col_names,
         categorical_feature_names=cat_col_names,
     )
-
-    # Note: train and test sets are imported from Hugging Face dataset repo
-    # to enable running training pipeline in GitHub Actions. Thus, train and
-    # test splits performed in previous step has not impact in this setting.
-    data_prep.import_datasets(
-        hf_data_source=HUGGINGFACE_SOURCE,
-        is_local_source=False,
-    )
-
-    # Preprocess train and test sets by enforcing data types of numerical and categorical features
-    data_prep.select_relevant_columns()
+    data_prep.extract_features(valid_set=validation_set)
     data_prep.enforce_data_types()
-    data_prep.replace_nans_in_cat_features(nan_replacement=CAT_FEAT_NAN_REPLACEMENT)
-    data_prep.create_validation_set(
-        split_type=DATASET_SPLIT_TYPE,
-        train_set_size=TRAIN_SIZE,
-        split_random_seed=DATASET_SPLIT_SEED,
-        split_date_col_name=SPLIT_DATE_COL_NAME,
-        split_cutoff_date=SPLIT_CUTOFF_DATE,
-        split_date_col_format=SPLIT_DATE_FORMAT,
-    )
-    data_prep.drop_primary_key()
-    data_prep.extract_features()
 
     # Encode class labels
     # Note: class encoder is fitted on train class labels and will be used
@@ -125,6 +119,11 @@ def main(
         pos_class_label=POS_CLASS_LABEL,
     )
 
+    # Return features
+    train_features = data_prep.get_training_features()
+    valid_features = data_prep.get_validation_features()
+    test_features = data_prep.get_testing_features()
+
     # Create data transformation pipeline
     data_transformation_pipeline = data_prep.create_data_transformation_pipeline(
         var_thresh_val=VAR_THRESH_VAL
@@ -132,23 +131,12 @@ def main(
     data_prep.clean_up_feature_names()
     num_feature_names, cat_feature_names = data_prep.get_feature_names()
 
-    # Return datasets
-    # Note: preprocessed train and validation features are needed during hyperparams
-    # optimization procedure to avoid data transformation in each iteration.
-    train_features = data_prep.get_training_features()
-    valid_features = data_prep.get_validation_features()
-    test_features = data_prep.get_testing_features()
+    # Return preprocessed train and validation features, which are needed during
+    # hyperparams optimization to avoid applying data transformation in each iteration.
     train_features_preprocessed = data_prep.get_train_features_preprocessed()
     valid_features_preprocessed = data_prep.get_valid_features_preprocessed()
 
-    # Save train and test sets for best model evaluation
-    train_set = train_features
-    train_set[CLASS_COL_NAME] = train_class
-    train_set.to_parquet(
-        data_dir / TRAIN_FILE_NAME,
-        index=False,
-    )
-
+    # Save test set with encoded class
     test_set = test_features
     test_set[CLASS_COL_NAME] = test_class
     test_set.to_parquet(

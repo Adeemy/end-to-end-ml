@@ -10,13 +10,12 @@ from typing import Callable, Literal, Union
 
 import numpy as np
 import pandas as pd
-from datasets import load_dataset
 from numpy import ravel
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import (  # StandardScaler,; RobustScaler,
+from sklearn.preprocessing import (  # StandardScaler, RobustScaler,
     LabelEncoder,
     MinMaxScaler,
     OneHotEncoder,
@@ -181,6 +180,8 @@ class DataPipelineCreator:
 class PrepTrainingData:
     def __init__(
         self,
+        train_set: pd.DataFrame,
+        test_set: pd.DataFrame,
         primary_key: str,
         class_col_name: str,
         numerical_feature_names: list,
@@ -190,34 +191,14 @@ class PrepTrainingData:
         self.class_col_name = class_col_name
         self.numerical_feature_names = numerical_feature_names
         self.categorical_feature_names = categorical_feature_names
-        self.train_set = None
+        self.train_set = train_set
         self.valid_set = None
-        self.test_set = None
+        self.test_set = test_set
         self.training_features = None
         self.validation_features = None
         self.testing_features = None
         self.train_features_preprocessed = None
         self.valid_features_preprocessed = None
-
-    def import_datasets(
-        self,
-        hf_data_source: str = None,
-        train_set_path: str = None,
-        test_set_path: str = None,
-        is_local_source: bool = False,
-    ) -> Union[pd.DataFrame, pd.DataFrame]:
-        """Imports the training and testing sets from parquet files. It returns
-        two pandas dataframes: train_set and test_set."""
-
-        if is_local_source:
-            self.train_set = pd.read_parquet(path=train_set_path)
-            self.test_set = pd.read_parquet(path=test_set_path)
-
-        else:
-            # Import train and test sets
-            dataset = load_dataset(hf_data_source)
-            self.train_set = dataset["train"].to_pandas()
-            self.test_set = dataset["test"].to_pandas()
 
     def select_relevant_columns(self) -> None:
         """Ensures specified numerical and categorical features exist in train and test
@@ -271,6 +252,15 @@ class PrepTrainingData:
         train_set_processor.specify_data_types()
         self.train_set = train_set_processor.get_preprocessed_data()
 
+        if self.valid_set is not None:
+            valid_set_processor = DataPreprocessor(
+                input_data=self.valid_set,
+                num_feature_names=self.numerical_feature_names,
+                cat_feature_names=self.categorical_feature_names,
+            )
+            valid_set_processor.specify_data_types()
+            self.valid_set = valid_set_processor.get_preprocessed_data()
+
         test_set_processor = DataPreprocessor(
             input_data=self.test_set,
             num_feature_names=self.numerical_feature_names,
@@ -323,15 +313,22 @@ class PrepTrainingData:
             split_date_col_format=split_date_col_format,
         )
 
-    def drop_primary_key(self) -> None:
-        """Drop primary key column (not needed in training)."""
+    def extract_features(self, valid_set: pd.DataFrame = None) -> None:
+        """Separate features and class column of testing set. The validation
+        set (valid_set) can be provided in this method if to wasn't provided
+        already. If validation set is provided here, it will overwrite the
+        validation set created by create_validation_set"""
 
-        self.train_set.drop([self.primary_key], axis=1, inplace=True)
-        self.valid_set.drop([self.primary_key], axis=1, inplace=True)
-        self.test_set.drop([self.primary_key], axis=1, inplace=True)
-
-    def extract_features(self) -> None:
-        """Separate features and class column of testing set."""
+        if valid_set is not None and self.valid_set is None:
+            self.valid_set = valid_set
+        elif valid_set is not None and self.valid_set is not None:
+            raise ValueError(
+                "Validation set was created already but it was provided here!"
+            )
+        elif valid_set is None and self.valid_set is None:
+            raise ValueError(
+                "Validation set neither provided nor created using create_validation_set method!"
+            )
 
         selected_features = (
             self.numerical_feature_names + self.categorical_feature_names
@@ -435,6 +432,18 @@ class PrepTrainingData:
         self.valid_features_preprocessed = self.valid_features_preprocessed.rename(
             columns=lambda x: re.sub("[^A-Za-z0-9]+", "_", x), inplace=False
         )
+
+    def get_train_set(self):
+        """Returns the training set (features and class) when invoked."""
+        return self.train_set.copy()
+
+    def get_validation_set(self):
+        """Returns the validation set (features and class) when invoked."""
+        return self.valid_set.copy()
+
+    def get_test_set(self):
+        """Returns the testing set (features and class) when invoked."""
+        return self.test_set.copy()
 
     def get_training_features(self):
         """Returns the training features when invoked."""

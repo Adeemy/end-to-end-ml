@@ -90,6 +90,7 @@ files:
     preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
     preprocessed_dataset_features_file_name: "preprocessed_dataset_features.parquet"
     train_set_file_name: "train.parquet"
+    valid_set_file_name: "validation.parquet"
     test_set_file_name: "test.parquet"
     experiments_keys_file_name: "experiment_keys" # Name of the csv file storing keys of experiments that ran successfully (needed for evaluate.py)
 
