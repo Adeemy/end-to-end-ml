@@ -111,7 +111,7 @@ def main(
     print("\nRaw dataset was generated.\n")
 
 
-# python ./src/feature_store/initial_data_setup/generate_initial_data.py ./config/feature_store/config.yml 891 random 123
+###########################################################
 if __name__ == "__main__":
     main(
         config_yaml_abs_path=sys.argv[1],

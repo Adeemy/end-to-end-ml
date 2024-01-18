@@ -438,4 +438,4 @@ def create_voting_ensemble(
     # End experiment to upload metrics and artifacts to Comet project
     comet_exp.end()
 
-    return ve_pipeline, comet_exp
+    return comet_exp

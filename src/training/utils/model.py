@@ -13,7 +13,7 @@ import optuna
 import optuna_distributed
 import pandas as pd
 import scikitplot as skplt
-from comet_ml import ExistingExperiment, Experiment
+from comet_ml import API, ExistingExperiment, Experiment
 from dask.distributed import Client
 from matplotlib.figure import Figure
 from numpy.typing import ArrayLike
@@ -674,7 +674,7 @@ class ModelEvaluator(ModelOptimizer):
 
     def evaluate_model_perf(
         self,
-        class_encoder: LabelEncoder,
+        class_encoder: LabelEncoder = None,
         pos_class_label_thresh: float = 0.5,
     ) -> Union[pd.DataFrame, pd.DataFrame, Pipeline, list]:
         """Evaluates the best model returned by hyperparameters optimization procedure
@@ -705,17 +705,30 @@ class ModelEvaluator(ModelOptimizer):
             pred_class=pred_valid_class,
         )
 
-        # Extract original class label names, which are supposed to be expressive.
-        # Note: should be included in model tags.
-        original_class_labels = list(
-            class_encoder.inverse_transform(self.pipeline.classes_)
-        )
+        # Extract original class label names, which can be expressive, i.e., not encoded.
+        if class_encoder is None:  # Class labels are already encoded
+            original_class_labels = self.pipeline.classes_
 
-        # Extract expressive class names for confusion matrix
-        original_train_class = class_encoder.inverse_transform(self.train_class)
-        original_valid_class = class_encoder.inverse_transform(self.valid_class)
-        pred_original_train_class = class_encoder.inverse_transform(pred_train_class)
-        pred_original_valid_class = class_encoder.inverse_transform(pred_valid_class)
+            # Extract expressive class names for confusion matrix
+            original_train_class = self.train_class
+            original_valid_class = self.valid_class
+            pred_original_train_class = pred_train_class
+            pred_original_valid_class = pred_valid_class
+
+        else:
+            original_class_labels = list(
+                class_encoder.inverse_transform(self.pipeline.classes_)
+            )
+
+            # Extract expressive class names for confusion matrix
+            original_train_class = class_encoder.inverse_transform(self.train_class)
+            original_valid_class = class_encoder.inverse_transform(self.valid_class)
+            pred_original_train_class = class_encoder.inverse_transform(
+                pred_train_class
+            )
+            pred_original_valid_class = class_encoder.inverse_transform(
+                pred_valid_class
+            )
 
         train_cm = confusion_matrix(
             y_true=original_train_class,
@@ -883,38 +896,55 @@ class ModelEvaluator(ModelOptimizer):
         return ece[0]
 
 
-def select_best_performer(comparison_metric: str, models_with_exp: dict):
-    """Selects the best performer from all trained models. It extracts the
-    value of the comparison_metric on validation set for each model in
-    models_with_exp and returns the name of the best model. The models_with_exp
-    is a dictionary of model names as keys and their corresponding experiment
-    objects as values."""
+class LogChampModel:
+    """Selects the best model and registers it in workspace."""
 
-    models_scores = {}
-    for k, v in models_with_exp.items():
-        models_scores[k] = v.get_metric(comparison_metric)
+    def select_best_performer(
+        self,
+        comet_project_name: str,
+        comet_workspace_name: str,
+        comparison_metric: str,
+        comet_exp_keys: dict,
+    ) -> str:
+        """Selects the best performer from all challenger models. The comet_exp_keys
+        is a dictionary of model names as keys and their corresponding experiment
+        objects as values. It returns the name of the best challenger model."""
 
-    best_performer = max(models_scores, key=models_scores.get)
+        comet_api = API()
+        exp_scores = {}
+        for i in range(comet_exp_keys.shape[0]):
+            experiment = comet_api.get_experiment(
+                project_name=comet_project_name,
+                workspace=comet_workspace_name,
+                experiment=comet_exp_keys.iloc[i, 1],
+            )
+            exp_metric_score = float(
+                experiment.get_metrics(comparison_metric)[0]["metricValue"]
+            )
+            exp_scores.update(**{f"{comet_exp_keys.iloc[i, 0]}": exp_metric_score})
 
-    return best_performer
+        # Select the best performer
+        best_challenger_name = max(exp_scores, key=exp_scores.get)
 
+        return best_challenger_name
 
-def log_and_register_champ_model(
-    local_path: str,
-    champ_model_name: str,
-    pipeline: Pipeline,
-    exp_obj: ExistingExperiment,
-) -> None:
-    """Logs and registers champion model in workspace. It returns None."""
+    def log_and_register_champ_model(
+        self,
+        local_path: str,
+        champ_model_name: str,
+        pipeline: Pipeline,
+        exp_obj: ExistingExperiment,
+    ) -> None:
+        """Logs and registers champion model in workspace. It returns None."""
 
-    if not os.path.exists(local_path):
-        os.makedirs(local_path)
-    joblib.dump(pipeline, f"{local_path}/{champ_model_name}.pkl")
-    exp_obj.log_model(
-        name=champ_model_name,
-        file_or_folder=f"{local_path}/{champ_model_name}.pkl",
-        overwrite=False,
-    )
-    exp_obj.register_model(model_name=champ_model_name)
-    exp_obj.end()
-    print(f"Champion model {champ_model_name} was registered in workspace.")
+        if not os.path.exists(local_path):
+            os.makedirs(local_path)
+        joblib.dump(pipeline, f"{local_path}/{champ_model_name}.pkl")
+        exp_obj.log_model(
+            name=champ_model_name,
+            file_or_folder=f"{local_path}/{champ_model_name}.pkl",
+            overwrite=False,
+        )
+        exp_obj.register_model(model_name=champ_model_name)
+        exp_obj.end()
+        print(f"Champion model {champ_model_name} was registered in workspace.")

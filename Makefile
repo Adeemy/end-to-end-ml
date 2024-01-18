@@ -69,7 +69,10 @@ split_data:
 train:
 	python ./src/training/train.py ./config/training/config.yml
 
-submit_train: prep_data split_data train
+evaluate:
+	python ./src/training/evaluate.py ./config/training/config.yml
+
+submit_train: prep_data split_data train evaluate
 
 
 # Test model locally (go to http://localhost:8000/docs page to test sample)
