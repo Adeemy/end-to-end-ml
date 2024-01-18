@@ -54,7 +54,7 @@ jobs:
         run: |
           make train
 
-      - name: Evaluate
+      - name: Evaluate models
         env:
           COMET_API_KEY: ${{secrets.COMET_API_KEY}}
         run: |
