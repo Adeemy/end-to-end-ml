@@ -122,7 +122,7 @@ def main(
 
     best_model_exp_obj.log_metrics(test_scores)
 
-    # Calibrate champ model
+    # Calibrate champ model before deployment
     training_features = train_set.drop(CLASS_COL_NAME, axis=1)
     training_class = np.array(train_set[CLASS_COL_NAME])
     calib_pipeline = prep_champ_model.calibrate_pipeline(
