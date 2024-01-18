@@ -47,12 +47,12 @@ data:
 train:
   params:
     initiate_comet_project: False # Should be True if new Comet project should be created
-    comet_project_name: "end-to-end-tabular-ml"
+    comet_project_name: "end-to-end-ml"
     comet_workspace_name: "6bmod5d8"
     search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization
     parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
     exp_timout_secs: 3600 # Experiment timeout
-    cross_val_folds: 5
+    cross_val_folds: 5 # No. of folds used for cross-validation for model calibration
     fbeta_score_beta_val: 0.5 # Value of beta in f_beta_score, which is a metric used for hyperparams optimization
     comparison_metric: "fbeta_score" # Metric name to compare models. Must be: recall, precision, roc_auc, f1, or fbeta_score
     voting_rule: "soft" # Voting strategy in voting ensemble
@@ -90,7 +90,9 @@ files:
     preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
     preprocessed_dataset_features_file_name: "preprocessed_dataset_features.parquet"
     train_set_file_name: "train.parquet"
+    valid_set_file_name: "validation.parquet"
     test_set_file_name: "test.parquet"
+    experiments_keys_file_name: "experiment_keys" # Name of the csv file storing keys of experiments that ran successfully (needed for evaluate.py)
 
 modelregistry:
   params:

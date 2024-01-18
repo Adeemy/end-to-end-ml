@@ -1,6 +1,6 @@
 """
-This script performs hyperparameters optimization 
-using Optuna Python package.
+This script submits experiments to perform 
+hyperparameters optimization for multiple models.
 """
 
 import os
@@ -9,8 +9,7 @@ from datetime import datetime
 from pathlib import PosixPath
 
 import comet_ml
-import joblib
-from comet_ml import ExistingExperiment
+import pandas as pd
 from dotenv import load_dotenv
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -18,19 +17,26 @@ from sklearn.linear_model import LogisticRegression
 from utils.config import Config
 from utils.data import PrepTrainingData
 from utils.job import create_voting_ensemble, submit_train_exp
-from utils.model import (
-    ModelEvaluator,
-    log_and_register_champ_model,
-    select_best_performer,
-)
-from utils.path import ARTIFACTS_DIR
+from utils.path import ARTIFACTS_DIR, DATA_DIR
 from xgboost import XGBClassifier
 
 load_dotenv()
 
 
 ###########################################################
-def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath):
+def main(
+    config_yaml_abs_path: str,
+    comet_api_key: str,
+    data_dir: PosixPath,
+    artifacts_dir: PosixPath,
+):
+    print(
+        """\n
+    ---------------------------------------------------------------------
+    --- Hyperparameters Optimization Experiments Starts ...
+    ---------------------------------------------------------------------\n"""
+    )
+
     # Experiment settings
     config = Config(config_path=config_yaml_abs_path)
     INITIATE_COMET_PROJECT = bool(
@@ -39,13 +45,20 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
     COMET_API_KEY = comet_api_key
     COMET_PROJECT_NAME = config.params["train"]["params"]["comet_project_name"]
     COMET_WORKSPACE_NAME = config.params["train"]["params"]["comet_workspace_name"]
+    PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
+    CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
+    num_col_names = config.params["data"]["params"]["num_col_names"]
+    cat_col_names = config.params["data"]["params"]["cat_col_names"]
     MAX_SEARCH_ITERS = config.params["train"]["params"]["search_max_iters"]
     PARALLEL_JOBS_COUNT = config.params["train"]["params"]["parallel_jobs_count"]
     EXP_TIMEOUT_SECS = config.params["train"]["params"]["exp_timout_secs"]
     CROSS_VAL_FOLDS = config.params["train"]["params"]["cross_val_folds"]
     F_BETA_SCORE_BETA_VAL = config.params["train"]["params"]["fbeta_score_beta_val"]
-    COMPARISON_METRIC = config.params["train"]["params"]["comparison_metric"]
     VOTING_RULE = config.params["train"]["params"]["voting_rule"]
+    TRAIN_FILE_NAME = config.params["files"]["params"]["train_set_file_name"]
+    VALID_FILE_NAME = config.params["files"]["params"]["valid_set_file_name"]
+    TEST_FILE_NAME = config.params["files"]["params"]["test_set_file_name"]
+    EXP_KEY_FILE_NAME = config.params["files"]["params"]["experiments_keys_file_name"]
     LR_REGISTERED_MODEL_NAME = config.params["modelregistry"]["params"][
         "lr_registered_model_name"
     ]
@@ -61,61 +74,37 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
     VOTING_ENSEMBLE_REGISTERED_MODEL_NAME = config.params["modelregistry"]["params"][
         "voting_ensemble_registered_model_name"
     ]
-    CHAMPION_MODEL_NAME = config.params["modelregistry"]["params"][
-        "champion_model_name"
-    ]
-    DEPLOYMENT_SCORE_THRESH = config.params["train"]["params"][
-        "deployment_score_thresh"
-    ]
-
-    # Dataset split configuration, feature data types, and positive class label
-    HUGGINGFACE_SOURCE = config.params["data"]["params"]["raw_dataset_source"]
-    PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
-    CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
     POS_CLASS_LABEL = config.params["data"]["params"]["pos_class"]
-    num_col_names = config.params["data"]["params"]["num_col_names"]
-    cat_col_names = config.params["data"]["params"]["cat_col_names"]
-    DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
-    DATASET_SPLIT_SEED = config.params["data"]["params"]["split_rand_seed"]
-    SPLIT_DATE_COL_NAME = config.params["data"]["params"]["split_date_col_name"]
-    SPLIT_CUTOFF_DATE = config.params["data"]["params"]["train_valid_split_curoff_date"]
-    SPLIT_DATE_FORMAT = config.params["data"]["params"]["split_date_col_format"]
-    CAT_FEAT_NAN_REPLACEMENT = config.params["data"]["params"][
-        "cat_features_nan_replacement"
-    ]
-    TRAIN_SIZE = config.params["data"]["params"]["train_set_size"]
     VAR_THRESH_VAL = config.params["data"]["params"]["variance_threshold_val"]
 
-    # Import dataset and prepare it for training
+    # Import data splits
+    training_set = pd.read_parquet(
+        data_dir / TRAIN_FILE_NAME,
+    )
+
+    validation_set = pd.read_parquet(
+        data_dir / VALID_FILE_NAME,
+    )
+
+    testing_set = pd.read_parquet(
+        data_dir / TEST_FILE_NAME,
+    )
+
+    # Ensure that columns provided in config files exists in training data
+    num_col_names = [col for col in num_col_names if col in training_set.columns]
+    cat_col_names = [col for col in cat_col_names if col in training_set.columns]
+
+    # Prepare data for training
     data_prep = PrepTrainingData(
+        train_set=training_set,
+        test_set=testing_set,
         primary_key=PRIMARY_KEY,
         class_col_name=CLASS_COL_NAME,
         numerical_feature_names=num_col_names,
         categorical_feature_names=cat_col_names,
     )
-
-    # Note: train and test sets are imported from Hugging Face dataset repo
-    # to enable running training pipeline in GitHub Actions. Thus, train and
-    # test splits performed in previous step has not impact in this setting.
-    data_prep.import_datasets(
-        hf_data_source=HUGGINGFACE_SOURCE,
-        is_local_source=False,
-    )
-
-    # Preprocess train and test sets by enforcing data types of numerical and categorical features
-    data_prep.select_relevant_columns()
+    data_prep.extract_features(valid_set=validation_set)
     data_prep.enforce_data_types()
-    data_prep.replace_nans_in_cat_features(nan_replacement=CAT_FEAT_NAN_REPLACEMENT)
-    data_prep.create_validation_set(
-        split_type=DATASET_SPLIT_TYPE,
-        train_set_size=TRAIN_SIZE,
-        split_random_seed=DATASET_SPLIT_SEED,
-        split_date_col_name=SPLIT_DATE_COL_NAME,
-        split_cutoff_date=SPLIT_CUTOFF_DATE,
-        split_date_col_format=SPLIT_DATE_FORMAT,
-    )
-    data_prep.drop_primary_key()
-    data_prep.extract_features()
 
     # Encode class labels
     # Note: class encoder is fitted on train class labels and will be used
@@ -130,6 +119,11 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
         pos_class_label=POS_CLASS_LABEL,
     )
 
+    # Return features
+    train_features = data_prep.get_training_features()
+    valid_features = data_prep.get_validation_features()
+    test_features = data_prep.get_testing_features()
+
     # Create data transformation pipeline
     data_transformation_pipeline = data_prep.create_data_transformation_pipeline(
         var_thresh_val=VAR_THRESH_VAL
@@ -137,14 +131,32 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
     data_prep.clean_up_feature_names()
     num_feature_names, cat_feature_names = data_prep.get_feature_names()
 
-    # Return datasets
-    # Note: preprocessed train and validation features are needed during hyperparams
-    # optimization procedure to avoid data transformation in each iteration.
-    train_features = data_prep.get_training_features()
-    valid_features = data_prep.get_validation_features()
-    test_features = data_prep.get_testing_features()
+    # Return preprocessed train and validation features, which are needed during
+    # hyperparams optimization to avoid applying data transformation in each iteration.
     train_features_preprocessed = data_prep.get_train_features_preprocessed()
     valid_features_preprocessed = data_prep.get_valid_features_preprocessed()
+
+    # Save data splits with encoded class
+    train_set = train_features
+    train_set[CLASS_COL_NAME] = train_class
+    train_set.to_parquet(
+        data_dir / TRAIN_FILE_NAME,
+        index=False,
+    )
+
+    valid_set = valid_features
+    valid_set[CLASS_COL_NAME] = valid_class
+    valid_set.to_parquet(
+        data_dir / VALID_FILE_NAME,
+        index=False,
+    )
+
+    test_set = test_features
+    test_set[CLASS_COL_NAME] = test_class
+    test_set.to_parquet(
+        data_dir / TEST_FILE_NAME,
+        index=False,
+    )
 
     # Initiate a comet project if needed
     if INITIATE_COMET_PROJECT:
@@ -175,7 +187,6 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
-            cv_folds=CROSS_VAL_FOLDS,
             fbeta_score_beta=F_BETA_SCORE_BETA_VAL,
             encoded_pos_class_label=encoded_positive_class_label,
             max_search_iters=MAX_SEARCH_ITERS,
@@ -184,6 +195,7 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
             model_opt_timeout_secs=EXP_TIMEOUT_SECS,
             registered_model_name=LR_REGISTERED_MODEL_NAME,
         )
+        lr_experiment.end()
     else:
         lr_calibrated_pipeline = None
         lr_experiment = None
@@ -209,7 +221,6 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
-            cv_folds=CROSS_VAL_FOLDS,
             fbeta_score_beta=F_BETA_SCORE_BETA_VAL,
             encoded_pos_class_label=encoded_positive_class_label,
             max_search_iters=MAX_SEARCH_ITERS,
@@ -218,6 +229,7 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
             model_opt_timeout_secs=EXP_TIMEOUT_SECS,
             registered_model_name=RF_REGISTERED_MODEL_NAME,
         )
+        rf_experiment.end()
     else:
         rf_calibrated_pipeline = None
         rf_experiment = None
@@ -243,7 +255,6 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
-            cv_folds=CROSS_VAL_FOLDS,
             fbeta_score_beta=F_BETA_SCORE_BETA_VAL,
             encoded_pos_class_label=encoded_positive_class_label,
             max_search_iters=MAX_SEARCH_ITERS,
@@ -252,6 +263,7 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
             model_opt_timeout_secs=EXP_TIMEOUT_SECS,
             registered_model_name=LGBM_REGISTERED_MODEL_NAME,
         )
+        lgbm_experiment.end()
     else:
         lgbm_calibrated_pipeline = None
         lgbm_experiment = None
@@ -280,7 +292,6 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
-            cv_folds=CROSS_VAL_FOLDS,
             fbeta_score_beta=F_BETA_SCORE_BETA_VAL,
             encoded_pos_class_label=encoded_positive_class_label,
             max_search_iters=MAX_SEARCH_ITERS,
@@ -289,6 +300,7 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
             model_opt_timeout_secs=EXP_TIMEOUT_SECS,
             registered_model_name=XGB_REGISTERED_MODEL_NAME,
         )
+        xgb_experiment.end()
     else:
         xgb_calibrated_pipeline = None
         xgb_experiment = None
@@ -296,7 +308,7 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
     #############################################
     # Create a voting ensmble model with LR, RF, LightGBM, and XGBoost as base estimators
     if config.params["includedmodels"]["params"]["include_voting_ensemble"]:
-        ve_calibrated_pipeline, ve_experiment = create_voting_ensemble(
+        ve_experiment = create_voting_ensemble(
             comet_api_key=COMET_API_KEY,
             comet_project_name=COMET_PROJECT_NAME,
             comet_exp_name=f"voting_ensemble_{datetime.now()}",
@@ -317,8 +329,8 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
             fbeta_score_beta=F_BETA_SCORE_BETA_VAL,
             registered_model_name=VOTING_ENSEMBLE_REGISTERED_MODEL_NAME,
         )
+        ve_experiment.end()
     else:
-        ve_calibrated_pipeline = None
         ve_experiment = None
 
     #############################################
@@ -336,95 +348,26 @@ def main(config_yaml_abs_path: str, comet_api_key: str, artifacts_dir: PosixPath
 
     if len(exp_objects) == 0:
         raise ValueError(
-            "No model was selected to be trained. Select at least one model!"
+            "No model was selected for training or all training experiments failed."
         )
 
-    # Rename comparison metric if it's fbeta_score to include beta value
-    if COMPARISON_METRIC == "fbeta_score":
-        COMPARISON_METRIC = f"f_{F_BETA_SCORE_BETA_VAL}_score"
+    # Save names of successful experiments names so that logged training
+    # metrics can imported in evaluate.py from workspace
+    exp_names_keys = {}
+    for i in range(len(exp_objects)):
+        exp_key = list(exp_objects.keys())[i]
+        exp_value = list(exp_objects.values())[i]
+        exp_names_keys.update(**{f"{exp_key}": exp_value.get_key()})
 
-    best_model_name = select_best_performer(
-        comparison_metric="valid_" + COMPARISON_METRIC, models_with_exp=exp_objects
-    )
-
-    # Register the best performer as champion model for scoring
-    best_model_exp = exp_objects.get(best_model_name)
-    best_model_exp_key = best_model_exp.get_key()
-
-    #############################################
-    # Assess generalization capability of the best performer on test set
-    # Note: test set was not exposed to any model during training or
-    # evaluation to ensure all models are independent of the test set.
-    compared_pipelines = {
-        LR_REGISTERED_MODEL_NAME: lr_calibrated_pipeline,
-        RF_REGISTERED_MODEL_NAME: rf_calibrated_pipeline,
-        LGBM_REGISTERED_MODEL_NAME: lgbm_calibrated_pipeline,
-        XGB_REGISTERED_MODEL_NAME: xgb_calibrated_pipeline,
-        VOTING_ENSEMBLE_REGISTERED_MODEL_NAME: ve_calibrated_pipeline,
-    }
-    compared_pipelines = {
-        key: value for key, value in compared_pipelines.items() if value is not None
-    }
-    best_model_pipeline = compared_pipelines.get(best_model_name)
-
-    best_model_evaluator = ModelEvaluator(
-        comet_exp=best_model_exp,
-        pipeline=best_model_pipeline,
-        train_features=train_features,
-        train_class=train_class,
-        valid_features=test_features,
-        valid_class=test_class,
-        fbeta_score_beta=F_BETA_SCORE_BETA_VAL,
-        is_voting_ensemble=True
-        if best_model_name == VOTING_ENSEMBLE_REGISTERED_MODEL_NAME
-        else False,
-    )
-
-    # Evaluate best model on testing set to assess its generalization capability
-    (
-        _,
-        test_scores,
-    ) = best_model_evaluator.evaluate_model_perf(
-        class_encoder=class_encoder,
-    )
-
-    test_scores = best_model_evaluator.convert_metrics_from_df_to_dict(
-        scores=test_scores, prefix="test_"
-    )
-
-    # Create ExistingExperiment object to allow appending logging new metrics
-    best_model_exp_obj = ExistingExperiment(
-        api_key=COMET_API_KEY, experiment_key=best_model_exp_key
-    )
-    best_model_exp_obj.log_metrics(test_scores)
-
-    # Log and register champion model (in Comet, model must be logged first)
-    # Note: the best model should not be deployed in production if its score
-    # on the test set is below minimum score. Otherwise, prevent deploying
-    # the model by raising error preventing build job.
-    BEST_MODEL_TEST_SCORE = test_scores.get(f"test_{COMPARISON_METRIC}")
-    if BEST_MODEL_TEST_SCORE >= DEPLOYMENT_SCORE_THRESH:
-        log_and_register_champ_model(
-            local_path=artifacts_dir,
-            champ_model_name=CHAMPION_MODEL_NAME,
-            pipeline=best_model_pipeline,
-            exp_obj=best_model_exp_obj,
-        )
-
-        # Save the champion model in local direcotry to be uploaded as an artifact
-        joblib.dump(best_model_pipeline, f"{ARTIFACTS_DIR}/{CHAMPION_MODEL_NAME}.pkl")
-
-    else:
-        raise ValueError(
-            f"Best model score is {BEST_MODEL_TEST_SCORE}, which is lower than deployment threshold {DEPLOYMENT_SCORE_THRESH}."
-        )
+    successful_exp = pd.DataFrame(exp_names_keys.items())
+    successful_exp.to_csv(f"{ARTIFACTS_DIR}/{EXP_KEY_FILE_NAME}.csv", index=False)
 
 
 ###########################################################
 if __name__ == "__main__":
-    # Submit training experiment
     main(
         config_yaml_abs_path=sys.argv[1],
         comet_api_key=os.environ["COMET_API_KEY"],
+        data_dir=DATA_DIR,
         artifacts_dir=ARTIFACTS_DIR,
     )

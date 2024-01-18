@@ -124,5 +124,4 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath):
 
 ###########################################################
 if __name__ == "__main__":
-    # Preprocess and transform data
     main(config_yaml_abs_path=sys.argv[1], data_dir=DATA_DIR)

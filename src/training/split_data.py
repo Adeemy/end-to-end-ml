@@ -16,6 +16,7 @@ from pathlib import PosixPath
 
 from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 from utils.config import Config
+from utils.data import PrepTrainingData
 from utils.path import DATA_DIR, FEATURE_REPO_DIR
 
 from src.feature_store.utils.prep import DataSplitter
@@ -38,9 +39,6 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     config = Config(config_path=config_yaml_abs_path)
     DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
     DATASET_SPLIT_SEED = int(config.params["data"]["params"]["split_rand_seed"])
-    SPLIT_DATE_COL_NAME = config.params["data"]["params"]["split_date_col_name"]
-    SPLIT_CUTOFF_DATE = config.params["data"]["params"]["train_test_split_curoff_date"]
-    SPLIT_DATE_FORMAT = config.params["data"]["params"]["split_date_col_format"]
     TRAIN_SET_SIZE = config.params["data"]["params"]["train_set_size"]
     PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
     CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
@@ -54,8 +52,20 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     historical_data_file_name = config.params["files"]["params"][
         "historical_data_file_name"
     ]
-    train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
-    test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
+    TRAIN_FILE_NAME = config.params["files"]["params"]["train_set_file_name"]
+    VALID_FILE_NAME = config.params["files"]["params"]["valid_set_file_name"]
+    TEST_FILE_NAME = config.params["files"]["params"]["test_set_file_name"]
+
+    # Dataset split configuration, feature data types, and positive class label
+    DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
+    DATASET_SPLIT_SEED = config.params["data"]["params"]["split_rand_seed"]
+    SPLIT_DATE_COL_NAME = config.params["data"]["params"]["split_date_col_name"]
+    SPLIT_CUTOFF_DATE = config.params["data"]["params"]["train_valid_split_curoff_date"]
+    SPLIT_DATE_FORMAT = config.params["data"]["params"]["split_date_col_format"]
+    CAT_FEAT_NAN_REPLACEMENT = config.params["data"]["params"][
+        "cat_features_nan_replacement"
+    ]
+    TRAIN_SIZE = config.params["data"]["params"]["train_set_size"]
 
     # Extract cut-off date for splitting train and test sets
     input_split_cutoff_date = None
@@ -130,13 +140,14 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
     )
     preprocessed_data = preprocessed_data[required_input_col_names].copy()
 
+    # Split data into train and test sets
     data_splitter = DataSplitter(
         dataset=preprocessed_data,
         primary_key_col_name=PRIMARY_KEY,
         class_col_name=CLASS_COL_NAME,
     )
 
-    train_set, test_set = data_splitter.split_dataset(
+    training_set, testing_set = data_splitter.split_dataset(
         split_type=DATASET_SPLIT_TYPE,
         train_set_size=TRAIN_SET_SIZE,
         split_random_seed=DATASET_SPLIT_SEED,
@@ -145,15 +156,46 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
         split_date_col_format=SPLIT_DATE_FORMAT,
     )
 
-    # Store train and test sets locally
+    # Prepare data for training
+    data_prep = PrepTrainingData(
+        train_set=training_set,
+        test_set=testing_set,
+        primary_key=PRIMARY_KEY,
+        class_col_name=CLASS_COL_NAME,
+        numerical_feature_names=num_col_names,
+        categorical_feature_names=cat_col_names,
+    )
+
+    # Preprocess train and test sets by enforcing data types of numerical and categorical features
+    data_prep.select_relevant_columns()
+    data_prep.enforce_data_types()
+    data_prep.replace_nans_in_cat_features(nan_replacement=CAT_FEAT_NAN_REPLACEMENT)
+    data_prep.create_validation_set(
+        split_type=DATASET_SPLIT_TYPE,
+        train_set_size=TRAIN_SIZE,
+        split_random_seed=DATASET_SPLIT_SEED,
+        split_date_col_name=SPLIT_DATE_COL_NAME,
+        split_cutoff_date=SPLIT_CUTOFF_DATE,
+        split_date_col_format=SPLIT_DATE_FORMAT,
+    )
+
+    # Store train, validation, and test sets locally
     # Note: should be registered and tagged for reproducibility.
+    train_set = data_prep.get_train_set()
     train_set.to_parquet(
-        data_dir / train_set_file_name,
+        data_dir / TRAIN_FILE_NAME,
         index=False,
     )
 
+    valid_set = data_prep.get_validation_set()
+    valid_set.to_parquet(
+        data_dir / VALID_FILE_NAME,
+        index=False,
+    )
+
+    test_set = data_prep.get_test_set()
     test_set.to_parquet(
-        data_dir / test_set_file_name,
+        data_dir / TEST_FILE_NAME,
         index=False,
     )
 

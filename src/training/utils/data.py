@@ -10,13 +10,12 @@ from typing import Callable, Literal, Union
 
 import numpy as np
 import pandas as pd
-from datasets import load_dataset
 from numpy import ravel
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import (  # StandardScaler,; RobustScaler,
+from sklearn.preprocessing import (  # StandardScaler, RobustScaler,
     LabelEncoder,
     MinMaxScaler,
     OneHotEncoder,
@@ -179,45 +178,42 @@ class DataPipelineCreator:
 
 
 class PrepTrainingData:
+    """A class to prep data for training during data split. It can be used to create the
+    three data splits: training, validation, and testing, and apply minimal preprocessing
+    steps that doesn't cause data leakage. It can also be used in training script to ensure
+    all data splits have proper data types espcially when importing data from csv files. The
+    class can also be used to fit label encoder on training class and use the fitted encoder
+    to transform the validation and testing set class labels. Although there is no dependencies
+    between methods, this class can be further improved in future refactoring efforts.
+    """
+
     def __init__(
         self,
+        train_set: pd.DataFrame,
+        test_set: pd.DataFrame,
         primary_key: str,
         class_col_name: str,
-        numerical_feature_names: list,
-        categorical_feature_names: list,
+        numerical_feature_names: list = None,
+        categorical_feature_names: list = None,
     ) -> None:
         self.primary_key = primary_key
         self.class_col_name = class_col_name
         self.numerical_feature_names = numerical_feature_names
         self.categorical_feature_names = categorical_feature_names
-        self.train_set = None
+        self.train_set = train_set
         self.valid_set = None
-        self.test_set = None
+        self.test_set = test_set
         self.training_features = None
         self.validation_features = None
         self.testing_features = None
         self.train_features_preprocessed = None
         self.valid_features_preprocessed = None
 
-    def import_datasets(
-        self,
-        hf_data_source: str = None,
-        train_set_path: str = None,
-        test_set_path: str = None,
-        is_local_source: bool = False,
-    ) -> Union[pd.DataFrame, pd.DataFrame]:
-        """Imports the training and testing sets from parquet files. It returns
-        two pandas dataframes: train_set and test_set."""
-
-        if is_local_source:
-            self.train_set = pd.read_parquet(path=train_set_path)
-            self.test_set = pd.read_parquet(path=test_set_path)
-
-        else:
-            # Import train and test sets
-            dataset = load_dataset(hf_data_source)
-            self.train_set = dataset["train"].to_pandas()
-            self.test_set = dataset["test"].to_pandas()
+        # Assert that at least one feature data type was passed
+        assert (
+            self.numerical_feature_names is not None
+            and self.categorical_feature_names is not None
+        ), "Names of numerical and/or categorical features must be provided. None was provided!"
 
     def select_relevant_columns(self) -> None:
         """Ensures specified numerical and categorical features exist in train and test
@@ -258,11 +254,6 @@ class PrepTrainingData:
         be considered categorical and will be converted to string.
         """
 
-        # Assert that at least one feature data type was passed
-        assert (
-            len(self.numerical_feature_names + self.categorical_feature_names) > 0
-        ), "Name of numerical or categorical features must be provided. None was provided!"
-
         train_set_processor = DataPreprocessor(
             input_data=self.train_set,
             num_feature_names=self.numerical_feature_names,
@@ -270,6 +261,15 @@ class PrepTrainingData:
         )
         train_set_processor.specify_data_types()
         self.train_set = train_set_processor.get_preprocessed_data()
+
+        if self.valid_set is not None:
+            valid_set_processor = DataPreprocessor(
+                input_data=self.valid_set,
+                num_feature_names=self.numerical_feature_names,
+                cat_feature_names=self.categorical_feature_names,
+            )
+            valid_set_processor.specify_data_types()
+            self.valid_set = valid_set_processor.get_preprocessed_data()
 
         test_set_processor = DataPreprocessor(
             input_data=self.test_set,
@@ -283,13 +283,19 @@ class PrepTrainingData:
         self,
         nan_replacement: str = "Unspecified",
     ) -> None:
-        """Replaces missing values with NaNs to allow converting them from float to integer.
-        Note: the error (AttributeError: 'bool' object has no attribute 'transpose') is raised
-        when transforming train set possibly because of pd.NA."""
+        """Replaces missing values with NaNs to allow converting them from
+        float to integer.
+        Note: the error (AttributeError: 'bool' object has no attribute 'transpose')
+        is raised when transforming train set possibly because of pd.NA."""
 
         self.train_set[self.categorical_feature_names] = self.train_set[
             self.categorical_feature_names
         ].replace({pd.NA: nan_replacement})
+
+        if self.valid_set is not None:
+            self.valid_set[self.categorical_feature_names] = self.valid_set[
+                self.categorical_feature_names
+            ].replace({pd.NA: nan_replacement})
 
         self.test_set[self.categorical_feature_names] = self.test_set[
             self.categorical_feature_names
@@ -308,6 +314,10 @@ class PrepTrainingData:
         validation sets randomly or based on time.
         Note: validation set will be used to select the best model.
         """
+
+        if self.valid_set is not None:
+            raise ValueError("Validation set already exists!")
+
         data_splitter = DataSplitter(
             dataset=self.train_set,
             primary_key_col_name=self.primary_key,
@@ -323,15 +333,23 @@ class PrepTrainingData:
             split_date_col_format=split_date_col_format,
         )
 
-    def drop_primary_key(self) -> None:
-        """Drop primary key column (not needed in training)."""
+    def extract_features(self, valid_set: pd.DataFrame = None) -> None:
+        """Separate features and class column of testing set. The validation
+        set (valid_set) can be provided in this method if to wasn't provided
+        already. If validation set is provided here, it will overwrite the
+        validation set created by create_validation_set"""
 
-        self.train_set.drop([self.primary_key], axis=1, inplace=True)
-        self.valid_set.drop([self.primary_key], axis=1, inplace=True)
-        self.test_set.drop([self.primary_key], axis=1, inplace=True)
-
-    def extract_features(self) -> None:
-        """Separate features and class column of testing set."""
+        if valid_set is not None and self.valid_set is None:
+            print("Provided validation set will replace existing validation set!")
+            self.valid_set = valid_set
+        elif valid_set is not None and self.valid_set is not None:
+            raise ValueError(
+                "Validation set was provided although it was already created!"
+            )
+        elif valid_set is None and self.valid_set is None:
+            raise ValueError(
+                "Validation set neither provided nor created using create_validation_set method!"
+            )
 
         selected_features = (
             self.numerical_feature_names + self.categorical_feature_names
@@ -435,6 +453,18 @@ class PrepTrainingData:
         self.valid_features_preprocessed = self.valid_features_preprocessed.rename(
             columns=lambda x: re.sub("[^A-Za-z0-9]+", "_", x), inplace=False
         )
+
+    def get_train_set(self):
+        """Returns the training set (features and class) when invoked."""
+        return self.train_set.copy()
+
+    def get_validation_set(self):
+        """Returns the validation set (features and class) when invoked."""
+        return self.valid_set.copy()
+
+    def get_test_set(self):
+        """Returns the testing set (features and class) when invoked."""
+        return self.test_set.copy()
 
     def get_training_features(self):
         """Returns the training features when invoked."""

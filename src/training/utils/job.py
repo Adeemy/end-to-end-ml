@@ -3,7 +3,6 @@ This utility module includes functions to submit
 training job.
 """
 
-##########################
 import re
 from copy import deepcopy
 from typing import Callable, Literal
@@ -41,7 +40,6 @@ def submit_train_exp(
     artifacts_path: str,
     num_feature_names: list = None,
     cat_feature_names: list = None,
-    cv_folds: int = 5,
     fbeta_score_beta: float = 1.0,
     encoded_pos_class_label: int = 1,
     max_search_iters: int = 100,
@@ -75,7 +73,6 @@ def submit_train_exp(
         num_feature_names (list): list of original numerical feature names.
         cat_feature_names (list, optional): list of original categorical feature names
         (before encoding and feature selection). Defaults to None.
-        cv_folds (int, optional): number of folds for cross-validation.
         fbeta_score_beta (float, optional): beta value (weight of recall) in fbeta_score().
             Default to 1 (same as F1).
         encoded_pos_class_label (int, optional): encoded label of positive class using LabelEncoder().
@@ -120,7 +117,6 @@ def submit_train_exp(
             valid_class=valid_class,
             n_features=n_features,
             model=model,
-            cv_folds=cv_folds,
             fbeta_score_beta=fbeta_score_beta,
             encoded_pos_class_label=encoded_pos_class_label,
         )
@@ -156,12 +152,8 @@ def submit_train_exp(
         #############################################
         # Fit best model with and without calibration (the latter is for feature importance)
         model = model.set_params(**study.best_params)
-        (
-            calibrated_pipeline,
-            uncalibrated_pipeline,
-        ) = optimizer.fit_pipeline(
+        fitted_pipeline = optimizer.fit_pipeline(
             train_features=train_features,
-            valid_features=valid_features,
             preprocessor_step=preprocessor_step,
             selector_step=selector_step,
             model=model,
@@ -170,17 +162,16 @@ def submit_train_exp(
         # Log model params
         model_params = {
             k: v
-            for k, v in calibrated_pipeline.get_params().items()
+            for k, v in fitted_pipeline.get_params().items()
             if k.startswith("classifier__")
         }
         comet_exp.log_parameters(model_params)
 
         # Get feature importance for best model
-        # Note: must use uncalibrated_pipeline, as it has feature
-        # importance attributes.
+
         evaluator = ModelEvaluator(
             comet_exp=comet_exp,
-            pipeline=calibrated_pipeline,
+            pipeline=fitted_pipeline,
             train_features=train_features,
             train_class=train_class,
             valid_features=valid_features,
@@ -190,7 +181,7 @@ def submit_train_exp(
         )
 
         evaluator.extract_feature_importance(
-            pipeline=uncalibrated_pipeline,
+            pipeline=fitted_pipeline,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
             figure_size=(24, 36),
@@ -219,10 +210,8 @@ def submit_train_exp(
         metrics_to_log.update(valid_metric_values)
 
         # Add Expected Calibration Error (ECE) to model metrics
-        pred_probs = calibrated_pipeline.predict_proba(valid_features)
-        pos_class_index = list(calibrated_pipeline.classes_).index(
-            encoded_pos_class_label
-        )
+        pred_probs = fitted_pipeline.predict_proba(valid_features)
+        pos_class_index = list(fitted_pipeline.classes_).index(encoded_pos_class_label)
         model_ece = evaluator.calc_expected_calibration_error(
             pred_probs=pred_probs[:, pos_class_index],
             true_labels=valid_class,
@@ -232,9 +221,7 @@ def submit_train_exp(
         comet_exp.log_metrics(metrics_to_log)
 
         # Log model
-        joblib.dump(
-            calibrated_pipeline, f"{artifacts_path}/{registered_model_name}.pkl"
-        )
+        joblib.dump(fitted_pipeline, f"{artifacts_path}/{registered_model_name}.pkl")
         comet_exp.log_model(
             name=registered_model_name,
             file_or_folder=f"{artifacts_path}/{registered_model_name}.pkl",
@@ -243,13 +230,13 @@ def submit_train_exp(
         comet_exp.register_model(registered_model_name)
 
     except Exception as e:  # pylint: disable=W0718
-        print(f"Model training error --> {e}")
-        calibrated_pipeline = None
+        print(f"\n\nModel training error --> {e}\n\n")
+        fitted_pipeline = None
 
     # End experiment to upload metrics and artifacts to Comet project
     comet_exp.end()
 
-    return calibrated_pipeline, comet_exp
+    return fitted_pipeline, comet_exp
 
 
 def create_voting_ensemble(
@@ -451,4 +438,4 @@ def create_voting_ensemble(
     # End experiment to upload metrics and artifacts to Comet project
     comet_exp.end()
 
-    return ve_pipeline, comet_exp
+    return comet_exp
