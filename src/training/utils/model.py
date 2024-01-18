@@ -17,7 +17,7 @@ from comet_ml import API, ExistingExperiment, Experiment
 from dask.distributed import Client
 from matplotlib.figure import Figure
 from numpy.typing import ArrayLike
-from sklearn.calibration import CalibrationDisplay
+from sklearn.calibration import CalibratedClassifierCV, CalibrationDisplay
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.metrics import (
@@ -896,8 +896,9 @@ class ModelEvaluator(ModelOptimizer):
         return ece[0]
 
 
-class LogChampModel:
-    """Selects the best model and registers it in workspace."""
+class PrepChampModel:
+    """A class to select the best (champion) model, calibrates it, and
+    registers it in workspace."""
 
     def select_best_performer(
         self,
@@ -927,6 +928,38 @@ class LogChampModel:
         best_challenger_name = max(exp_scores, key=exp_scores.get)
 
         return best_challenger_name
+
+    def calibrate_pipeline(
+        self,
+        train_features: pd.DataFrame,
+        train_class: np.ndarray,
+        preprocessor_step: ColumnTransformer,
+        selector_step: VarianceThreshold,
+        model: Callable,
+        cv_folds: int = 5,
+    ) -> Pipeline:
+        """Calibrates a model within sklearn pipelines. It ."""
+
+        # Fit a pipeline with a calibrated model
+        calib_pipeline = Pipeline(
+            steps=[
+                ("preprocessor", preprocessor_step),
+                ("selector", selector_step),
+                (
+                    "classifier",
+                    CalibratedClassifierCV(
+                        estimator=model,
+                        method="isotonic" if len(train_class) > 1000 else "sigmoid",
+                        cv=cv_folds,
+                    ),
+                ),
+            ]
+        )
+
+        # Fit pipelines
+        calib_pipeline.fit(train_features, train_class)
+
+        return calib_pipeline
 
     def log_and_register_champ_model(
         self,

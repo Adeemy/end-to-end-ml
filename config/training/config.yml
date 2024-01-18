@@ -52,7 +52,7 @@ train:
     search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization
     parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
     exp_timout_secs: 3600 # Experiment timeout
-    cross_val_folds: 5
+    cross_val_folds: 5 # No. of folds used for cross-validation for model calibration
     fbeta_score_beta_val: 0.5 # Value of beta in f_beta_score, which is a metric used for hyperparams optimization
     comparison_metric: "fbeta_score" # Metric name to compare models. Must be: recall, precision, roc_auc, f1, or fbeta_score
     voting_rule: "soft" # Voting strategy in voting ensemble

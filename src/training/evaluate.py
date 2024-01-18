@@ -17,7 +17,7 @@ import pandas as pd
 from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
 from utils.config import Config
-from utils.model import LogChampModel, ModelEvaluator
+from utils.model import ModelEvaluator, PrepChampModel
 from utils.path import ARTIFACTS_DIR, DATA_DIR
 
 load_dotenv()
@@ -37,6 +37,7 @@ def main(
     COMET_WORKSPACE_NAME = config.params["train"]["params"]["comet_workspace_name"]
     CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
     F_BETA_SCORE_BETA_VAL = config.params["train"]["params"]["fbeta_score_beta_val"]
+    CALIB_CV_FOLDS = config.params["train"]["params"]["cross_val_folds"]
     COMPARISON_METRIC = config.params["train"]["params"]["comparison_metric"]
     EXP_KEY_FILE_NAME = config.params["files"]["params"]["experiments_keys_file_name"]
     TRAIN_FILE_NAME = config.params["files"]["params"]["train_set_file_name"]
@@ -72,8 +73,8 @@ def main(
     )
 
     # Select the best performing model
-    log_champ_model = LogChampModel()
-    best_model_name = log_champ_model.select_best_performer(
+    prep_champ_model = PrepChampModel()
+    best_model_name = prep_champ_model.select_best_performer(
         comet_project_name=COMET_PROJECT_NAME,
         comet_workspace_name=COMET_WORKSPACE_NAME,
         comparison_metric=f"valid_{COMPARISON_METRIC}",
@@ -121,16 +122,28 @@ def main(
 
     best_model_exp_obj.log_metrics(test_scores)
 
+    # Calibrate champ model
+    training_features = train_set.drop(CLASS_COL_NAME, axis=1)
+    training_class = np.array(train_set[CLASS_COL_NAME])
+    calib_pipeline = prep_champ_model.calibrate_pipeline(
+        train_features=training_features,
+        train_class=training_class,
+        preprocessor_step=best_model_pipeline.named_steps["preprocessor"],
+        selector_step=best_model_pipeline.named_steps["selector"],
+        model=best_model_pipeline.named_steps["classifier"],
+        cv_folds=CALIB_CV_FOLDS,
+    )
+
     # Log and register champion model (in Comet, model must be logged first)
     # Note: the best model should not be deployed in production if its score
     # on the test set is below minimum score. Otherwise, prevent deploying
     # the model by raising error preventing build job.
     BEST_MODEL_TEST_SCORE = test_scores.get(f"test_{COMPARISON_METRIC}")
     if BEST_MODEL_TEST_SCORE >= DEPLOYMENT_SCORE_THRESH:
-        log_champ_model.log_and_register_champ_model(
+        prep_champ_model.log_and_register_champ_model(
             local_path=artifacts_dir,
             champ_model_name=CHAMPION_MODEL_NAME,
-            pipeline=best_model_pipeline,
+            pipeline=calib_pipeline,
             exp_obj=best_model_exp_obj,
         )
 
