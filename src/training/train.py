@@ -136,7 +136,21 @@ def main(
     train_features_preprocessed = data_prep.get_train_features_preprocessed()
     valid_features_preprocessed = data_prep.get_valid_features_preprocessed()
 
-    # Save test set with encoded class
+    # Save data splits with encoded class
+    train_set = train_features
+    train_set[CLASS_COL_NAME] = train_class
+    train_set.to_parquet(
+        data_dir / TRAIN_FILE_NAME,
+        index=False,
+    )
+
+    valid_set = valid_features
+    valid_set[CLASS_COL_NAME] = valid_class
+    valid_set.to_parquet(
+        data_dir / VALID_FILE_NAME,
+        index=False,
+    )
+
     test_set = test_features
     test_set[CLASS_COL_NAME] = test_class
     test_set.to_parquet(

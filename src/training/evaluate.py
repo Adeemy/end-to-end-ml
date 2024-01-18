@@ -52,6 +52,7 @@ def main(
     ]
 
     # Import train and test sets to evaluate best model on test set
+    # Note: it requires class labels to be encoded.
     train_set = pd.read_parquet(
         data_dir / TRAIN_FILE_NAME,
     )

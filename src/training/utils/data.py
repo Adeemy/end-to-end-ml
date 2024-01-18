@@ -178,14 +178,23 @@ class DataPipelineCreator:
 
 
 class PrepTrainingData:
+    """A class to prep data for training during data split. It can be used to create the
+    three data splits: training, validation, and testing, and apply minimal preprocessing
+    steps that doesn't cause data leakage. It can also be used in training script to ensure
+    all data splits have proper data types espcially when importing data from csv files. The
+    class can also be used to fit label encoder on training class and use the fitted encoder
+    to transform the validation and testing set class labels. Although there is no dependencies
+    between methods, this class can be further improved in future refactoring efforts.
+    """
+
     def __init__(
         self,
         train_set: pd.DataFrame,
         test_set: pd.DataFrame,
         primary_key: str,
         class_col_name: str,
-        numerical_feature_names: list,
-        categorical_feature_names: list,
+        numerical_feature_names: list = None,
+        categorical_feature_names: list = None,
     ) -> None:
         self.primary_key = primary_key
         self.class_col_name = class_col_name
@@ -199,6 +208,12 @@ class PrepTrainingData:
         self.testing_features = None
         self.train_features_preprocessed = None
         self.valid_features_preprocessed = None
+
+        # Assert that at least one feature data type was passed
+        assert (
+            self.numerical_feature_names is not None
+            and self.categorical_feature_names is not None
+        ), "Names of numerical and/or categorical features must be provided. None was provided!"
 
     def select_relevant_columns(self) -> None:
         """Ensures specified numerical and categorical features exist in train and test
@@ -239,11 +254,6 @@ class PrepTrainingData:
         be considered categorical and will be converted to string.
         """
 
-        # Assert that at least one feature data type was passed
-        assert (
-            len(self.numerical_feature_names + self.categorical_feature_names) > 0
-        ), "Name of numerical or categorical features must be provided. None was provided!"
-
         train_set_processor = DataPreprocessor(
             input_data=self.train_set,
             num_feature_names=self.numerical_feature_names,
@@ -273,13 +283,19 @@ class PrepTrainingData:
         self,
         nan_replacement: str = "Unspecified",
     ) -> None:
-        """Replaces missing values with NaNs to allow converting them from float to integer.
-        Note: the error (AttributeError: 'bool' object has no attribute 'transpose') is raised
-        when transforming train set possibly because of pd.NA."""
+        """Replaces missing values with NaNs to allow converting them from
+        float to integer.
+        Note: the error (AttributeError: 'bool' object has no attribute 'transpose')
+        is raised when transforming train set possibly because of pd.NA."""
 
         self.train_set[self.categorical_feature_names] = self.train_set[
             self.categorical_feature_names
         ].replace({pd.NA: nan_replacement})
+
+        if self.valid_set is not None:
+            self.valid_set[self.categorical_feature_names] = self.valid_set[
+                self.categorical_feature_names
+            ].replace({pd.NA: nan_replacement})
 
         self.test_set[self.categorical_feature_names] = self.test_set[
             self.categorical_feature_names
@@ -298,6 +314,10 @@ class PrepTrainingData:
         validation sets randomly or based on time.
         Note: validation set will be used to select the best model.
         """
+
+        if self.valid_set is not None:
+            raise ValueError("Validation set already exists!")
+
         data_splitter = DataSplitter(
             dataset=self.train_set,
             primary_key_col_name=self.primary_key,
@@ -320,10 +340,11 @@ class PrepTrainingData:
         validation set created by create_validation_set"""
 
         if valid_set is not None and self.valid_set is None:
+            print("Provided validation set will replace existing validation set!")
             self.valid_set = valid_set
         elif valid_set is not None and self.valid_set is not None:
             raise ValueError(
-                "Validation set was created already but it was provided here!"
+                "Validation set was provided although it was already created!"
             )
         elif valid_set is None and self.valid_set is None:
             raise ValueError(
