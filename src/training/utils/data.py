@@ -3,10 +3,8 @@ This module contains helper functions used within the main
 function in train.py
 """
 
-import os
 import re
-import sys
-from typing import Callable, Literal, Union
+from typing import Callable, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -20,9 +18,7 @@ from sklearn.preprocessing import (  # StandardScaler, RobustScaler,
     MinMaxScaler,
     OneHotEncoder,
 )
-
-sys.path.insert(0, os.getcwd())
-from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
+from utils.prep import DataPreprocessor, DataSplitter
 
 ###########################################################
 
@@ -33,7 +29,7 @@ class DataPipelineCreator:
     def __init__(
         self,
         num_features_imputer: str = "median",
-        num_features_scaler: Union[Callable, None] = None,
+        num_features_scaler: Optional[Union[Callable, None]] = None,
         cat_features_imputer: str = "constant",
         cat_features_ohe_handle_unknown: str = "infrequent_if_exist",
         cat_features_nans_replacement: float = np.nan,
@@ -88,8 +84,8 @@ class DataPipelineCreator:
     def create_data_pipeline(
         self,
         input_features: pd.DataFrame,
-        num_feature_col_names: list = None,
-        cat_feature_col_names: list = None,
+        num_feature_col_names: Optional[list] = None,
+        cat_feature_col_names: Optional[list] = None,
         variance_threshold_val: float = 0.05,
     ) -> Union[pd.DataFrame, Pipeline]:
         """
@@ -193,8 +189,8 @@ class PrepTrainingData:
         test_set: pd.DataFrame,
         primary_key: str,
         class_col_name: str,
-        numerical_feature_names: list = None,
-        categorical_feature_names: list = None,
+        numerical_feature_names: Optional[list] = None,
+        categorical_feature_names: Optional[list] = None,
     ) -> None:
         self.primary_key = primary_key
         self.class_col_name = class_col_name
@@ -305,9 +301,9 @@ class PrepTrainingData:
         self,
         split_type: Literal["time", "random"] = "random",
         train_set_size: float = 0.8,
-        split_random_seed: int = None,
-        split_date_col_name: str = None,
-        split_cutoff_date: str = None,
+        split_random_seed: Optional[int] = None,
+        split_date_col_name: Optional[str] = None,
+        split_cutoff_date: Optional[str] = None,
         split_date_col_format: str = "%Y-%m-%d %H:%M:%S",
     ) -> None:
         """Creates a validation set by splitting training set into training and
@@ -333,14 +329,13 @@ class PrepTrainingData:
             split_date_col_format=split_date_col_format,
         )
 
-    def extract_features(self, valid_set: pd.DataFrame = None) -> None:
+    def extract_features(self, valid_set: Optional[pd.DataFrame] = None) -> None:
         """Separate features and class column of testing set. The validation
         set (valid_set) can be provided in this method if to wasn't provided
         already. If validation set is provided here, it will overwrite the
         validation set created by create_validation_set"""
 
         if valid_set is not None and self.valid_set is None:
-            print("Provided validation set will replace existing validation set!")
             self.valid_set = valid_set
         elif valid_set is not None and self.valid_set is not None:
             raise ValueError(

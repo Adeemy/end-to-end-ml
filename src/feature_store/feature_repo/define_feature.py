@@ -5,7 +5,6 @@ store capability, but in this project feature
 store is created in local path.
 """
 
-import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -13,9 +12,10 @@ from pathlib import Path
 from feast import Entity, FeatureView, Field, FileSource, ValueType
 from feast.types import Float32, String
 
-sys.path.append(str(Path(__file__).parent.resolve().parent.parent.parent))
+sys.path.append(str(Path(__file__).parent.resolve().parent))
 
-from src.feature_store.utils.config import Config
+from utils.config import Config
+from utils.path import DATA_DIR
 
 #################################
 # Specify required column names by data type
@@ -31,12 +31,8 @@ EVENT_TIMESTAMP_COL_NAME = config.params["data"]["params"]["event_timestamp_col_
 ttl_duration_in_days = timedelta(days=180)
 
 # Specify path to features and target
-feat_path_source = (
-    f"{os.path.abspath('..')}/feature_repo/data/preprocessed_dataset_features.parquet"
-)
-target_path_source = (
-    f"{os.path.abspath('..')}/feature_repo/data/preprocessed_dataset_target.parquet"
-)
+feat_path_source = f"{str(DATA_DIR)}/preprocessed_dataset_features.parquet"
+target_path_source = f"{str(DATA_DIR)}/preprocessed_dataset_target.parquet"
 
 #################################
 # Define an entity for encounters

@@ -3,18 +3,14 @@ This script prepares data retrieved from feature store
 for training. 
 """
 
-import os
 import sys
 from datetime import datetime
-
-import pandas as pd
-
-sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
 
-from src.feature_store.utils.config import Config
-from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
-from src.training.utils.path import DATA_DIR
+import pandas as pd
+from utils.config import Config
+from utils.path import DATA_DIR
+from utils.prep import DataPreprocessor, DataTransformer
 
 
 #################################

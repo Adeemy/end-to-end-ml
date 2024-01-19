@@ -32,7 +32,7 @@ check_code: install isort format test lint
 
 # Import raw dataset from source
 get_init_data:
-	python ./src/feature_store/initial_data_setup/generate_initial_data.py ./config/feature_store/config.yml
+	python ./src/feature_store/generate_initial_data.py ./config/feature_store/config.yml
 
 # Preprocess and transform data before ingestion by feature store
 prep_data:
@@ -74,9 +74,12 @@ evaluate:
 
 submit_train: prep_data split_data train evaluate
 
+# Test model locally
+test_model:
+	python ./src/inference/predict.py ./config/training/config.yml
 
-# Test model locally (go to http://localhost:8000/docs page to test sample)
-test_container:
+# Test model via API (go to http://localhost:8000/docs page to test sample)
+test_packaged_model:
 	cd ./src/inference &&\
 	uvicorn --host 0.0.0.0 main:app
 
