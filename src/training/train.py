@@ -52,7 +52,6 @@ def main(
     MAX_SEARCH_ITERS = config.params["train"]["params"]["search_max_iters"]
     PARALLEL_JOBS_COUNT = config.params["train"]["params"]["parallel_jobs_count"]
     EXP_TIMEOUT_SECS = config.params["train"]["params"]["exp_timout_secs"]
-    CROSS_VAL_FOLDS = config.params["train"]["params"]["cross_val_folds"]
     F_BETA_SCORE_BETA_VAL = config.params["train"]["params"]["fbeta_score_beta_val"]
     VOTING_RULE = config.params["train"]["params"]["voting_rule"]
     TRAIN_FILE_NAME = config.params["files"]["params"]["train_set_file_name"]
@@ -318,14 +317,12 @@ def main(
             xgb_calib_pipeline=xgb_calibrated_pipeline,
             train_features=train_features,
             valid_features=valid_features,
-            valid_features_preprocessed=valid_features_preprocessed,
             train_class=train_class,
             valid_class=valid_class,
             class_encoder=class_encoder,
             artifacts_path=artifacts_dir,
             voting_rule=VOTING_RULE,
             encoded_pos_class_label=encoded_positive_class_label,
-            cv_folds=CROSS_VAL_FOLDS,
             fbeta_score_beta=F_BETA_SCORE_BETA_VAL,
             registered_model_name=VOTING_ENSEMBLE_REGISTERED_MODEL_NAME,
         )

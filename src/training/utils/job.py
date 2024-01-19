@@ -11,7 +11,6 @@ import joblib
 import numpy as np
 import pandas as pd
 from comet_ml import Experiment
-from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import VotingClassifier
 from sklearn.feature_selection import VarianceThreshold
@@ -249,14 +248,12 @@ def create_voting_ensemble(
     xgb_calib_pipeline: Pipeline,
     train_features: pd.DataFrame,
     valid_features: pd.DataFrame,
-    valid_features_preprocessed: pd.DataFrame,
     train_class: np.ndarray,
     valid_class: np.ndarray,
     class_encoder: LabelEncoder,
     artifacts_path: str,
     voting_rule: Literal["hard", "soft"] = "soft",
     encoded_pos_class_label: int = 1,
-    cv_folds: int = 5,
     fbeta_score_beta: float = 1.0,
     registered_model_name: str = None,
 ) -> Pipeline:
@@ -275,7 +272,6 @@ def create_voting_ensemble(
         train_features (pd.DataFrame): original features (not preprocessed) of training set
             for ModelEvaluator class.
         train_class (np.ndarray): The target labels for the training set.
-        valid_features_preprocessed (pd.DataFrame): transformed features of validation set.
         valid_features (pd.DataFrame): original features (not preprocessed) of validation set
             for ModelEvaluator class.
         valid_class (np.ndarray): The target labels for the validation set.
@@ -285,7 +281,6 @@ def create_voting_ensemble(
         encoded_pos_class_label (int): encoded label of positive class using
             LabelEncoder(). Default to 1.
         artifacts_path (str): path to save training artificats, e.g., .pkl and .png files.
-        cv_folds (int, optional): number of folds for cross-validation.
         fbeta_score_beta (float): beta value (weight of recall) in fbeta_score().
             Default to 1 (same as F1).
         registered_model_name (str): name used for the registered model.
@@ -309,41 +304,25 @@ def create_voting_ensemble(
     # Note: some base models may not exist if all its losses are zero.
     base_models = []
     try:
-        model_lr = CalibratedClassifierCV(
-            estimator=lr_calib_pipeline.named_steps["classifier"],
-            method="isotonic" if len(valid_class) > 1000 else "sigmoid",
-            cv=cv_folds,
-        )
+        model_lr = lr_calib_pipeline.named_steps["classifier"]
         base_models.append(("LR", model_lr))
     except Exception:  # pylint: disable=W0718
         print("RF model does not exist or not in required type!")
 
     try:
-        model_rf = CalibratedClassifierCV(
-            estimator=rf_calib_pipeline.named_steps["classifier"],
-            method="isotonic" if len(valid_class) > 1000 else "sigmoid",
-            cv=cv_folds,
-        )
+        model_rf = rf_calib_pipeline.named_steps["classifier"]
         base_models.append(("RF", model_rf))
     except Exception:  # pylint: disable=W0718
         print("RF model does not exist or not in required type!")
 
     try:
-        model_lgbm = CalibratedClassifierCV(
-            estimator=lgbm_calib_pipeline.named_steps["classifier"],
-            method="isotonic" if len(valid_class) > 1000 else "sigmoid",
-            cv=cv_folds,
-        )
+        model_lgbm = lgbm_calib_pipeline.named_steps["classifier"]
         base_models.append(("LightGBM", model_lgbm))
     except Exception:  # pylint: disable=W0718
         print("LightGBM model does not exist or not in required type!")
 
     try:
-        model_xgb = CalibratedClassifierCV(
-            estimator=xgb_calib_pipeline.named_steps["classifier"],
-            method="isotonic" if len(valid_class) > 1000 else "sigmoid",
-            cv=cv_folds,
-        )
+        model_xgb = xgb_calib_pipeline.named_steps["classifier"]
         base_models.append(("XGBoost", model_xgb))
     except Exception:  # pylint: disable=W0718
         print("XGBoost model does not exist or not in required type!")
@@ -373,11 +352,8 @@ def create_voting_ensemble(
             ["classifier", ve_model],
         )
 
-        # Fit pipeline and calibrate base classifiers
+        # Fit pipeline
         ve_pipeline.fit(train_features, train_class)
-        ve_pipeline.named_steps["classifier"].fit(
-            valid_features_preprocessed, valid_class
-        )
 
         # Evaluate voting ensemble on training and validation sets
         evaluator = ModelEvaluator(
