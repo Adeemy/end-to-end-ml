@@ -74,9 +74,12 @@ evaluate:
 
 submit_train: prep_data split_data train evaluate
 
+# Test model locally
+test_model:
+	python ./src/inference/predict.py ./config/training/config.yml
 
-# Test model locally (go to http://localhost:8000/docs page to test sample)
-test_container:
+# Test model via API (go to http://localhost:8000/docs page to test sample)
+test_packaged_model:
 	cd ./src/inference &&\
 	uvicorn --host 0.0.0.0 main:app
 
