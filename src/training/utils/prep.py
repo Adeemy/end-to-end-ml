@@ -3,7 +3,7 @@ Data preprocessing and transformation classes.
 """
 
 from datetime import datetime
-from typing import Literal, Union
+from typing import Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -47,8 +47,8 @@ class DataSplitter:
         split_type: Literal["time", "random"] = "random",
         train_set_size: float = 0.8,
         split_random_seed: int = 123,
-        split_date_col_name: str = None,
-        split_cutoff_date: datetime.date = None,
+        split_date_col_name: Optional[str] = None,
+        split_cutoff_date: Optional[datetime.date] = None,
         split_date_col_format: str = "%Y-%m-%d %H:%M:%S",
     ) -> Union[pd.DataFrame, pd.DataFrame]:
         if split_type == "random":
@@ -166,11 +166,11 @@ class DataPreprocessor:
     def __init__(
         self,
         input_data: pd.DataFrame,
-        primary_key_names: list = None,
-        date_cols_names: list = None,
-        datetime_cols_names: list = None,
-        num_feature_names: list = None,
-        cat_feature_names: list = None,
+        primary_key_names: Optional[list] = None,
+        date_cols_names: Optional[list] = None,
+        datetime_cols_names: Optional[list] = None,
+        num_feature_names: Optional[list] = None,
+        cat_feature_names: Optional[list] = None,
     ):
         self._data = input_data.copy()
         self.primary_key_names = primary_key_names
@@ -337,7 +337,7 @@ class DataPreprocessor:
 
     def identify_cols_with_high_nans(
         self,
-        cols_to_exclude: list = None,
+        cols_to_exclude: Optional[list] = None,
         high_nans_percent_threshold: float = 0.3,
         update_cols_types: bool = True,
     ) -> list:
@@ -409,11 +409,11 @@ class DataTransformer:
     def __init__(
         self,
         preprocessed_data: pd.DataFrame,
-        primary_key_names: list = None,
-        date_cols_names: list = None,
-        datetime_cols_names: list = None,
-        num_feature_names: list = None,
-        cat_feature_names: list = None,
+        primary_key_names: Optional[list] = None,
+        date_cols_names: Optional[list] = None,
+        datetime_cols_names: Optional[list] = None,
+        num_feature_names: Optional[list] = None,
+        cat_feature_names: Optional[list] = None,
     ):
         self.preprocessed_data = preprocessed_data.copy()
         self.primary_key_names = primary_key_names

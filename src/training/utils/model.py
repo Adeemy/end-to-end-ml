@@ -4,7 +4,7 @@ model optimization and evaluation.
 """
 
 import os
-from typing import Callable, Union
+from typing import Callable, Optional, Union
 
 import joblib
 import matplotlib.pyplot as plt
@@ -441,8 +441,8 @@ class ModelEvaluator(ModelOptimizer):
     def extract_feature_importance(
         self,
         pipeline: Pipeline,
-        num_feature_names: list = None,
-        cat_feature_names: list = None,
+        num_feature_names: Optional[list] = None,
+        cat_feature_names: Optional[list] = None,
         n_top_features: int = 30,
         figure_size: tuple = (24, 36),
         font_size: float = 10.0,
@@ -659,7 +659,7 @@ class ModelEvaluator(ModelOptimizer):
     @staticmethod
     def convert_metrics_from_df_to_dict(
         scores: pd.DataFrame,
-        prefix: str = None,
+        prefix: Optional[str] = None,
     ) -> dict:
         """ "Converts scors on training and validation sets from dataframe to
         dictionary for results logging."""
@@ -674,7 +674,7 @@ class ModelEvaluator(ModelOptimizer):
 
     def evaluate_model_perf(
         self,
-        class_encoder: LabelEncoder = None,
+        class_encoder: Optional[LabelEncoder] = None,
         pos_class_label_thresh: float = 0.5,
     ) -> Union[pd.DataFrame, pd.DataFrame, Pipeline, list]:
         """Evaluates the best model returned by hyperparameters optimization procedure

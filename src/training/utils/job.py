@@ -5,7 +5,7 @@ training job.
 
 import re
 from copy import deepcopy
-from typing import Callable, Literal
+from typing import Callable, Literal, Optional
 
 import joblib
 import numpy as np
@@ -37,15 +37,15 @@ def submit_train_exp(
     selector_step: VarianceThreshold,
     model: Callable,
     artifacts_path: str,
-    num_feature_names: list = None,
-    cat_feature_names: list = None,
+    num_feature_names: Optional[list] = None,
+    cat_feature_names: Optional[list] = None,
     fbeta_score_beta: float = 1.0,
     encoded_pos_class_label: int = 1,
     max_search_iters: int = 100,
     optimize_in_parallel: bool = False,
     n_parallel_jobs: int = 4,
     model_opt_timeout_secs: int = 600,
-    registered_model_name: str = None,
+    registered_model_name: Optional[str] = None,
     is_voting_ensemble: bool = False,
 ) -> Pipeline:
     """Submits an experiment to train a model using hyperparameter optimization.
@@ -255,7 +255,7 @@ def create_voting_ensemble(
     voting_rule: Literal["hard", "soft"] = "soft",
     encoded_pos_class_label: int = 1,
     fbeta_score_beta: float = 1.0,
-    registered_model_name: str = None,
+    registered_model_name: Optional[str] = None,
 ) -> Pipeline:
     """Creates a voting ensemble model with data transformation pipeline
     given three models (Random Forest, LightGBM, and XGBoost). The created
