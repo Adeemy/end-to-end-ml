@@ -9,7 +9,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse
-from utils.model import LoadScoringModel
+from utils.model import ModelLoader  # pylint: disable=E0611
 from utils.path import ARTIFACTS_DIR, PARENT_DIR
 
 load_dotenv()
@@ -41,7 +41,7 @@ load_dotenv()
 # }
 
 # Extracts config params
-load_model = LoadScoringModel()
+load_model = ModelLoader()
 (
     comet_ws,
     champ_model_name,

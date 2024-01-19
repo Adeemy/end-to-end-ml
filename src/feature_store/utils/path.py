@@ -1,8 +1,6 @@
 import os
 from pathlib import Path
 
-##########################################################
-
 # Specify paths to data and training artifacts directories
 PARENT_DIR = Path(__file__).parent.resolve().parent.parent
 

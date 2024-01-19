@@ -1,6 +1,6 @@
 """
-This utility module includes functions to download a model and its
-config params for scoring prod data
+This utility module includes functions to download a model and
+its config params for scoring prod data.
 """
 
 from pathlib import PosixPath
@@ -11,7 +11,7 @@ from utils.config import Config
 
 
 ########################################################
-class LoadScoringModel:
+class ModelLoader:
     """Loads scoring models for inference."""
 
     def get_config_params(self, config_yaml_abs_path: str):
