@@ -4,22 +4,17 @@ i.e., features and class labels, and creates data splits
 for model training. 
 """
 
-import os
 import sys
 from datetime import datetime
+from pathlib import PosixPath
 
 import pandas as pd
 from feast import FeatureStore
-
-sys.path.insert(0, os.getcwd())
-from pathlib import PosixPath
-
 from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 from utils.config import Config
 from utils.data import PrepTrainingData
 from utils.path import DATA_DIR, FEATURE_REPO_DIR
-
-from src.feature_store.utils.prep import DataSplitter
+from utils.prep import DataSplitter
 
 #################################
 

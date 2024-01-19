@@ -4,18 +4,13 @@ production data via API calls.
 """
 
 import os
-import sys
-from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse
-
-sys.path.append(str(Path(__file__).parent.resolve().parent.parent))
-
-from src.inference.utils import download_model, get_config_params
-from src.training.utils.path import ARTIFACTS_DIR, PARENT_DIR
+from utils.model import LoadScoringModel
+from utils.path import ARTIFACTS_DIR, PARENT_DIR
 
 load_dotenv()
 
@@ -46,16 +41,17 @@ load_dotenv()
 # }
 
 # Extracts config params
+load_model = LoadScoringModel()
 (
     comet_ws,
     champ_model_name,
     *_,
-) = get_config_params(
+) = load_model.get_config_params(
     config_yaml_abs_path=str(PARENT_DIR.parent) + "/config/training/config.yml"
 )
 
 # Download champion model
-model = download_model(
+model = load_model.download_model(
     comet_workspace=comet_ws,
     comet_api_key=os.environ["COMET_API_KEY"],
     model_name=champ_model_name,

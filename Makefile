@@ -32,7 +32,7 @@ check_code: install isort format test lint
 
 # Import raw dataset from source
 get_init_data:
-	python ./src/feature_store/initial_data_setup/generate_initial_data.py ./config/feature_store/config.yml
+	python ./src/feature_store/generate_initial_data.py ./config/feature_store/config.yml
 
 # Preprocess and transform data before ingestion by feature store
 prep_data:

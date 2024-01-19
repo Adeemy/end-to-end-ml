@@ -11,17 +11,13 @@ Note that this script is only used in the beginning of this project just to
 generate data for the project and it isn't part of feature or inference pipelines.
 """
 
-import os
 import sys
-
-from ucimlrepo import fetch_ucirepo
-
-sys.path.insert(0, os.getcwd())
 from pathlib import PosixPath
 
-from src.feature_store.utils.config import Config
-from src.feature_store.utils.prep import DataSplitter
-from src.training.utils.path import DATA_DIR
+from ucimlrepo import fetch_ucirepo
+from utils.config import Config
+from utils.path import DATA_DIR
+from utils.prep import DataSplitter
 
 
 def main(

@@ -25,15 +25,15 @@ jobs:
         run: |
           make install
 
-      - name: Sort imports
+      - name: Sort imports with isort
         run: |
           make isort
 
-      - name: Format code
+      - name: Format with black
         run: |
           make format
 
-      - name: Unit tests
+      - name: Test with pytest
         run: |
           make test
 

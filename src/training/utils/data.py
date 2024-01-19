@@ -3,9 +3,7 @@ This module contains helper functions used within the main
 function in train.py
 """
 
-import os
 import re
-import sys
 from typing import Callable, Literal, Union
 
 import numpy as np
@@ -20,9 +18,7 @@ from sklearn.preprocessing import (  # StandardScaler, RobustScaler,
     MinMaxScaler,
     OneHotEncoder,
 )
-
-sys.path.insert(0, os.getcwd())
-from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
+from utils.prep import DataPreprocessor, DataSplitter
 
 ###########################################################
 

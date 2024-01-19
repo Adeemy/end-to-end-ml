@@ -44,12 +44,14 @@ Below is the project structure.
         ├── LICENSE
         ├── Makefile
         ├── README.md
+        ├── __init__.py
         ├── config
-        │   ├── __init__.py
         │   ├── feature_store
         │   │   └── config.yml
         │   └── training
         │       └── config.yml
+        ├── img
+        │   └── feast_workflow.png
         ├── notebooks
         │   ├── eda.ipynb
         │   ├── eda_requirements.txt
@@ -61,6 +63,7 @@ Below is the project structure.
         │   │   ├── README.md
         │   │   ├── feature_repo
         │   │   │   ├── data
+        │   │   │   │   ├── historical_data.parquet
         │   │   │   │   ├── inference.parquet
         │   │   │   │   ├── online_store.db
         │   │   │   │   ├── preprocessed_dataset_features.parquet
@@ -68,25 +71,33 @@ Below is the project structure.
         │   │   │   │   ├── raw_dataset.parquet
         │   │   │   │   ├── registry.db
         │   │   │   │   ├── test.parquet
-        │   │   │   │   └── train.parquet
+        │   │   │   │   ├── train.parquet
+        │   │   │   │   └── validation.parquet
         │   │   │   ├── define_feature.py
         │   │   │   └── feature_store.yaml
-        │   │   ├── initial_data_setup
-        │   │   │   ├── generate_initial_data.py
+        │   │   ├── generate_initial_data.py
         │   │   ├── prep_data.py
         │   │   └── utils
         │   │       ├── __init__.py
         │   │       ├── config.py
+        │   │       ├── path.py
         │   │       └── prep.py
         │   ├── inference
         │   │   ├── Dockerfile
-        │   │   ├── __init__.py
         │   │   ├── main.py
-        │   │   └── utils.py
+        │   │   └── utils
+        │   │       ├── __init__.py
+        │   │       ├── config.py
+        │   │       ├── model.py
+        │   │       └── path.py
         │   └── training
         │       ├── artifacts
+        │       │   ├── champion_model.pkl
+        │       │   ├── experiment_keys.csv
         │       │   ├── logistic-regression.pkl
-        │       │   └── study_LogisticRegression.csv
+        │       │   ├── random-forest.pkl
+        │       │   ├── study_LogisticRegression.csv
+        │       │   └── study_RandomForestClassifier.csv
         │       ├── evaluate.py
         │       ├── split_data.py
         │       ├── train.py
@@ -96,7 +107,8 @@ Below is the project structure.
         │           ├── data.py
         │           ├── job.py
         │           ├── model.py
-        │           └── path.py
+        │           ├── path.py
+        │           └── prep.py
         └── tests
         └── test_feature_utils.py
 
