@@ -336,7 +336,6 @@ class PrepTrainingData:
         validation set created by create_validation_set"""
 
         if valid_set is not None and self.valid_set is None:
-            print("Provided validation set will replace existing validation set!")
             self.valid_set = valid_set
         elif valid_set is not None and self.valid_set is not None:
             raise ValueError(

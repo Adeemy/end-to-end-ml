@@ -85,6 +85,7 @@ Below is the project structure.
         │   ├── inference
         │   │   ├── Dockerfile
         │   │   ├── main.py
+        │   │   ├── predict.py
         │   │   └── utils
         │   │       ├── __init__.py
         │   │       ├── config.py

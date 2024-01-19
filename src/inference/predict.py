@@ -32,6 +32,7 @@ model = load_model.download_model(
     artifacts_path=ARTIFACTS_DIR,
 )
 
+
 def predict(data: dict = Body(...)):
     # Convert input dictionary to data frame required by the model
     data_df = pd.json_normalize(data)
@@ -42,9 +43,8 @@ def predict(data: dict = Body(...)):
 
 
 if __name__ == "__main__":
-
     # Sample of prod data for testing
-    data = {
+    sample_data = {
         "BMI": 29.0,
         "PhysHlth": 0,
         "Age": "65 to 69",
@@ -65,8 +65,8 @@ if __name__ == "__main__":
         "DiffWalk": "1",
         "Sex": "1",
         "Education": "1",
-        "Income": "7"
+        "Income": "7",
     }
 
-    prediction = predict(data)
-    print(f'\n\n\n{prediction=}\n\n\n')
+    prediction = predict(sample_data)
+    print(f"\n\n\n{prediction=}\n\n\n")
