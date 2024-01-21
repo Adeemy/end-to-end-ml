@@ -17,8 +17,9 @@ from sklearn.linear_model import LogisticRegression
 from utils.config import Config
 from utils.data import PrepTrainingData
 from utils.job import create_voting_ensemble, submit_train_exp
-from utils.path import ARTIFACTS_DIR, DATA_DIR
 from xgboost import XGBClassifier
+
+from config.path import ARTIFACTS_DIR, DATA_DIR
 
 load_dotenv()
 

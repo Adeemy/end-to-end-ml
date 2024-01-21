@@ -13,8 +13,9 @@ from feast import FeatureStore
 from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 from utils.config import Config
 from utils.data import PrepTrainingData
-from utils.path import DATA_DIR, FEATURE_REPO_DIR
-from utils.prep import DataSplitter
+
+from config.path import DATA_DIR, FEATURE_REPO_DIR
+from feature_store.utils.prep import DataSplitter
 
 #################################
 

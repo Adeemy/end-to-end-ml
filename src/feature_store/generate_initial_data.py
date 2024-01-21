@@ -16,8 +16,9 @@ from pathlib import PosixPath
 
 from ucimlrepo import fetch_ucirepo
 from utils.config import Config
-from utils.path import DATA_DIR
 from utils.prep import DataSplitter
+
+from config.path import DATA_DIR
 
 
 def main(

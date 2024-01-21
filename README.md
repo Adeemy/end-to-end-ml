@@ -45,11 +45,6 @@ Below is the project structure.
         ├── Makefile
         ├── README.md
         ├── __init__.py
-        ├── config
-        │   ├── feature_store
-        │   │   └── config.yml
-        │   └── training
-        │       └── config.yml
         ├── img
         │   └── feast_workflow.png
         ├── notebooks
@@ -59,6 +54,13 @@ Below is the project structure.
         ├── requirements.txt
         ├── src
         │   ├── __init__.py
+        │   ├── config
+        │   │   ├── __init__.py
+        │   │   ├── feature_store
+        │   │   │   └── config.yml
+        │   │   ├── path.py
+        │   │   └── training
+        │   │       └── config.yml
         │   ├── feature_store
         │   │   ├── README.md
         │   │   ├── feature_repo
@@ -80,7 +82,6 @@ Below is the project structure.
         │   │   └── utils
         │   │       ├── __init__.py
         │   │       ├── config.py
-        │   │       ├── path.py
         │   │       └── prep.py
         │   ├── inference
         │   │   ├── Dockerfile
@@ -93,12 +94,19 @@ Below is the project structure.
         │   │       └── path.py
         │   └── training
         │       ├── artifacts
+        │       │   ├── champion_model (1).pkl
+        │       │   ├── champion_model (2).pkl
         │       │   ├── champion_model.pkl
         │       │   ├── experiment_keys.csv
+        │       │   ├── lightgbm.pkl
         │       │   ├── logistic-regression.pkl
         │       │   ├── random-forest.pkl
+        │       │   ├── study_LGBMClassifier.csv
         │       │   ├── study_LogisticRegression.csv
-        │       │   └── study_RandomForestClassifier.csv
+        │       │   ├── study_RandomForestClassifier.csv
+        │       │   ├── study_XGBClassifier.csv
+        │       │   ├── voting-ensemble.pkl
+        │       │   └── xgboost.pkl
         │       ├── evaluate.py
         │       ├── split_data.py
         │       ├── train.py
@@ -107,9 +115,7 @@ Below is the project structure.
         │           ├── config.py
         │           ├── data.py
         │           ├── job.py
-        │           ├── model.py
-        │           ├── path.py
-        │           └── prep.py
+        │           └── model.py
         └── tests
         └── test_feature_utils.py
 

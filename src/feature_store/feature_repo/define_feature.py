@@ -12,15 +12,15 @@ from pathlib import Path
 from feast import Entity, FeatureView, Field, FileSource, ValueType
 from feast.types import Float32, String
 
-sys.path.append(str(Path(__file__).parent.resolve().parent))
+sys.path.append(str(Path(__file__).parent.resolve().parent.parent))
 
-from utils.config import Config
-from utils.path import DATA_DIR
+from config.path import DATA_DIR
+from feature_store.utils.config import Config
 
 #################################
 # Specify required column names by data type
 config = Config(
-    config_path=str(Path(__file__).parent.resolve().parent.parent.parent)
+    config_path=str(Path(__file__).parent.resolve().parent.parent)
     + "/config/feature_store/config.yml"
 )
 PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]

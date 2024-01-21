@@ -18,7 +18,8 @@ from sklearn.preprocessing import (  # StandardScaler, RobustScaler,
     MinMaxScaler,
     OneHotEncoder,
 )
-from utils.prep import DataPreprocessor, DataSplitter
+
+from feature_store.utils.prep import DataPreprocessor, DataSplitter
 
 ###########################################################
 

@@ -18,7 +18,8 @@ from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
 from utils.config import Config
 from utils.model import ModelEvaluator, PrepChampModel
-from utils.path import ARTIFACTS_DIR, DATA_DIR
+
+from config.path import ARTIFACTS_DIR, DATA_DIR
 
 load_dotenv()
 
