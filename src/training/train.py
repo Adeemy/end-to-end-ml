@@ -6,7 +6,7 @@ hyperparameters optimization for multiple models.
 import os
 import sys
 from datetime import datetime
-from pathlib import PosixPath
+from pathlib import Path, PosixPath
 
 import comet_ml
 import pandas as pd
@@ -18,6 +18,8 @@ from utils.config import Config
 from utils.data import PrepTrainingData
 from utils.job import create_voting_ensemble, submit_train_exp
 from xgboost import XGBClassifier
+
+sys.path.append(str(Path(__file__).parent.resolve().parent))
 
 from config.path import ARTIFACTS_DIR, DATA_DIR
 

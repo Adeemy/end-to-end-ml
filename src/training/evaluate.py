@@ -9,7 +9,7 @@ on the test set is better than a required threshold value.
 
 import os
 import sys
-from pathlib import PosixPath
+from pathlib import Path, PosixPath
 
 import joblib
 import numpy as np
@@ -18,6 +18,9 @@ from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
 from utils.config import Config
 from utils.model import ModelEvaluator, PrepChampModel
+
+sys.path.append(str(Path(__file__).parent.resolve().parent))
+
 
 from config.path import ARTIFACTS_DIR, DATA_DIR
 
