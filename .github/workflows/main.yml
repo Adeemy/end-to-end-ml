@@ -26,7 +26,7 @@ jobs:
           make install
 
       - name: Set path
-        run: ./set_path.sh
+        run: bash set_path.sh
 
       - name: Sort imports with isort
         run: |
