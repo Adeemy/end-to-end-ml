@@ -25,10 +25,10 @@ jobs:
         run: |
           make install
 
-      # - name: Set path
-      #   run: |
-      #     chmod +x set_path.sh
-      #     ./set_path.sh
+      - name: Set path
+        run: |
+          chmod +x set_path.sh
+          bash ./set_path.sh
 
       - name: Sort imports with isort
         run: |
