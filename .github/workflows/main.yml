@@ -27,7 +27,8 @@ jobs:
 
       - name: Set path
         run: |
-          git update-index --chmod=-x  ./set_path.sh
+          chmod +x set_path.sh
+          bash ./set_path.sh
 
       - name: Sort imports with isort
         run: |
@@ -45,8 +46,8 @@ jobs:
         run: |
           make lint
 
-      - name: Prepare data
-        run: make prep_data
+      # - name: Prepare data
+      #   run: make prep_data
 
       # - name: Split data
       #   run: make split_data
