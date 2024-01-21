@@ -1,0 +1,3 @@
+number,f_0.5_score,datetime_start,datetime_complete,duration,criterion,max_depth,max_features,min_samples_leaf,min_samples_split,n_estimators,state
+0,0.8497860648695548,2024-01-19 09:42:33.375154,2024-01-19 09:42:34.387896,0 days 00:00:01.012742,entropy,3,23,7,0.24973979667499135,93,COMPLETE
+1,0.8536494875959469,2024-01-19 09:42:34.388242,2024-01-19 09:42:35.536405,0 days 00:00:01.148163,entropy,3,27,6,0.4250455662574105,97,COMPLETE
