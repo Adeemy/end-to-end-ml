@@ -26,8 +26,7 @@ jobs:
           make install
 
       - name: Set path
-        run: chmod=+x set_path.sh
-        shell: bash
+        run: bash ${GITHUB_WORKSPACE}/set_path.sh
 
       - name: Sort imports with isort
         run: |
