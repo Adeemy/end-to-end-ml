@@ -94,8 +94,6 @@ Below is the project structure.
         │   │       └── path.py
         │   └── training
         │       ├── artifacts
-        │       │   ├── champion_model (1).pkl
-        │       │   ├── champion_model (2).pkl
         │       │   ├── champion_model.pkl
         │       │   ├── experiment_keys.csv
         │       │   ├── lightgbm.pkl
