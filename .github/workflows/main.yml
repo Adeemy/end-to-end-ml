@@ -27,9 +27,6 @@ jobs:
 
       - name: Set path
         run: |
-          chmod +x set_path.sh
-          cd $GITHUB_WORKSPACE
-          bash ./set_path.sh
           echo “::add-path::/src”
 
       - name: Sort imports with isort
