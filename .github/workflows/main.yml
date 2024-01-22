@@ -47,7 +47,7 @@ jobs:
 
       - name: Prepare data
         working-directory: ./src
-        run: make prep_data
+        run: python ./src/feature_store/prep_data.py  ./src/config/feature_store/config.yml
 
       # - name: Split data
       #   run: make split_data
