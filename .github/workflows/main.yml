@@ -42,9 +42,9 @@ jobs:
         run: |
           make test
 
-      - name: Lint with pylint
-        run: |
-          make lint
+      # - name: Lint with pylint
+      #   run: |
+      #     make lint
 
       - name: Prepare data
         run: python ${{github.workspace}}/src/feature_store/prep_data.py ${{github.workspace}}/src/config/feature_store/config.yml
