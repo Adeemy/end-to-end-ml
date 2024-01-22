@@ -5,7 +5,7 @@ for training.
 
 import sys
 from datetime import datetime
-from pathlib import PosixPath, Path
+from pathlib import Path, PosixPath
 
 import pandas as pd
 
@@ -16,6 +16,7 @@ from src.config.path import DATA_DIR
 # sys.path.append(str(Path(__file__).parent.resolve().parent))
 
 print("\nstr(Path(__file__)):", str(Path(__file__)))
+
 
 #################################
 def main(config_yaml_abs_path: str, data_dir: PosixPath):

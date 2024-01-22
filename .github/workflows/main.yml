@@ -14,6 +14,9 @@ jobs:
   train:
     runs-on: ubuntu-latest
 
+    env:
+      PROJECT_PATH: ./src
+
     steps:
       # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
       - uses: actions/checkout@v3
@@ -42,14 +45,15 @@ jobs:
         run: |
           make test
 
-      # - name: Lint with pylint
-      #   run: |
-      #     make lint
+      - name: Lint with pylint
+        run: |
+          make lint
 
       - name: Prepare data
+        working-directory: ${{ github.workspace }}/${{ env.PROJECT_PATH }}
         run: |
           ls ${{github.workspace}}
-          python ${{github.workspace}}/src/feature_store/prep_data.py ${{github.workspace}}/src/config/feature_store/config.yml
+          python ./src/feature_store/prep_data.py  ./src/config/feature_store/config.yml
 
       # - name: Split data
       #   run: make split_data
