@@ -25,11 +25,10 @@ jobs:
         run: |
           make install
 
-      - name: Set path
-        run: |
-          chmod +x set_path.sh
-          cd $GITHUB_WORKSPACE
-          bash ./set_path.sh
+      # - name: Set path
+      #   run: |
+      #     chmod +x set_path.sh
+      #     bash ./set_path.sh
 
       - name: Sort imports with isort
         run: |
@@ -66,31 +65,31 @@ jobs:
         run: |
           make evaluate
 
-  # build:
-  #   runs-on: ubuntu-latest
-  #   needs: train
+  build:
+    runs-on: ubuntu-latest
+    needs: train
 
-  #   steps:
-  #     - uses: actions/checkout@v3
+    steps:
+      - uses: actions/checkout@v3
 
-  #     - name: Set up Docker Buildx
-  #       uses: docker/setup-buildx-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
 
-  #     # Login using same GitHub Actions credentials
-  #     - name: Log in to GitHub container registry
-  #       uses: docker/login-action@v1.10.0
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ github.actor }}
-  #         password: ${{ github.token }}
+      # Login using same GitHub Actions credentials
+      - name: Log in to GitHub container registry
+        uses: docker/login-action@v1.10.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
-  #     # Ensures that repo name is lowercase, which is a requirement for publishing to ghcr.io
-  #     - name: Lowercase the repo name and username
-  #       run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+      # Ensures that repo name is lowercase, which is a requirement for publishing to ghcr.io
+      - name: Lowercase the repo name and username
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
 
-  #     - name: Build and push container image to registry
-  #       uses: docker/build-push-action@v2
-  #       with:
-  #         push: true
-  #         tags: ghcr.io/${{ env.REPO }}:${{ github.sha }}
-  #         file: ./src/inference/Dockerfile
+      - name: Build and push container image to registry
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: ghcr.io/${{ env.REPO }}:${{ github.sha }}
+          file: ./src/inference/Dockerfile
