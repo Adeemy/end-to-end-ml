@@ -27,7 +27,7 @@ jobs:
 
       - name: Set path
         run: |
-          echo “::add-path::/src”
+          ls ${{github.workspace}}
 
       - name: Sort imports with isort
         run: |
@@ -46,8 +46,7 @@ jobs:
           make lint
 
       - name: Prepare data
-        working-directory: ./src
-        run: python ./src/feature_store/prep_data.py  ./src/config/feature_store/config.yml
+        run: make prep_data
 
       # - name: Split data
       #   run: make split_data
@@ -60,7 +59,6 @@ jobs:
       #     make train
 
       - name: Evaluate models
-        working-directory: ./src
         env:
           COMET_API_KEY: ${{secrets.COMET_API_KEY}}
         run: |
