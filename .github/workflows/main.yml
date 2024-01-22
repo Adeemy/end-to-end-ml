@@ -60,6 +60,7 @@ jobs:
       #     make train
 
       - name: Evaluate models
+        working-directory: ./src
         env:
           COMET_API_KEY: ${{secrets.COMET_API_KEY}}
         run: |
