@@ -5,13 +5,9 @@ for training.
 
 import sys
 from datetime import datetime
-from pathlib import PosixPath  # , Path
+from pathlib import PosixPath, Path
 
 import pandas as pd
-
-print("sys.path:", sys.path)
-
-import os
 
 from feature_store.utils.config import Config
 from feature_store.utils.prep import DataPreprocessor, DataTransformer
@@ -19,8 +15,7 @@ from src.config.path import DATA_DIR
 
 # sys.path.append(str(Path(__file__).parent.resolve().parent))
 
-os.getcwd()
-
+print("\nstr(Path(__file__)):", str(Path(__file__)))
 
 #################################
 def main(config_yaml_abs_path: str, data_dir: PosixPath):
