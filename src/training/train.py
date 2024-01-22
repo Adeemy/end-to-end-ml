@@ -6,7 +6,7 @@ hyperparameters optimization for multiple models.
 import os
 import sys
 from datetime import datetime
-from pathlib import Path, PosixPath
+from pathlib import PosixPath #, Path
 
 import comet_ml
 import pandas as pd
@@ -14,12 +14,12 @@ from dotenv import load_dotenv
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from utils.config import Config
-from utils.data import PrepTrainingData
-from utils.job import create_voting_ensemble, submit_train_exp
+from training.utils.config import Config
+from training.utils.data import PrepTrainingData
+from training.utils.job import create_voting_ensemble, submit_train_exp
 from xgboost import XGBClassifier
 
-sys.path.append(str(Path(__file__).parent.resolve().parent))
+# sys.path.append(str(Path(__file__).parent.resolve().parent))
 
 from config.path import ARTIFACTS_DIR, DATA_DIR
 
