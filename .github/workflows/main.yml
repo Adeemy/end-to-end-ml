@@ -28,6 +28,7 @@ jobs:
       - name: Set path
         run: |
           chmod +x set_path.sh
+          cd $GITHUB_WORKSPACE/end-to-end-tabular-ml
           bash ./set_path.sh
 
       - name: Sort imports with isort
