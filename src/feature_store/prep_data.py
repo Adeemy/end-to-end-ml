@@ -11,11 +11,15 @@ import pandas as pd
 
 print("sys.path:", sys.path)
 
-from config.path import DATA_DIR
+import os
+
 from feature_store.utils.config import Config
 from feature_store.utils.prep import DataPreprocessor, DataTransformer
+from src.config.path import DATA_DIR
 
 # sys.path.append(str(Path(__file__).parent.resolve().parent))
+
+os.getcwd()
 
 
 #################################

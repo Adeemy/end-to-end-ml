@@ -17,7 +17,7 @@ import pandas as pd
 from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
 
-from config.path import ARTIFACTS_DIR, DATA_DIR
+from src.config.path import ARTIFACTS_DIR, DATA_DIR
 from training.utils.config import Config
 from training.utils.model import ModelEvaluator, PrepChampModel
 
