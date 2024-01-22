@@ -5,17 +5,17 @@ for training.
 
 import sys
 from datetime import datetime
-from pathlib import PosixPath #, Path
+from pathlib import PosixPath  # , Path
 
 import pandas as pd
-from feature_store.utils.config import Config
-from feature_store.utils.prep import DataPreprocessor, DataTransformer
-
-# sys.path.append(str(Path(__file__).parent.resolve().parent))
 
 print("sys.path:", sys.path)
 
 from config.path import DATA_DIR
+from feature_store.utils.config import Config
+from feature_store.utils.prep import DataPreprocessor, DataTransformer
+
+# sys.path.append(str(Path(__file__).parent.resolve().parent))
 
 
 #################################
