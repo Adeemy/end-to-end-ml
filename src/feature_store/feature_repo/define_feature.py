@@ -14,8 +14,8 @@ from feast.types import Float32, String
 
 sys.path.append(str(Path(__file__).parent.resolve().parent.parent))
 
-from config.path import DATA_DIR
-from feature_store.utils.config import Config
+from src.config.path import DATA_DIR
+from src.feature_store.utils.config import Config
 
 #################################
 # Specify required column names by data type

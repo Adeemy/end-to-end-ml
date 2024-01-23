@@ -69,7 +69,7 @@ ignored-modules=
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
-init-hook='import os, sys; sys.path.append(os.path.join(os.getcwd(), "./src"))'
+init-hook='import os, sys; sys.path.append(os.path.join(os.getcwd(), "."))'
 ; init-hook='import os, sys; sys.path.append(os.path.join(os.getcwd(), "./src/training/utils")); sys.path.append(os.path.join(os.getcwd(), "./src/config")); sys.path.append(os.path.join(os.getcwd(), "./src/feature_store/utils")); sys.path.append(os.path.join(os.getcwd(), "./src/feature_store/feature_repo/data"))'
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
