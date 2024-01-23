@@ -53,7 +53,7 @@ jobs:
         working-directory: ${{ github.workspace }}/${{ env.PROJECT_PATH }}
         run: |
           ls ${{github.workspace}}
-          python ./src/feature_store/prep_data.py  ./src/config/feature_store/config.yml
+          python ${{github.workspace}}/src/feature_store/prep_data.py  ${{github.workspace}}/src/config/feature_store/config.yml
 
       # - name: Split data
       #   run: make split_data
