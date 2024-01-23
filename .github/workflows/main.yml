@@ -47,9 +47,8 @@ jobs:
           make lint
 
       - name: Prepare data
-        working-directory: ${{ github.workspace }}
+        # working-directory: ${{ github.workspace }}
         run: |
-          ls ${{github.workspace}}
           python ${{github.workspace}}/src/feature_store/prep_data.py  ${{github.workspace}}/src/config/feature_store/config.yml
 
       # - name: Split data
