@@ -14,9 +14,6 @@ jobs:
   train:
     runs-on: ubuntu-latest
 
-    # env:
-    #   PROJECT_PATH: ~/
-
     steps:
       # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
       - uses: actions/checkout@v3
@@ -53,7 +50,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           ls ${{github.workspace}}
-          python ${{github.workspace}}/src/feature_store/prep_data.py  ${{github.workspace}}/src/config/feature_store/config.yml
+          python -m ${{github.workspace}}/src/feature_store/prep_data.py  ${{github.workspace}}/src/config/feature_store/config.yml
 
       # - name: Split data
       #   run: make split_data
