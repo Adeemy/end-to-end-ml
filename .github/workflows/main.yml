@@ -25,7 +25,7 @@ jobs:
         run: |
           make install
 
-      - name: Set path
+      - name: Add project path
         run: |
           ls ${{github.workspace}}
           echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
@@ -47,12 +47,14 @@ jobs:
           make lint
 
       - name: Prepare data
-        # working-directory: ${{ github.workspace }}
         run: |
           python ${{github.workspace}}/src/feature_store/prep_data.py  ${{github.workspace}}/src/config/feature_store/config.yml
 
-      # - name: Split data
-      #   run: make split_data
+      - name: Setup Feast
+        run: make setup_feast
+
+      - name: Split data
+        run: make split_data
 
       # Data splits were already saved in Hugging Face repo
       # - name: Train
