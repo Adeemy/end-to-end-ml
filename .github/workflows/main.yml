@@ -31,7 +31,7 @@ jobs:
       - name: Set path
         run: |
           ls ${{github.workspace}}
-          echo -e 'export PYTHONPATH=$PYTHONPATH:./src' >> ~/.bashrc
+          echo -e 'export PYTHONPATH=$PYTHONPATH:~/' >> ~/.bashrc
 
       - name: Sort imports with isort
         run: |
@@ -45,9 +45,9 @@ jobs:
         run: |
           make test
 
-      # - name: Lint with pylint
-      #   run: |
-      #     make lint
+      - name: Lint with pylint
+        run: |
+          make lint
 
       - name: Prepare data
         working-directory: ${{ github.workspace }}/${{ env.PROJECT_PATH }}
