@@ -17,7 +17,7 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
-from training.utils.model import ModelEvaluator, ModelOptimizer
+from src.training.utils.model import ModelEvaluator, ModelOptimizer
 
 ###########################################################
 

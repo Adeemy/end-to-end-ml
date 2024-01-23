@@ -17,9 +17,9 @@ from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
 
 from src.config.path import ARTIFACTS_DIR, DATA_DIR
-from training.utils.config import Config
-from training.utils.data import PrepTrainingData
-from training.utils.job import create_voting_ensemble, submit_train_exp
+from src.training.utils.config import Config
+from src.training.utils.data import PrepTrainingData
+from src.training.utils.job import create_voting_ensemble, submit_train_exp
 
 # sys.path.append(str(Path(__file__).parent.resolve().parent))
 

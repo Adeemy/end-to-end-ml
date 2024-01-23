@@ -43,7 +43,7 @@
   },
   // Set variables for VS Code and related sub-processes (terminals, tasks, debugging, etc.)
   "remoteEnv": {
-    "PATH": "${containerEnv:PATH}:./src"
+    "PATH": "${containerEnv:PATH}:."
   },
   // Features to add to the dev container. More info: https://containers.dev/features.
   "features": {

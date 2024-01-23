@@ -18,8 +18,8 @@ from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
 
 from src.config.path import ARTIFACTS_DIR, DATA_DIR
-from training.utils.config import Config
-from training.utils.model import ModelEvaluator, PrepChampModel
+from src.training.utils.config import Config
+from src.training.utils.model import ModelEvaluator, PrepChampModel
 
 # sys.path.append(str(Path(__file__).parent.resolve().parent))
 

@@ -9,9 +9,9 @@ from pathlib import Path, PosixPath
 
 import pandas as pd
 
-from feature_store.utils.config import Config
-from feature_store.utils.prep import DataPreprocessor, DataTransformer
 from src.config.path import DATA_DIR
+from src.feature_store.utils.config import Config
+from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
 
 # sys.path.append(str(Path(__file__).parent.resolve().parent))
 
