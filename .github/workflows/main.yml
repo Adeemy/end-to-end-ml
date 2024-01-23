@@ -28,7 +28,7 @@ jobs:
       - name: Set path
         run: |
           ls ${{github.workspace}}
-          echo "PYTHONPATH=~/" >> $GITHUB_ENV
+          echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
 
       - name: Sort imports with isort
         run: |
