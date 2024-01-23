@@ -14,8 +14,8 @@ jobs:
   train:
     runs-on: ubuntu-latest
 
-    env:
-      PROJECT_PATH: ~/
+    # env:
+    #   PROJECT_PATH: ~/
 
     steps:
       # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
@@ -50,7 +50,7 @@ jobs:
           make lint
 
       - name: Prepare data
-        working-directory: ${{ github.workspace }}/${{ env.PROJECT_PATH }}
+        working-directory: ${{ github.workspace }}
         run: |
           ls ${{github.workspace}}
           python ${{github.workspace}}/src/feature_store/prep_data.py  ${{github.workspace}}/src/config/feature_store/config.yml
