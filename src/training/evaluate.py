@@ -9,7 +9,7 @@ on the test set is better than a required threshold value.
 
 import os
 import sys
-from pathlib import PosixPath  # , Path
+from pathlib import PosixPath
 
 import joblib
 import numpy as np
@@ -20,9 +20,6 @@ from dotenv import load_dotenv
 from src.config.path import ARTIFACTS_DIR, DATA_DIR
 from src.training.utils.config import Config
 from src.training.utils.model import ModelEvaluator, PrepChampModel
-
-# sys.path.append(str(Path(__file__).parent.resolve().parent))
-
 
 load_dotenv()
 

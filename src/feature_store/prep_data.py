@@ -4,8 +4,6 @@ for training.
 """
 
 import sys
-print(sys.path)
-
 from datetime import datetime
 from pathlib import PosixPath
 

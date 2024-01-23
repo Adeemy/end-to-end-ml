@@ -21,9 +21,6 @@ from src.training.utils.config import Config
 from src.training.utils.data import PrepTrainingData
 from src.training.utils.job import create_voting_ensemble, submit_train_exp
 
-# sys.path.append(str(Path(__file__).parent.resolve().parent))
-
-
 load_dotenv()
 
 
