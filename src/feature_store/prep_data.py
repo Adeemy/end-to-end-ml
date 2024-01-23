@@ -7,7 +7,7 @@ import sys
 print(sys.path)
 
 from datetime import datetime
-from pathlib import Path, PosixPath
+from pathlib import PosixPath
 
 import pandas as pd
 
