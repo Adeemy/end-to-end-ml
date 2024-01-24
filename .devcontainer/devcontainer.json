@@ -55,6 +55,7 @@
     8080
   ],
   // Use 'postCreateCommand' to run commands after the container is created.
+  // Adds project root path to sys.path 
   "postCreateCommand": "bash ./.devcontainer/set_path.sh"
   // Configure tool-specific properties.
   // "customizations": {},
