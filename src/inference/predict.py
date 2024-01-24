@@ -8,8 +8,9 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import Body
-from utils.model import ModelLoader  # pylint: disable=E0611
-from utils.path import ARTIFACTS_DIR, PARENT_DIR
+
+from src.config.path import ARTIFACTS_DIR, PARENT_DIR
+from src.inference.utils.model import ModelLoader
 
 load_dotenv()
 
@@ -21,7 +22,7 @@ load_model = ModelLoader()
     champ_model_name,
     *_,
 ) = load_model.get_config_params(
-    config_yaml_abs_path=str(PARENT_DIR.parent) + "/config/training/config.yml"
+    config_yaml_abs_path=str(PARENT_DIR.parent) + "/src/config/training/config.yml"
 )
 
 # Download champion model

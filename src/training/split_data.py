@@ -6,19 +6,16 @@ for model training.
 
 import sys
 from datetime import datetime
-from pathlib import Path, PosixPath
+from pathlib import PosixPath
 
 import pandas as pd
 from feast import FeatureStore
 from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
-from utils.config import Config
-from utils.data import PrepTrainingData
 
-sys.path.append(str(Path(__file__).parent.resolve().parent))
-
-
-from config.path import DATA_DIR, FEATURE_REPO_DIR
-from feature_store.utils.prep import DataSplitter
+from src.config.path import DATA_DIR, FEATURE_REPO_DIR
+from src.feature_store.utils.prep import DataSplitter
+from src.training.utils.config import Config
+from src.training.utils.data import PrepTrainingData
 
 #################################
 

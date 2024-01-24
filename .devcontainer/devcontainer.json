@@ -43,7 +43,7 @@
   },
   // Set variables for VS Code and related sub-processes (terminals, tasks, debugging, etc.)
   "remoteEnv": {
-    "PATH": "${containerEnv:PATH}:./src"
+    "PATH": "${containerEnv:PATH}:."
   },
   // Features to add to the dev container. More info: https://containers.dev/features.
   "features": {
@@ -55,7 +55,9 @@
     8080
   ],
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "bash ./.devcontainer/setup_path.sh"
+  // Adds project root path to sys.path 
+  "postCreateCommand": "bash ./.devcontainer/set_path.sh"
+
   // Configure tool-specific properties.
   // "customizations": {},
   // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.

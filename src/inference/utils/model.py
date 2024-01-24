@@ -7,7 +7,8 @@ from pathlib import PosixPath
 
 import joblib
 from comet_ml import API
-from utils.config import Config
+
+from src.training.utils.config import Config
 
 
 ########################################################

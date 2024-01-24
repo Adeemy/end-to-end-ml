@@ -25,10 +25,9 @@ jobs:
         run: |
           make install
 
-      # - name: Set path
-      #   run: |
-      #     chmod +x set_path.sh
-      #     bash ./set_path.sh
+      - name: Add project path to sys.path
+        run: |
+          echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
 
       - name: Sort imports with isort
         run: |
@@ -47,23 +46,35 @@ jobs:
           make lint
 
       - name: Prepare data
-        run: make prep_data
+        run: |
+          make prep_data
 
-      # - name: Split data
-      #   run: make split_data
+      - name: Setup Feast
+        run: |
+          make setup_feast
 
-      # Data splits were already saved in Hugging Face repo
-      # - name: Train
-      #   env:
-      #     COMET_API_KEY: ${{secrets.COMET_API_KEY}}
-      #   run: |
-      #     make train
+      - name: Split data
+        run: |
+          make split_data
+
+      - name: Train
+        env:
+          COMET_API_KEY: ${{secrets.COMET_API_KEY}}
+        run: |
+          make train
 
       - name: Evaluate models
         env:
           COMET_API_KEY: ${{secrets.COMET_API_KEY}}
         run: |
           make evaluate
+
+      - name: Test champion model
+        env:
+          COMET_API_KEY: ${{secrets.COMET_API_KEY}}
+        run: |
+          make test_model
+
 
   build:
     runs-on: ubuntu-latest

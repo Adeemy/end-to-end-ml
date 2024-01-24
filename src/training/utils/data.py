@@ -4,8 +4,6 @@ function in train.py
 """
 
 import re
-import sys
-from pathlib import Path
 from typing import Callable, Literal, Optional, Union
 
 import numpy as np
@@ -21,9 +19,7 @@ from sklearn.preprocessing import (  # StandardScaler, RobustScaler,
     OneHotEncoder,
 )
 
-sys.path.append(str(Path(__file__).parent.resolve().parent.parent))
-
-from feature_store.utils.prep import DataPreprocessor, DataSplitter
+from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
 
 ###########################################################
 
