@@ -113,17 +113,6 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
         ),
         allow_overwrite=True,
     ).to_df()
-    # preprocessed_data = historical_data.to_df()
-
-    # # The following lines added to create preprocessed dataset instead of retrieving it from Feast
-    # # due to an error in Feast related to not finding features file path.
-    # historical_features = pd.read_parquet(
-    #     path=data_dir / "preprocessed_dataset_features.parquet"
-    # )
-
-    # preprocessed_data = historical_features.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1).join(
-    #     target_data.set_index(PRIMARY_KEY).drop("event_timestamp", axis=1), how="inner"
-    # ).reset_index()
 
     # Select specified features
     required_input_col_names = (
