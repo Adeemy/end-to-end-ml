@@ -6,7 +6,7 @@ hyperparameters optimization for multiple models.
 import os
 import sys
 from datetime import datetime
-from pathlib import PosixPath  # , Path
+from pathlib import PosixPath
 
 import comet_ml
 import pandas as pd
