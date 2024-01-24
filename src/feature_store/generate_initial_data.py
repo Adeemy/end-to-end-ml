@@ -15,8 +15,6 @@ import sys
 from pathlib import PosixPath
 
 from ucimlrepo import fetch_ucirepo
-from utils.config import Config
-from utils.prep import DataSplitter
 
 from src.config.path import DATA_DIR
 from src.feature_store.utils.config import Config
