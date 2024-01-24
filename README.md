@@ -63,7 +63,6 @@ Below is the project structure.
         │   │   ├── README.md
         │   │   ├── feature_repo
         │   │   │   ├── data
-        │   │   │   │   ├── __init__.py
         │   │   │   │   ├── historical_data.parquet
         │   │   │   │   ├── inference.parquet
         │   │   │   │   ├── online_store.db
