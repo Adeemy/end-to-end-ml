@@ -13,8 +13,6 @@ from src.config.path import DATA_DIR
 from src.feature_store.utils.config import Config
 from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
 
-print(sys.path)
-
 
 #################################
 def main(config_yaml_abs_path: str, data_dir: PosixPath):
