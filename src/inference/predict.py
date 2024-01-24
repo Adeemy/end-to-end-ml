@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from fastapi import Body
 
 from src.config.path import ARTIFACTS_DIR, PARENT_DIR
-from src.inference.utils.model import ModelLoader  # pylint: disable=E0611
+from src.inference.utils.model import ModelLoader
 
 load_dotenv()
 

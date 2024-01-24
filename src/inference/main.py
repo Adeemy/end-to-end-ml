@@ -11,7 +11,7 @@ from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse
 
 from src.config.path import ARTIFACTS_DIR, PARENT_DIR
-from src.inference.utils.model import ModelLoader  # pylint: disable=E0611
+from src.inference.utils.model import ModelLoader
 
 load_dotenv()
 
