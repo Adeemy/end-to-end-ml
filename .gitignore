@@ -160,7 +160,6 @@ cython_debug/
 /notebooks/.eda_figures/*.png
 /src/training/*.png
 /src/inference/*.png
-/src/training/artifacts/
 .comet.json
 .localconfig
 .DS_Store
