@@ -36,6 +36,15 @@ data:
       - Sex
       - Education
       - Income
+    entity_name: "patient" # For feature store
+    entity_description: "Patient ID" # For feature store
+    feature_view_name: "features_view" # For feature store
+    feature_view_description: "Patient level features." # For feature store
+    target_view_name: "target_view" # For feature store
+    target_view_description: "Patient level target value." # For feature store
+    view_tags_name_1: "patient" # For feature store
+    view_tags_value_1: "population_health" # For feature store
+    ttl_duration_in_days: 30
 
 files:
   params:

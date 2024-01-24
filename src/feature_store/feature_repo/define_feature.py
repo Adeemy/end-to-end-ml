@@ -5,7 +5,6 @@ store capability, but in this project feature
 store is created in local path.
 """
 
-# import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -14,9 +13,6 @@ from feast.types import Float32, String
 
 from src.config.path import DATA_DIR
 from src.feature_store.utils.config import Config
-
-# sys.path.append(str(Path(__name__).parent.resolve().parent.parent))
-
 
 #################################
 # Specify required column names by data type
@@ -29,19 +25,21 @@ CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
 EVENT_TIMESTAMP_COL_NAME = config.params["data"]["params"]["event_timestamp_col_name"]
 
 # TTL duration
-ttl_duration_in_days = timedelta(days=180)
+ttl_duration_in_days = timedelta(
+    days=float(config.params["data"]["params"]["ttl_duration_in_days"])
+)
 
 # Specify path to features and target
-feat_path_source = f"{str(DATA_DIR)}/preprocessed_dataset_features.parquet"
-target_path_source = f"{str(DATA_DIR)}/preprocessed_dataset_target.parquet"
+feat_path_source = f"{str(DATA_DIR)}/{config.params['files']['params']['preprocessed_dataset_features_file_name']}"
+target_path_source = f"{str(DATA_DIR)}/{config.params['files']['params']['preprocessed_dataset_target_file_name']}"
 
 #################################
 # Define an entity for encounters
 patient = Entity(
-    name="patient",
+    name=config.params["data"]["params"]["entity_name"],
     join_keys=[PRIMARY_KEY],
     value_type=ValueType.STRING,
-    description="Patient ID",
+    description=config.params["data"]["params"]["entity_description"],
 )
 
 # Define the source of training set features
@@ -52,7 +50,7 @@ feat_source = FileSource(
 
 # Define a view for training set features
 _feat_view = FeatureView(
-    name="features_view",
+    name=config.params["data"]["params"]["feature_view_name"],
     ttl=ttl_duration_in_days,
     entities=[patient],
     source=feat_source,
@@ -151,8 +149,12 @@ _feat_view = FeatureView(
             description="Income scale (INCOME2 see codebook) scale 1-8 1 = less than $10,000 5 = less than $35,000 8 = $75,000 or more.",
         ),
     ],
-    tags={"patient": "population_health"},
-    description="Patient level features.",
+    tags={
+        config.params["data"]["params"]["view_tags_name_1"]: config.params["data"][
+            "params"
+        ]["view_tags_value_1"]
+    },
+    description=config.params["data"]["params"]["feature_view_description"],
 )
 
 #################################
@@ -164,7 +166,7 @@ target_source = FileSource(
 
 # Define a view for training set target
 _target_view = FeatureView(
-    name="target_view",
+    name=config.params["data"]["params"]["target_view_name"],
     ttl=ttl_duration_in_days,
     entities=[patient],
     source=target_source,
@@ -173,6 +175,10 @@ _target_view = FeatureView(
         Field(name=CLASS_COL_NAME, dtype=String),
     ],
     online=True,
-    tags={"patient": "population_health"},
-    description="Patient level target value.",
+    tags={
+        config.params["data"]["params"]["view_tags_name_1"]: config.params["data"][
+            "params"
+        ]["view_tags_value_1"]
+    },
+    description=config.params["data"]["params"]["target_view_description"],
 )
