@@ -41,7 +41,21 @@ from sklearn.preprocessing import LabelEncoder
 class ModelOptimizer:
     """A class to optimize model hyperparameters. It requires supplying preprocessed
     versions of the train and validation features to avoid fitting the whole pipeline
-    in each objective function call during hyperparameters optimization."""
+    in each objective function call during hyperparameters optimization.
+
+    Attributes:
+        comet_exp (Experiment): Comet experiment object.
+        train_features_preprocessed (pd.DataFrame): preprocessed train features.
+        train_class (np.ndarray): train class labels.
+        valid_features_preprocessed (pd.DataFrame): preprocessed validation features.
+        valid_class (np.ndarray): validation class labels.
+        n_features (int): number of features in the data.
+        model (Callable): model object.
+        fbeta_score_beta (float): beta value for fbeta score.
+        encoded_pos_class_label (int): encoded positive class label.
+        is_voting_ensemble (bool): whether the model is a voting ensemble or not.
+        classifier_name (str): name of the classifier.
+    """
 
     # List of supported models in this class
     # Note: this private variable shouldn't be mutated outside the class. It
@@ -67,6 +81,11 @@ class ModelOptimizer:
         encoded_pos_class_label: int = 1,
         is_voting_ensemble: bool = False,
     ) -> None:
+        """Creates a ModelOptimizer instance.
+
+        Raises:
+            AssertionError: if the specified model name is not supported.
+        """
         self.comet_exp = comet_exp
         self.train_features_preprocessed = train_features_preprocessed
         self.train_class = train_class
@@ -84,8 +103,15 @@ class ModelOptimizer:
                 self.classifier_name in self._supported_models
             ), f"Supported models are: {self._supported_models}. Got {self.classifier_name}!"
 
-    def generate_search_space(self, trial: optuna.trial.Trial):
-        """Returns search space provided model name."""
+    def generate_search_space(self, trial: optuna.trial.Trial) -> dict:
+        """Returns search space provided model name.
+
+        Args:
+            trial (optuna.trial.Trial): an optuna trial object.
+
+        Raises:
+            AssertionError: if the specified model name is not supported.
+        """
 
         if self.classifier_name == "LogisticRegression":
             params = {
@@ -168,12 +194,11 @@ class ModelOptimizer:
         true_class: ArrayLike,
         pred_class: ArrayLike,
     ) -> pd.DataFrame:
-        """
-        Calculates different performance metrics for binary classification models.
+        """Calculates different performance metrics for binary classification models.
 
         Args:
-            true_class (list): true class label.
-            pred_class (list): predicted class label not probability.
+            true_class (ArrayLike): true class label.
+            pred_class (ArrayLike): predicted class label not probability.
 
         Returns:
             performance_metrics (pd.DataFrame): a dataframe with metric name and score columns.
@@ -213,7 +238,14 @@ class ModelOptimizer:
         trial: optuna.trial.Trial,
     ) -> float:
         """Performs hyperparameters optimization for a specified model, where the
-        search metric is fbeta score."""
+        search metric is fbeta score.
+
+        Args:
+            trial (optuna.trial.Trial): an optuna trial object.
+
+        Returns:
+            valid_score (float): validation score.
+        """
 
         # Define parameters search space
         params = self.generate_search_space(trial=trial)
@@ -253,8 +285,16 @@ class ModelOptimizer:
         self,
         max_search_iters: int = 100,
         model_opt_timeout_secs: int = 180,
-    ):
-        """Tunes model hyperparameters using Optuna package."""
+    ) -> optuna.study.Study:
+        """Tunes model hyperparameters using Optuna package.
+
+        Args:
+            max_search_iters (int): maximum number of search iterations.
+            model_opt_timeout_secs (int): maximum time in seconds to optimize model.
+
+        Returns:
+            study (optuna.study.Study): optuna study object.
+        """
 
         # Turn off optuna log notes
         # Note: uncomment this during dev to see warnings.
@@ -304,8 +344,17 @@ class ModelOptimizer:
         max_search_iters: int = 100,
         n_parallel_jobs: int = 1,
         model_opt_timeout_secs: int = 180,
-    ):
-        """Tunes model hyperparameters using Optuna package."""
+    ) -> optuna.study.Study:
+        """Tunes model hyperparameters using Optuna package.
+
+        Args:
+            max_search_iters (int): maximum number of search iterations.
+            n_parallel_jobs (int): number of parallel jobs.
+            model_opt_timeout_secs (int): maximum time in seconds to optimize model.
+
+        Returns:
+            study (optuna.study.Study): optuna study object.
+        """
 
         sampler = optuna.samplers.TPESampler(
             n_startup_trials=int(0.1 * max_search_iters),
@@ -337,7 +386,16 @@ class ModelOptimizer:
         selector_step: VarianceThreshold,
         model: Callable,
     ) -> Pipeline:
-        """Creates a pipeline including data prep steps and fitted model."""
+        """Creates a pipeline including data prep steps and fitted model.
+
+        Args:
+            preprocessor_step (ColumnTransformer): data preprocessing step.
+            selector_step (VarianceThreshold): feature selection step.
+            model (Callable): model object.
+
+        Returns:
+            pipeline (Pipeline): pipeline including data prep steps and fitted model.
+        """
 
         pipeline = Pipeline(
             steps=[
@@ -357,7 +415,17 @@ class ModelOptimizer:
         selector_step: VarianceThreshold,
         model: Callable,
     ) -> Pipeline:
-        """Fits a pipeline including model with data preprocessing steps."""
+        """Fits a pipeline including model with data preprocessing steps.
+
+        Args:
+            train_features (pd.DataFrame): train features.
+            preprocessor_step (ColumnTransformer): data preprocessing step.
+            selector_step (VarianceThreshold): feature selection step.
+            model (Callable): model object.
+
+        Returns:
+            pipeline (Pipeline): fitted pipeline.
+        """
 
         # Fit a pipeline
         pipeline = self.create_pipeline(
@@ -373,7 +441,19 @@ class ModelOptimizer:
 class ModelEvaluator(ModelOptimizer):
     """A class to evaluate models beyond mere scores, like feature
     importance plots and confusion matrices that are not produced
-    by ModelOptimizer class."""
+    by ModelOptimizer class.
+
+    Args:
+        ModelOptimizer (ModelOptimizer): ModelOptimizer class.
+        comet_exp (Experiment): Comet experiment object.
+        pipeline (Pipeline): fitted pipeline.
+        train_features (pd.DataFrame): train features.
+        train_class (np.ndarray): train class labels.
+        valid_features (pd.DataFrame): validation features.
+        valid_class (np.ndarray): validation class labels.
+        fbeta_score_beta (float): beta value for fbeta score.
+        is_voting_ensemble (bool): whether the model is a voting ensemble or not.
+    """
 
     def __init__(
         self,
@@ -416,11 +496,24 @@ class ModelEvaluator(ModelOptimizer):
         n_top_features: int = 30,
         font_size: int = 10,
         fig_size: tuple = (8, 12),
-    ) -> None:
-        """
-        Plots top feature importance with their encoded names. It requires
+    ) -> Figure:
+        """Plots top feature importance with their encoded names. It requires
         an empty figure object (figure_obj) to add plot to it and return
         plot as a figure object that can be logged.
+
+        Args:
+            feature_importance_scores (np.ndarray): feature importance scores.
+            feature_names (list): list of feature names.
+            figure_obj (Figure): empty figure object.
+            n_top_features (int): number of top features to plot.
+            font_size (int): font size.
+            fig_size (tuple): figure size.
+
+        Returns:
+            figure_obj (plt.figure.Figure): figure object that can be logged.
+
+        Raises:
+            ValueError: if feature names and feature importance scores have different lengths.
         """
         try:
             feat_importances = pd.Series(feature_importance_scores, index=feature_names)
@@ -448,7 +541,20 @@ class ModelEvaluator(ModelOptimizer):
         font_size: float = 10.0,
     ) -> None:
         """Extracts feature importance and returns figure object and
-        column names from fitted pipeline."""
+        column names from fitted pipeline.
+
+        Args:
+            pipeline (Pipeline): fitted pipeline.
+            num_feature_names (list): list of numerical feature names.
+            cat_feature_names (list): list of categorical feature names.
+            n_top_features (int): number of top features to plot.
+            figure_size (tuple): figure size.
+            font_size (float): font size.
+
+        Raises:
+            ValueError: if num_feature_names and cat_feature_names are both None.
+            Exception: if any error occurs during feature importance extraction.
+        """
 
         # Catch any error raised in this function to prevent experiment
         # from registering a model as it's not worth failing experiment for
@@ -534,18 +640,18 @@ class ModelEvaluator(ModelOptimizer):
         y_true: np.array,
         y_pred: np.array,
         fig_size: tuple = (6, 6),
-    ) -> None:
-        """
-        Plots receiver operating characteristic (ROC) curve for a binary classification model.
+    ) -> Figure:
+        """Plots receiver operating characteristic (ROC) curve for a binary classification model.
         It shows the trade-off between the true positive rate (TPR) and the false positive rate
         (FPR) for different probability thresholds.
 
         Args:
             y_true (np.ndarray): true labels of the data, either 0 or 1.
             y_pred (np.ndarray): predicted probabilities of the positive class by the model.
+            fig_size (tuple): figure size.
 
         Returns
-            ax.get_figure(): figure object that can be logged and saved.
+            fig (plt.figure.Figure): matplotlib figure object that can be logged and saved.
         """
 
         # Compute the FPR, TPR, and thresholds
@@ -569,18 +675,18 @@ class ModelEvaluator(ModelOptimizer):
         y_true: np.array,
         y_pred: np.array,
         fig_size: tuple = (6, 6),
-    ) -> None:
-        """
-        Plots plots the precision-recall curve for a binary classification model.
+    ) -> Figure:
+        """Plots plots the precision-recall curve for a binary classification model.
         It shows the trade-off between the precision and the recall for different
         probability thresholds.
 
         Args:
             y_true (np.ndarray): true labels of the data, either 0 or 1.
             y_pred (np.ndarray): predicted probabilities of the positive class by the model.
+            fig_size (tuple): figure size.
 
         Returns
-            ax.get_figure(): figure object that can be logged and saved.
+            fig (plt.figure.Figure): matplotlib figure object that can be logged and saved.
         """
 
         # Compute the precision, recall, and thresholds
@@ -609,14 +715,14 @@ class ModelEvaluator(ModelOptimizer):
         y_pred: np.array,
         fig_size: tuple = (6, 6),
     ) -> None:
-        """
-        Plots the cumulative gains curve for a binary classification model. It
+        """Plots the cumulative gains curve for a binary classification model. It
         shows the percentage of positive cases captured by the model as a function
         of the percentage of the sample that is predicted as positive.
 
         Args:
             y_true (np.ndarray): true labels of the data, either 0 or 1.
             y_pred (np.ndarray): predicted probabilities of the positive class by the model.
+            fig_size (tuple): figure size.
 
         Returns:
             ax.get_figure(): figure object that can be logged and saved.
@@ -643,6 +749,7 @@ class ModelEvaluator(ModelOptimizer):
         Args:
             y_true (np.ndarray): true labels of the data, either 0 or 1.
             y_pred (np.ndarray): predicted probabilities of the positive class by the model.
+            fig_size (tuple): figure size.
 
         Returns
             ax.get_figure(): figure object that can be logged and saved.
@@ -661,8 +768,16 @@ class ModelEvaluator(ModelOptimizer):
         scores: pd.DataFrame,
         prefix: Optional[str] = None,
     ) -> dict:
-        """ "Converts scors on training and validation sets from dataframe to
-        dictionary for results logging."""
+        """Converts scors on training and validation sets from dataframe to
+        dictionary for results logging.
+
+        Args:
+            scores (pd.DataFrame): dataframe of scores.
+            prefix (str): prefix to add to metric names.
+
+        Returns:
+            metrics_values (dict): dictionary of metric names and values.
+        """
 
         metrics_values = dict(scores.set_index("Metric").iloc[:, 0])
 
@@ -679,6 +794,16 @@ class ModelEvaluator(ModelOptimizer):
     ) -> Union[pd.DataFrame, pd.DataFrame, Pipeline, list]:
         """Evaluates the best model returned by hyperparameters optimization procedure
         on both training and validation set.
+
+        Args:
+            class_encoder (LabelEncoder): class encoder object.
+            pos_class_label_thresh (float): decision threshold value for positive class.
+
+        Returns:
+            train_scores (pd.DataFrame): training scores.
+            valid_scores (pd.DataFrame): validation scores.
+            pipeline (Pipeline): fitted pipeline.
+            original_class_labels (list): list of original class labels.
         """
 
         # Generate class labels for validation set based on decision threshold value (0.5)
@@ -909,7 +1034,18 @@ class PrepChampModel:
     ) -> str:
         """Selects the best performer from all challenger models. The comet_exp_keys
         is a dictionary of model names as keys and their corresponding experiment
-        objects as values. It returns the name of the best challenger model."""
+        objects as values. It returns the name of the best challenger model.
+
+        Args:
+            comet_project_name (str): comet project name.
+            comet_workspace_name (str): comet workspace name.
+            comparison_metric (str): metric name to compare models.
+            comet_exp_keys (dict): dictionary of model names as keys and their
+                                   corresponding experiment objects as values.
+
+        Returns:
+            best_challenger_name (str): name of the best challenger model.
+        """
 
         comet_api = API()
         exp_scores = {}
@@ -938,7 +1074,20 @@ class PrepChampModel:
         model: Callable,
         cv_folds: int = 5,
     ) -> Pipeline:
-        """Calibrates a model within sklearn pipelines. It ."""
+        """Takes a fitted pipeline and returns a calibrated pipeline.
+
+        Args:
+            train_features (pd.DataFrame): train features.
+            train_class (np.ndarray): train class labels.
+            preprocessor_step (ColumnTransformer): data preprocessing step.
+            selector_step (VarianceThreshold): feature selection step.
+            model (Callable): model object.
+            cv_folds (int): number of cross-validation
+                            folds for calibration.
+
+        Returns:
+            calib_pipeline (Pipeline): calibrated pipeline.
+        """
 
         # Fit a pipeline with a calibrated model
         calib_pipeline = Pipeline(
@@ -968,7 +1117,17 @@ class PrepChampModel:
         pipeline: Pipeline,
         exp_obj: ExistingExperiment,
     ) -> None:
-        """Logs and registers champion model in workspace. It returns None."""
+        """Logs and registers champion model in workspace.
+
+        Args:
+            local_path (str): local path to save champion model.
+            champ_model_name (str): champion model name.
+            pipeline (Pipeline): fitted pipeline.
+            exp_obj (ExistingExperiment): comet experiment object.
+
+        Returns:
+            None.
+        """
 
         if not os.path.exists(local_path):
             os.makedirs(local_path)

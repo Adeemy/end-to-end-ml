@@ -34,7 +34,16 @@ model = load_model.download_model(
 )
 
 
-def predict(data: dict = Body(...)):
+def predict(data: dict = Body(...)) -> dict:
+    """Predicts the probability of having a heart disease or stroke.
+
+    Args:
+        data (dict): dictionary containing the input data.
+
+    Returns:
+        dict: dictionary containing the predicted probability.
+    """
+
     # Convert input dictionary to data frame required by the model
     data_df = pd.json_normalize(data)
 

@@ -28,7 +28,7 @@
       "extensions": [
         "ms-python.python",
         "ms-azuretools.vscode-docker",
-        // "GitHub.copilot",
+        "GitHub.copilot",
         "ms-vscode.makefile-tools",
         "mhutchie.git-graph",
         "ms-python.pylint",

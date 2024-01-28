@@ -11,25 +11,13 @@ from sklearn.model_selection import train_test_split
 
 
 class DataSplitter:
-    """
-    Splits dataset into train and test sets either randomly or based on time. It
-    also verifies there is no overlapping samples (data leakage) in case the
-    primary key column was not unique.
+    """Splits dataset into two disjoint sets, train and test sets, either randomly
+    or based on time (a cut-off date must be provided).
 
-    Args:
-        dataset (pd.Dataframe): dataset features without class.
-        class_col_name (str): name of class column.
-        split_type (str): type of split and it can be either "random" or "time".
-        train_set_size (float): % of the training set (default: 0.8).
-        split_random_seed (int): seed for random number generator for random split.
-        split_date_col_name (str): name of date column to split dataset based on time.
-        split_cutoff_date (date): cut-off date (data after this date are test set). For
-            example, datetime.strptime("2023-15-11", "%Y-%d-%m").date().
-        split_date_col_format (str): date format of date column used for split.
-
-    Returns:
-        train_set (pd.Dataframe): train set with class column.
-        test_set (pd.Dataframe): test set with class column.
+    Attributes:
+        dataset (pd.DataFrame): input dataset.
+        primary_key_col_name (str): name of the primary key column(s).
+        class_col_name (str): name of the class column.
     """
 
     def __init__(
@@ -51,6 +39,24 @@ class DataSplitter:
         split_cutoff_date: Optional[datetime.date] = None,
         split_date_col_format: str = "%Y-%m-%d %H:%M:%S",
     ) -> Union[pd.DataFrame, pd.DataFrame]:
+        """Splits dataset into two disjoint sets, train and test sets, either randomly
+        or based on time (a cut-off date must be provided).
+
+        Args:
+            split_type (str): type of split, either 'random' or 'time'.
+            train_set_size (float): % of the training set (default: 0.8).
+            split_random_seed (int): seed for random number generator for random split (default: 123).
+            split_date_col_name (str): name of date column to split dataset based on time.
+            split_cutoff_date (date): cut-off date (data after this date are test set). For example,
+                if split_date_col_name is 'date' and split_cutoff_date is '2020-01-01', then all
+                samples with date >= '2020-01-01' are test set.
+            split_date_col_format (str): date column format.
+
+        Returns:
+            train_set (pd.Dataframe): train set with class column.
+            test_set (pd.Dataframe): test set with class column.
+        """
+
         if split_type == "random":
             (
                 training_features,
@@ -92,7 +98,8 @@ class DataSplitter:
             ]
 
             print(
-                f"Dataset was split based on time using {split_cutoff_date} as cut-off date."
+                f"""Dataset was split based on time using {split_cutoff_date} 
+                as cut-off date."""
             )
 
         else:
@@ -108,15 +115,15 @@ class DataSplitter:
     def check_datasets_overlap(
         self, first_dataset: pd.DataFrame, second_dataset: pd.DataFrame
     ) -> None:
-        """
-        Checks if there is overlapping between two sets (e.g., train and test sets)
-        based on a common primary key. It prints a message indicating whether there are
-        samples that exist in both sets (i.e., data leakage) or not.
+        """Raises an error if there are overlapping samples in two sets using
+        primary key column, i.e., two sets are not disjoint causing data leakage.
 
         Args:
             first_dataset (dataframe): it can be either training or testing set.
             second_dataset (dataframe): it can be either training or testing set.
-            primary_key_col_name (str): name of the shared primary key column(s).
+
+        Raises:
+            ValueError: if there are overlapping samples in both sets.
         """
 
         left_dataset = first_dataset.copy()
@@ -134,16 +141,19 @@ class DataSplitter:
 
         if len(overlap_samples) > 0:
             raise ValueError(
-                f"\n{len(overlap_samples)} overlapping samples between train and test sets.\n"
+                f"\n{len(overlap_samples)} overlapping samples in both sets.\n"
             )
         else:
-            print("\nNo overlapping samples between train and test sets.\n")
+            print("\nThe provided datasets are disjoint.\n")
 
     def print_class_dist(
         self,
     ) -> Union[pd.Series, pd.Series]:
-        """
-        Prints class distribution (counts and percentages).
+        """Prints class distribution (counts and percentages) of a given dataset.
+
+        Returns:
+            n_class_labels (pd.Series): class labels counts.
+            class_labels_proportions (pd.Series): class labels proportions.
         """
 
         # Calculate class labels counts and percentages
@@ -163,6 +173,20 @@ class DataSplitter:
 
 
 class DataPreprocessor:
+    """Preprocesses input data by replacing blank values with np.nan, checking
+    for duplicate rows, removing duplicate rows by primary key, specifying data types,
+    identifying columns with high % of missing values, and returning the preprocessed
+    data when invoked.
+
+    Attributes:
+        input_data (pd.DataFrame): input data.
+        primary_key_names (list): list of primary key column names.
+        date_cols_names (list): list of date column names.
+        datetime_cols_names (list): list of datetime column names.
+        num_feature_names (list): list of numerical column names.
+        cat_feature_names (list): list of categorical column names.
+    """
+
     def __init__(
         self,
         input_data: pd.DataFrame,
@@ -202,15 +226,17 @@ class DataPreprocessor:
             > 0
         ), "At least one feature data type must be provided. None was provided!"
 
-    def replace_blank_values_with_nan(self) -> pd.DataFrame:
-        """Replaces blank cells like "" and white space with np.nan.
-        This is particularly useful when preprocessing data sourced
-        from csv files."""
+    def replace_blank_values_with_nan(self) -> None:
+        """Replaces blank values with np.nan. It is useful when reading data from
+        csv files where blank values are represented by empty strings.
+        """
 
         self._data.replace(r"^\s*$", np.nan, regex=True, inplace=True)
 
-    def check_duplicate_rows(self) -> pd.DataFrame:
-        """Checks if there are duplicate rows in dataset."""
+    def check_duplicate_rows(self) -> None:
+        """Checks if there are duplicate rows in dataset. It returns the number of
+        duplicate rows if any.
+        """
 
         duplicates_count = self._data.duplicated().sum()
         if duplicates_count > 0:
@@ -225,14 +251,17 @@ class DataPreprocessor:
             ).sum()
             if duplicates_by_id_count > 0:
                 print(
-                    f"\n{duplicates_by_id_count} rows with non-unique {self.primary_key_names} in input data."
+                    f"""\n{duplicates_by_id_count} rows with non-unique {self.primary_key_names} 
+                    in input data."""
                 )
             else:
                 print(f"\nNo duplicate rows by {self.primary_key_names} in input data.")
 
-    def remove_duplicates_by_primary_key(self) -> pd.DataFrame:
-        """Checks if there are duplicates in dataset by primary key column(s), which could
-        be multiple columns."""
+    def remove_duplicates_by_primary_key(self) -> None:
+        """Removes duplicate rows by primary key. It returns the number of duplicate
+        rows and keeps the last duplicate row if any. It is useful when there are
+        duplicate rows by primary key in the dataset.
+        """
 
         # Check if there is duplicated primary_key_names and remove duplicate rows if any
         if len(self.primary_key_names) == 0:
@@ -243,25 +272,28 @@ class DataPreprocessor:
             ).sum()
             if duplicates_by_id_count > 0:
                 print(
-                    f"\n{duplicates_by_id_count} rows with the non-unique {self.primary_key_names} in input data."
+                    f"""\n{duplicates_by_id_count} rows with the non-unique 
+                    {self.primary_key_names} in input data."""
                 )
                 self._data.drop_duplicates(
                     subset=self.primary_key_names, keep="last", inplace=True
                 )
             else:
-                print(
-                    f"\nThere are no duplicate rows by {self.primary_key_names} in input data."
-                )
+                print(f"\nNo duplicate rows by {self.primary_key_names} in input data.")
 
     def specify_data_types(
         self,
         desired_date_format: str = "%Y-%d-%m",
         desired_datetime_format: str = "%Y-%d-%m %H:%M:%S",
-    ) -> pd.DataFrame:
-        """Enforces the specified data types of input dataset columns with
-        their proper missing value indicator. If date, datetime, and numerical
+    ) -> None:
+        """Specifies data types for date, datetime, numerical and categorical columns
+        with their proper missing value indicator. If date, datetime, and numerical
         columns are not provided, all columns will be converted to categorical
         data type (categorical type).
+
+        Args:
+            desired_date_format (str): desired date format.
+            desired_datetime_format (str): desired datetime format.
         """
 
         # Categorical variables are all veriables that are not numerical or date
@@ -291,7 +323,7 @@ class DataPreprocessor:
                 col for col in input_data_vars_names if col not in non_cat_col_names
             ]
 
-        # Cast date columns
+        # Cast columns to proper data types
         if len(self.date_cols_names) > 0:
             self._data[self.date_cols_names] = self._data[self.date_cols_names].apply(
                 pd.to_datetime, format=desired_date_format, errors="coerce"
@@ -301,9 +333,6 @@ class DataPreprocessor:
                 {np.nan: pd.NaT}
             )
 
-            print(f"Date columns:\n{self.date_cols_names}\n\n")
-
-        # Cast datetime columns
         if len(self.datetime_cols_names) > 0:
             self._data[self.datetime_cols_names] = self._data[
                 self.datetime_cols_names
@@ -313,22 +342,15 @@ class DataPreprocessor:
                 self.datetime_cols_names
             ].replace({np.nan: pd.NaT})
 
-            print(f"Datetime columns:\n{self.datetime_cols_names}\n\n")
-
-        # Cast numerical as float type
         if len(self.num_feature_names) > 0:
             self._data[self.num_feature_names] = self._data[
                 self.num_feature_names
             ].astype("float32")
 
-            print(f"Numerical columns:\n{self.num_feature_names}\n\n")
-
-        # Cast categorical columns to object stype
-        # Note: replacing NaNs after casting to object will convert columns to object data type.
         if len(self.cat_feature_names) > 0:
             print(
-                "The following (categorical) columns will be converted to 'string' type.\n",
-                self.cat_feature_names,
+                f"""The following categorical columns will be converted to 'string' 
+                type.\n {self.cat_feature_names}"""
             )
 
             self._data[self.cat_feature_names] = self._data[
@@ -345,7 +367,16 @@ class DataPreprocessor:
         (default: 0.3). It will update list of categorical, continuous, date and datetime
         column names. It keeps columns specified col_names_to_exclude from exclusion if
         provided. update_cols_types was added to pass tests where updating column names
-        by data types is not required."""
+        by data types is not required.
+
+        Args:
+            cols_to_exclude (list): list of columns to exclude from removal.
+            high_nans_percent_threshold (float): threshold for high % of missing values.
+            update_cols_types (bool): whether to update column names by data type.
+
+        Returns:
+            cols_to_drop (list): list of columns with high % of missing values.
+        """
 
         # Identify columns with % of missing values > high_nans_percent_threshold
         nans_count = self._data.isna().sum().sort_values(ascending=False)
@@ -400,12 +431,30 @@ class DataPreprocessor:
 
         return cols_to_drop
 
-    def get_preprocessed_data(self):
-        """Returns the preprocessed data when invoked."""
+    def get_preprocessed_data(self) -> pd.DataFrame:
+        """Returns the preprocessed data when invoked.
+
+        Returns:
+            preprocessed_data (pd.DataFrame): preprocessed data.
+        """
         return self._data.copy()
 
 
 class DataTransformer:
+    """Transforms input data by mapping categorical features to expressive values
+    and renaming class labels to 'Diabetic' or 'Non-Diabetic'. It returns the
+    transformed data when invoked. It is useful when the input data is not
+    in the same format as the training data.
+
+    Attributes:
+        preprocessed_data (pd.DataFrame): preprocessed data.
+        primary_key_names (list): list of primary key column names.
+        date_cols_names (list): list of date column names.
+        datetime_cols_names (list): list of datetime column names.
+        num_feature_names (list): list of numerical column names.
+        cat_feature_names (list): list of categorical column names.
+    """
+
     def __init__(
         self,
         preprocessed_data: pd.DataFrame,
@@ -434,7 +483,7 @@ class DataTransformer:
         if self.cat_feature_names is None:
             self.cat_feature_names = []
 
-    def map_categorical_features(self):
+    def map_categorical_features(self) -> None:
         """Maps categorical features to expressive values."""
 
         if "GenHlth" in self.preprocessed_data.columns:
@@ -484,8 +533,15 @@ class DataTransformer:
                 }
             )
 
-    def rename_class_labels(self, class_col_name: str):
-        """Rename class labels to 'Diabetic' or 'Non-Diabetic'."""
+    def rename_class_labels(self, class_col_name: str) -> None:
+        """Renames class labels to 'Diabetic' or 'Non-Diabetic'.
+
+        Args:
+            class_col_name (str): name of the class column.
+
+        Raises:
+            ValueError: if class column doesn't exist in data.
+        """
 
         if class_col_name in self.preprocessed_data.columns:
             self.preprocessed_data.loc[:, class_col_name] = (

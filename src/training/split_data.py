@@ -20,8 +20,17 @@ from src.training.utils.data import PrepTrainingData
 #################################
 
 
-def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath):
-    """Splits dataset into train and test sets."""
+def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath) -> None:
+    """Splits dataset into train and test sets.
+
+    Args:
+        feast_repo_dir (str): path to the feature store repo.
+        config_yaml_abs_path (str): path to the config yaml file.
+        data_dir (PosixPath): path to the data directory.
+
+    Returns:
+        None.
+    """
 
     print(
         """\n

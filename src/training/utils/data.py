@@ -21,11 +21,17 @@ from sklearn.preprocessing import (  # StandardScaler, RobustScaler,
 
 from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
 
-###########################################################
-
 
 class DataPipelineCreator:
-    """A class to create a data preprocessing pipeline using sklearn."""
+    """Create a data preprocessing pipeline using sklearn.
+
+    Attributes:
+        num_features_imputer (str): strategy to impute missing values in numerical features.
+        num_features_scaler (Optional[Union[Callable, None]]): scaler to scale numerical features.
+        cat_features_imputer (str): strategy to impute missing values in categorical features.
+        cat_features_ohe_handle_unknown (str): strategy to handle unknown categories in categorical features.
+        cat_features_nans_replacement (float): value to replace NaNs in categorical features.
+    """
 
     def __init__(
         self,
@@ -44,7 +50,11 @@ class DataPipelineCreator:
     def create_num_features_pipeline(
         self,
     ) -> Pipeline:
-        """Creates sklearn pipeline for numerical features."""
+        """Creates sklearn pipeline for numerical features.
+
+        Returns:
+            num_transformer (Pipeline): sklearn pipeline for numerical features.
+        """
         num_transformer = Pipeline(
             steps=[
                 ("imputer", SimpleImputer(strategy=self.num_features_imputer)),
@@ -57,7 +67,11 @@ class DataPipelineCreator:
     def create_cat_features_transformer(
         self,
     ) -> Pipeline:
-        """Creates sklearn pipeline for categorical features."""
+        """Creates sklearn pipeline for categorical features.
+
+        Attributes:
+            cat_transformer (Pipeline): sklearn pipeline for categorical features.
+        """
         cat_transformer = Pipeline(
             steps=[
                 (
@@ -89,10 +103,17 @@ class DataPipelineCreator:
         cat_feature_col_names: Optional[list] = None,
         variance_threshold_val: float = 0.05,
     ) -> Union[pd.DataFrame, Pipeline]:
-        """
-        Creates a data pipeline to transform training set features (class column
-        should not be included) and returns transformed train set features as
-        pd.DataFrame and fitted pipeline to transform validation and test sets.
+        """Creates a data transformation pipeline using sklearn and returns
+        transformed data and the pipeline.
+
+        Args:
+            input_features (pd.DataFrame): training set features.
+            num_feature_col_names (Optional[list], optional): numerical feature names. Defaults to None.
+            cat_feature_col_names (Optional[list], optional): categorical feature names. Defaults to None.
+            variance_threshold_val (float, optional): variance threshold value. Defaults to 0.05.
+
+        Raises:
+            AssertionError: if no numerical or categorical features are specified.
         """
 
         # Copy input data
@@ -130,9 +151,6 @@ class DataPipelineCreator:
                     ("categorical", "passthrough"),
                 ]
             )
-
-        print(f"\nNumerical features: {num_feature_col_names}")
-        print(f"\nCategorical features: {cat_feature_col_names}")
 
         preprocessor = ColumnTransformer(
             transformers=[
@@ -175,13 +193,22 @@ class DataPipelineCreator:
 
 
 class PrepTrainingData:
-    """A class to prep data for training during data split. It can be used to create the
+    """Prepares data for training during data split. It can be used to create the
     three data splits: training, validation, and testing, and apply minimal preprocessing
     steps that doesn't cause data leakage. It can also be used in training script to ensure
     all data splits have proper data types espcially when importing data from csv files. The
     class can also be used to fit label encoder on training class and use the fitted encoder
     to transform the validation and testing set class labels. Although there is no dependencies
     between methods, this class can be further improved in future refactoring efforts.
+
+    Attributes:
+        train_set (pd.DataFrame): training set.
+        valid_set (Optional[pd.DataFrame]): validation set.
+        test_set (pd.DataFrame): testing set.
+        primary_key (str): name of primary key column.
+        class_col_name (str): name of class column.
+        numerical_feature_names (Optional[list]): list of numerical feature names.
+        categorical_feature_names (Optional[list]): list of categorical feature names.
     """
 
     def __init__(
@@ -193,14 +220,38 @@ class PrepTrainingData:
         numerical_feature_names: Optional[list] = None,
         categorical_feature_names: Optional[list] = None,
     ) -> None:
+        """Creates a PrepTrainingData instance.
+
+        Args:
+            train_set (pd.DataFrame): training set.
+            test_set (pd.DataFrame): testing set.
+            primary_key (str): name of primary key column.
+            class_col_name (str): name of class column.
+            numerical_feature_names (Optional[list], optional): list of numerical feature names. Defaults to None.
+            categorical_feature_names (Optional[list], optional): list of categorical feature names. Defaults to None.
+
+            The following are attributes that are set to None by default and can be set later:
+
+            training_features (Optional[pd.DataFrame], optional): training set features. Defaults to None.
+            valid_set (Optional[pd.DataFrame], optional): validation set. Defaults to None but can be created using
+                create_validation_set method.
+            validation_features (Optional[pd.DataFrame], optional): validation set features. Defaults to None.
+            testing_features (Optional[pd.DataFrame], optional): testing set features. Defaults to None.
+            train_features_preprocessed (Optional[pd.DataFrame], optional): transformed training set features. Defaults to None.
+            valid_features_preprocessed (Optional[pd.DataFrame], optional): transformed validation set features. Defaults to None.
+
+        Raises:
+            AssertionError: if no numerical or categorical features are specified.
+        """
+
+        self.train_set = train_set
+        self.test_set = test_set
         self.primary_key = primary_key
         self.class_col_name = class_col_name
         self.numerical_feature_names = numerical_feature_names
         self.categorical_feature_names = categorical_feature_names
-        self.train_set = train_set
-        self.valid_set = None
-        self.test_set = test_set
         self.training_features = None
+        self.valid_set = None
         self.validation_features = None
         self.testing_features = None
         self.train_features_preprocessed = None
@@ -214,7 +265,8 @@ class PrepTrainingData:
 
     def select_relevant_columns(self) -> None:
         """Ensures specified numerical and categorical features exist in train and test
-        set, and returns train and test sets with the selected columns."""
+        set, and returns train and test sets with the selected columns.
+        """
 
         # Update specified columns in case some columns were dropped from preprocessed dataset
         self.numerical_feature_names = [
@@ -247,6 +299,7 @@ class PrepTrainingData:
 
     def enforce_data_types(self) -> None:
         """Enforces data types of numerical and categorical features.
+
         Note: if only numerical feature names are provided, all other features will
         be considered categorical and will be converted to string.
         """
@@ -283,7 +336,11 @@ class PrepTrainingData:
         """Replaces missing values with NaNs to allow converting them from
         float to integer.
         Note: the error (AttributeError: 'bool' object has no attribute 'transpose')
-        is raised when transforming train set possibly because of pd.NA."""
+        is raised when transforming train set possibly because of pd.NA.
+
+        Args:
+            nan_replacement (str, optional): value to replace NaNs with. Defaults to "Unspecified".
+        """
 
         self.train_set[self.categorical_feature_names] = self.train_set[
             self.categorical_feature_names
@@ -309,7 +366,20 @@ class PrepTrainingData:
     ) -> None:
         """Creates a validation set by splitting training set into training and
         validation sets randomly or based on time.
+
         Note: validation set will be used to select the best model.
+
+        Args:
+            split_type (Literal["time", "random"], optional): type of split. Defaults to "random".
+            train_set_size (float, optional): size of training set. Defaults to 0.8.
+            split_random_seed (Optional[int], optional): random seed for reproducibility. Defaults to None.
+            split_date_col_name (Optional[str], optional): name of date column. Defaults to None.
+            split_cutoff_date (Optional[str], optional): date to split on. Defaults to None.
+            split_date_col_format (str, optional): date column format. Defaults to "%Y-%m-%d %H:%M:%S".
+
+
+        Raises:
+            ValueError: if validation set already exists.
         """
 
         if self.valid_set is not None:
@@ -334,7 +404,15 @@ class PrepTrainingData:
         """Separate features and class column of testing set. The validation
         set (valid_set) can be provided in this method if to wasn't provided
         already. If validation set is provided here, it will overwrite the
-        validation set created by create_validation_set"""
+        validation set created by create_validation_set.
+
+        Args:
+            valid_set (Optional[pd.DataFrame], optional): validation set. Defaults to None.
+
+        Raises:
+            ValueError: if validation set is provided although it was already created.
+            ValueError: if validation set is neither provided nor created using create_validation_set method.
+        """
 
         if valid_set is not None and self.valid_set is None:
             self.valid_set = valid_set
@@ -360,7 +438,19 @@ class PrepTrainingData:
     ) -> Union[pd.DataFrame, np.ndarray, LabelEncoder, int]:
         """Encode class labels into integers and returns encoded class labels
         of training, validation, and testing sets in addition to encoded positive
-        class label and fitted encoder."""
+        class label and fitted encoder.
+
+        Args:
+            pos_class_label (str): positive class label.
+
+        Returns:
+            tuple: tuple containing:
+            encoded_train_class (np.ndarray): encoded training set class labels.
+            encoded_valid_class (np.ndarray): encoded validation set class labels.
+            encoded_test_class (np.ndarray): encoded testing set class labels.
+            enc_pos_class_label (int): encoded positive class label.
+            fitted_class_encoder (LabelEncoder): fitted class encoder.
+        """
 
         train_class = self.train_set[[self.class_col_name]]
         valid_class = self.valid_set[[self.class_col_name]]
@@ -387,7 +477,11 @@ class PrepTrainingData:
         self,
         var_thresh_val: float = 0.05,
     ) -> Pipeline:
-        """Creates a data transformation pipeline and fit it on training set."""
+        """Creates a data transformation pipeline and fit it on training set.
+
+        Args:
+            var_thresh_val (float, optional): variance threshold value. Defaults to 0.05.
+        """
 
         train_set_transformer = DataPipelineCreator(
             num_features_imputer="median",
@@ -427,6 +521,9 @@ class PrepTrainingData:
         because of special characters and returns clean feature names. This issue
         can be ebcountered after one-hot encoding where some category values with
         special characters can be become problematic column names.
+
+        Note: this method should be called after data transformation pipeline is
+        created and applied on training, validation, and testing sets.
         """
 
         # Remove special characters from column name to avoid error that LightGBM does
@@ -451,40 +548,78 @@ class PrepTrainingData:
         )
 
     def get_train_set(self):
-        """Returns the training set (features and class) when invoked."""
+        """Returns the training set (features and class) when invoked.
+
+        Returns:
+            train_set (pd.DataFrame): training set.
+        """
         return self.train_set.copy()
 
     def get_validation_set(self):
-        """Returns the validation set (features and class) when invoked."""
+        """Returns the validation set (features and class) when invoked.
+
+        Returns:
+            valid_set (pd.DataFrame): validation set.
+        """
         return self.valid_set.copy()
 
     def get_test_set(self):
-        """Returns the testing set (features and class) when invoked."""
+        """Returns the testing set (features and class) when invoked.
+
+        Returns:
+            test_set (pd.DataFrame): testing set.
+        """
         return self.test_set.copy()
 
     def get_training_features(self):
-        """Returns the training features when invoked."""
+        """Returns the training features when invoked.
+
+        Returns:
+            training_features (pd.DataFrame): training set features.
+        """
         return self.training_features.copy()
 
     def get_validation_features(self):
-        """Returns the validation features when invoked."""
+        """Returns the validation features when invoked.
+
+        Returns:
+            validation_features (pd.DataFrame): validation set features.
+        """
         return self.validation_features.copy()
 
     def get_testing_features(self):
-        """Returns the testing features when invoked."""
+        """Returns the testing features when invoked.
+
+        Returns:
+            testing_features (pd.DataFrame): testing set features.
+        """
         return self.testing_features.copy()
 
     def get_train_features_preprocessed(self):
-        """Returns the transformed training set features when invoked."""
+        """Returns the transformed training set features when invoked.
+
+        Returns:
+            train_features_preprocessed (pd.DataFrame): transformed training set features.
+        """
         return self.train_features_preprocessed.copy()
 
     def get_valid_features_preprocessed(self):
-        """Returns the transformed validation set features when invoked."""
+        """Returns the transformed validation set features when invoked.
+
+        Returns:
+            valid_features_preprocessed (pd.DataFrame): transformed validation set features.
+        """
         return self.valid_features_preprocessed.copy()
 
     def get_feature_names(self) -> Union[list, list]:
         """Returns the numerical and categorical feature names of all data
         splits. During preprocessing some features might be dropped in they
         are near-zero variance. So this methods ensures updated feature
-        names are returned."""
+        names are returned.
+
+        Returns:
+            tuple: tuple containing:
+                - numerical_feature_names (list): list of numerical feature names.
+                - categorical_feature_names (list): list of categorical feature names.
+        """
         return self.numerical_feature_names, self.categorical_feature_names

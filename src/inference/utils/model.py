@@ -7,35 +7,50 @@ from pathlib import PosixPath
 
 import joblib
 from comet_ml import API
+from sklearn.pipeline import Pipeline
 
 from src.training.utils.config import Config
 
 
-########################################################
 class ModelLoader:
-    """Loads scoring models for inference."""
+    """Loads scoring models for inference.
 
-    def get_config_params(self, config_yaml_abs_path: str):
+    Args:
+        None.
+    """
+
+    def get_config_params(self, config_yaml_abs_path: str) -> tuple:
         """Extracts training and model configurations, like workspace info
-        and registered champion model name."""
+        and registered model name.
 
-        # Get model settings
+        Args:
+            config_yaml_abs_path (str): path to config yaml file.
+
+        Returns:
+            tuple: Tuple containing:
+                - comet_workspace_name (str): Comet workspace name.
+                - model_name (str): registered model name.
+                - num_col_names (list): list of numerical column names.
+                - cat_col_names (list): list of categorical column names.
+                - hf_data_source (str): HuggingFace dataset source.
+
+        """
+
+        # Get config params
         config = Config(config_path=config_yaml_abs_path)
-        COMET_WORKSPACE_NAME = config.params["train"]["params"]["comet_workspace_name"]
-        CHAMPION_MODEL_NAME = config.params["modelregistry"]["params"][
-            "champion_model_name"
-        ]
-        HF_DATA_SOURCE = config.params["data"]["params"]["raw_dataset_source"]
+        comet_workspace_name = config.params["train"]["params"]["comet_workspace_name"]
+        model_name = config.params["modelregistry"]["params"]["champion_model_name"]
+        hf_data_source = config.params["data"]["params"]["raw_dataset_source"]
 
         num_col_names = config.params["data"]["params"]["num_col_names"]
         cat_col_names = config.params["data"]["params"]["cat_col_names"]
 
         return (
-            COMET_WORKSPACE_NAME,
-            CHAMPION_MODEL_NAME,
+            comet_workspace_name,
+            model_name,
             num_col_names,
             cat_col_names,
-            HF_DATA_SOURCE,
+            hf_data_source,
         )
 
     def download_model(
@@ -44,15 +59,24 @@ class ModelLoader:
         comet_api_key: str,
         model_name: str,
         artifacts_path: PosixPath,
-    ):
-        """Downloads a registered model from Comet workspace."""
+    ) -> Pipeline:
+        """Downloads a registered model from Comet workspace.
 
-        # Create API instances
+        Args:
+            comet_workspace (str): Comet workspace name.
+            comet_api_key (str): Comet API key.
+            model_name (str): registered model name.
+            artifacts_path (PosixPath): path to save model artifacts.
+
+        Returns:
+            model (sklearn.pipeline.Pipeline): trained model.
+        """
+
+        # Create Comet API instance
         comet_api = API(api_key=comet_api_key)
 
-        # Download a model from Hugging Face
-        # Note: log into Hugging Face CLI using huggingface-cli login --token $HUGGINGFACE_TOKEN
-        _model = comet_api.get_model(
+        # Download a registered model from Comet workspace
+        model = comet_api.get_model(
             workspace=comet_workspace,
             model_name=model_name,
         )
@@ -60,6 +84,6 @@ class ModelLoader:
             workspace=comet_workspace,
             registry_name=model_name,
         )
-        _model.download(model_versions[-1], artifacts_path, expand=True)
+        model.download(model_versions[-1], artifacts_path, expand=True)
 
         return joblib.load(f"{str(artifacts_path)}/{model_name}.pkl")

@@ -30,7 +30,24 @@ def main(
     comet_api_key: str,
     data_dir: PosixPath,
     artifacts_dir: PosixPath,
-):
+) -> None:
+    """
+    Takes a config file as input and submits experiments to perform
+    hyperparameters optimization for multiple models.
+
+    Args:
+        config_yaml_abs_path (str): path to config yaml file.
+        comet_api_key (str): Comet API key.
+        data_dir (PosixPath): path to data directory.
+        artifacts_dir (PosixPath): path to artifacts directory.
+
+    Returns:
+        None.
+
+    Raises:
+        ValueError: if no model specified in config file.
+    """
+
     print(
         """\n
     ---------------------------------------------------------------------

@@ -1,13 +1,23 @@
 """Defines a class that loads parameters from config.yml file."""
-from typing import Dict
-
 import yaml
 
 
 class PrettySafeLoader(yaml.SafeLoader):
-    """Custom loader for reading YAML files"""
+    """A YAML loader that loads mappings into ordered dictionaries.
 
-    def construct_python_tuple(self, node):
+    Attributes:
+        None.
+    """
+
+    def construct_python_tuple(self, node: str) -> tuple:
+        """Override the default constructor to create tuples instead of lists.
+
+        Args:
+            node (str): yaml node.
+
+        Returns:
+            tuple: python tuple.
+        """
         return tuple(self.construct_sequence(node))
 
 
@@ -17,18 +27,28 @@ PrettySafeLoader.add_constructor(
 
 
 class Config:
-    """A class that loads parameters from a yaml file.
+    """Loads parameters from config.yml file.
 
-    Args:
-    config_path (str): path of the config .yml file.
+    Attributes:
+        config_path (str): path of the config .yml file.
     """
 
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str) -> None:
+        """Creates a Config instance.
+
+        Args:
+            config_path (str): path of the config .yml file.
+
+        Raises:
+            FileNotFoundError: if config file doesn't exist.
+        """
+
         assert config_path.endswith(".yml")
         self.config_path = config_path
 
         print(
-            f"\n\nDirectory of data perprocessing and transformation config file: {self.config_path}\n\n"
+            f"""\n\nDirectory of data perprocessing and transformation config
+             file: {self.config_path}\n\n"""
         )
 
         try:
@@ -38,8 +58,16 @@ class Config:
             raise FileNotFoundError(f"{config_path} doesn't exist.") from exc
 
     @staticmethod
-    def _check_params(params: Dict):
-        """Check all required values exist."""
+    def _check_params(params: dict) -> None:
+        """Checks all required values exist.
+
+        Args:
+            params (dict): dictionary of parameters loaded from config file.
+
+        Raises:
+            AssertionError: if any required value is missing.
+        """
+
         assert "description" in params, "description is not included in config file"
         assert "data" in params, "data is not included in config file"
 

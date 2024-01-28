@@ -147,6 +147,10 @@ The training and deployment pipelines can be run in GitHub Actions. You can also
 
         make evaluate
 
+- Test champion model
+
+        make test_model
+
 - Pull containerized model
 
         docker pull ghcr.io/adeemy/end-to-end-tabular-ml:9c670633e181da234e0c57639d72a4b2834c7809
