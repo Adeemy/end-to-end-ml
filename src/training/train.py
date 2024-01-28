@@ -93,6 +93,11 @@ def main(
     pos_class = config.params["data"]["params"]["pos_class"]
     variance_threshold_val = config.params["data"]["params"]["variance_threshold_val"]
 
+    LR_PARAMS = config.params["logisticregression"]["params"]
+    RF_PARAMS = config.params["randomforest"]["params"]
+    LGBM_PARAMS = config.params["lgbm"]["params"]
+    XGB_PARAMS = config.params["xgboost"]["params"]
+
     # Import data splits
     training_set = pd.read_parquet(
         data_dir / train_file_name,
@@ -199,7 +204,7 @@ def main(
             class_encoder=class_encoder,
             preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
             selector_step=data_transformation_pipeline.named_steps["selector"],
-            model=LogisticRegression(**config.params["logisticregression"]["params"]),
+            model=LogisticRegression(**LR_PARAMS),
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
@@ -233,7 +238,7 @@ def main(
             class_encoder=class_encoder,
             preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
             selector_step=data_transformation_pipeline.named_steps["selector"],
-            model=RandomForestClassifier(**config.params["randomforest"]["params"]),
+            model=RandomForestClassifier(**RF_PARAMS),
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
@@ -267,7 +272,7 @@ def main(
             class_encoder=class_encoder,
             preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
             selector_step=data_transformation_pipeline.named_steps["selector"],
-            model=LGBMClassifier(**config.params["lgbm"]["params"]),
+            model=LGBMClassifier(**LGBM_PARAMS),
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
@@ -303,7 +308,7 @@ def main(
             selector_step=data_transformation_pipeline.named_steps["selector"],
             model=XGBClassifier(
                 scale_pos_weight=sum(train_class == 0) / sum(train_class == 1),
-                **config.params["xgboost"]["params"],
+                **XGB_PARAMS,
             ),
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,

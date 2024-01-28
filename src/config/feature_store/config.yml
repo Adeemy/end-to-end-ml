@@ -50,5 +50,5 @@ files:
   params:
     raw_dataset_file_name: "raw_dataset.parquet"
     inference_set_file_name: "inference.parquet"
-    preprocessed_dataset_features_file_name: "preprocessed_dataset_features.parquet" # For feature store
-    preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet" # For feature store
+    preprocessed_data_features_file_name: "preprocessed_dataset_features.parquet" # For feature store
+    preprocessed_data_target_file_name: "preprocessed_dataset_target.parquet" # For feature store
