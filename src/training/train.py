@@ -3,8 +3,8 @@ This script submits experiments to perform
 hyperparameters optimization for multiple models.
 """
 
+import argparse
 import os
-import sys
 from datetime import datetime
 from pathlib import PosixPath
 
@@ -26,7 +26,7 @@ load_dotenv()
 
 ###########################################################
 def main(
-    config_yaml_abs_path: str,
+    config_yaml_path: str,
     api_key: str,
     data_dir: PosixPath,
     artifacts_dir: PosixPath,
@@ -36,7 +36,7 @@ def main(
     hyperparameters optimization for multiple models.
 
     Args:
-        config_yaml_abs_path (str): path to config yaml file.
+        config_yaml_path (str): path to config yaml file.
         api_key (str): Comet API key.
         data_dir (PosixPath): path to data directory.
         artifacts_dir (PosixPath): path to artifacts directory.
@@ -56,7 +56,7 @@ def main(
     )
 
     # Experiment settings
-    config = Config(config_path=config_yaml_abs_path)
+    config = Config(config_path=config_yaml_path)
     initiate_comet_project = bool(
         config.params["train"]["params"]["initiate_comet_project"]
     )
@@ -384,8 +384,18 @@ def main(
 
 ###########################################################
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_yaml_path",
+        type=str,
+        default="./config.yml",
+        help="Path to the config yaml file.",
+    )
+
+    args = parser.parse_args()
+
     main(
-        config_yaml_abs_path=sys.argv[1],
+        config_yaml_path=args.config_yaml_path,
         api_key=os.environ["COMET_API_KEY"],
         data_dir=DATA_DIR,
         artifacts_dir=ARTIFACTS_DIR,

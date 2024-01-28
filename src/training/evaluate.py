@@ -7,8 +7,8 @@ will be registered as champion model only if its score
 on the test set is better than a required threshold value.
 """
 
+import argparse
 import os
-import sys
 from pathlib import PosixPath
 
 import joblib
@@ -26,7 +26,7 @@ load_dotenv()
 
 ###########################################################
 def main(
-    config_yaml_abs_path: str,
+    config_yaml_path: str,
     comet_api_key: str,
     data_dir: PosixPath,
     artifacts_dir: PosixPath,
@@ -34,7 +34,7 @@ def main(
     """Selects the best model based on performance on validation set and evaluates it on testing set.
 
     Args:
-        config_yaml_abs_path (str): path to the config yaml file.
+        config_yaml_path (str): path to the config yaml file.
         comet_api_key (str): Comet API key.
         data_dir (PosixPath): path to the data directory.
         artifacts_dir (PosixPath): path to the artifacts directory.
@@ -48,7 +48,7 @@ def main(
     """
 
     # Experiment settings
-    config = Config(config_path=config_yaml_abs_path)
+    config = Config(config_path=config_yaml_path)
     project_name = config.params["train"]["params"]["comet_project_name"]
     workspace_name = config.params["train"]["params"]["comet_workspace_name"]
     class_col_name = config.params["data"]["params"]["class_col_name"]
@@ -177,8 +177,18 @@ def main(
 
 ###########################################################
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_yaml_path",
+        type=str,
+        default="./config.yml",
+        help="Path to the config yaml file.",
+    )
+
+    args = parser.parse_args()
+
     main(
-        config_yaml_abs_path=sys.argv[1],
+        config_yaml_path=args.config_yaml_path,
         comet_api_key=os.environ["COMET_API_KEY"],
         data_dir=DATA_DIR,
         artifacts_dir=ARTIFACTS_DIR,

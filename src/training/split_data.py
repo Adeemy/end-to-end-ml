@@ -4,7 +4,7 @@ i.e., features and class labels, and creates data splits
 for model training. 
 """
 
-import sys
+import argparse
 from datetime import datetime
 from pathlib import PosixPath
 
@@ -20,12 +20,12 @@ from src.training.utils.data import PrepTrainingData
 #################################
 
 
-def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath) -> None:
+def main(feast_repo_dir: str, config_yaml_path: str, data_dir: PosixPath) -> None:
     """Splits dataset into train and test sets.
 
     Args:
         feast_repo_dir (str): path to the feature store repo.
-        config_yaml_abs_path (str): path to the config yaml file.
+        config_yaml_path (str): path to the config yaml file.
         data_dir (PosixPath): path to the data directory.
 
     Returns:
@@ -40,7 +40,7 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath) ->
     )
 
     feat_store = FeatureStore(repo_path=str(feast_repo_dir))
-    config = Config(config_path=config_yaml_abs_path)
+    config = Config(config_path=config_yaml_path)
     pk_col_name = config.params["data"]["params"]["pk_col_name"]
     class_column_name = config.params["data"]["params"]["class_col_name"]
     date_col_names = config.params["data"]["params"]["date_col_names"]
@@ -196,8 +196,18 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath) ->
 
 ###########################################################
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_yaml_path",
+        type=str,
+        default="./config.yml",
+        help="Path to the config yaml file.",
+    )
+
+    args = parser.parse_args()
+
     main(
-        config_yaml_abs_path=sys.argv[1],
+        config_yaml_path=args.config_yaml_path,
         feast_repo_dir=FEATURE_REPO_DIR,
         data_dir=DATA_DIR,
     )

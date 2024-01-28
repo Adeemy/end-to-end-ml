@@ -3,7 +3,7 @@ This script prepares data retrieved from feature store
 for training. 
 """
 
-import sys
+import argparse
 from datetime import datetime
 from pathlib import PosixPath
 
@@ -15,11 +15,11 @@ from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
 
 
 #################################
-def main(config_yaml_abs_path: str, data_dir: PosixPath) -> None:
+def main(config_yaml_path: str, data_dir: PosixPath) -> None:
     """Imports data from feature store to be preprocessed and transformed.
 
     Args:
-        config_yaml_abs_path (str): path to the config yaml file.
+        config_yaml_path (str): path to the config yaml file.
         data_dir (PosixPath): path to the data directory.
 
     Returns:
@@ -35,7 +35,7 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath) -> None:
 
     # Get initiated FeatureStore
     # Note: repo_path is the relative path to where this script is located.
-    config = Config(config_path=config_yaml_abs_path)
+    config = Config(config_path=config_yaml_path)
     pk_col_name = config.params["data"]["params"]["pk_col_name"]
     class_column_name = config.params["data"]["params"]["class_col_name"]
     date_col_names = config.params["data"]["params"]["date_col_names"]
@@ -125,4 +125,14 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath) -> None:
 
 ###########################################################
 if __name__ == "__main__":
-    main(config_yaml_abs_path=sys.argv[1], data_dir=DATA_DIR)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_yaml_path",
+        type=str,
+        default="./config.yml",
+        help="Path to the config yaml file.",
+    )
+
+    args = parser.parse_args()
+
+    main(config_yaml_path=args.config_yaml_path, data_dir=DATA_DIR)

@@ -11,7 +11,7 @@ Note that this script is only used in the beginning of this project just to
 generate data for the project and it isn't part of feature or inference pipelines.
 """
 
-import sys
+import argparse
 from pathlib import PosixPath
 
 from ucimlrepo import fetch_ucirepo
@@ -22,14 +22,14 @@ from src.feature_store.utils.prep import DataSplitter
 
 
 def main(
-    config_yaml_abs_path: str,
+    config_yaml_path: str,
     data_dir: PosixPath,
 ) -> None:
     """Imports raw dataset from UCI data repository and creates training data and
     inference set.
 
     Args:
-        config_yaml_abs_path (str): path to the config yaml file.
+        config_yaml_path (str): path to the config yaml file.
         data_dir (PosixPath): path to the data directory.
 
     Returns:
@@ -45,7 +45,7 @@ def main(
 
     #################################
     # Import data preprocessing config params and check inputs
-    config = Config(config_path=config_yaml_abs_path)
+    config = Config(config_path=config_yaml_path)
 
     # Specify variable types and data source from config file
     uci_dataset_id = config.params["data"]["params"]["uci_raw_data_num"]
@@ -106,7 +106,17 @@ def main(
 
 ###########################################################
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_yaml_path",
+        type=str,
+        default="./config.yml",
+        help="Path to the config yaml file.",
+    )
+
+    args = parser.parse_args()
+
     main(
-        config_yaml_abs_path=sys.argv[1],
+        config_yaml_path=args.config_yaml_path,
         data_dir=DATA_DIR,
     )
