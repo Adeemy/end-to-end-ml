@@ -5,11 +5,14 @@ store capability, but in this project feature
 store is created in local path.
 """
 
+import sys
 from datetime import timedelta
 from pathlib import Path
 
 from feast import Entity, FeatureView, Field, FileSource, ValueType
 from feast.types import Float32, String
+
+sys.path.append(str(Path(__file__).parent.resolve().parent.parent.parent))
 
 from src.config.path import DATA_DIR
 from src.feature_store.utils.config import Config
