@@ -85,8 +85,12 @@ def main(
 
     # Import experiment keys from artifacts folder
     successful_exp_keys = pd.read_csv(
-        f"{ARTIFACTS_DIR}/{EXP_KEY_FILE_NAME}.csv",
     )
+
+    if successful_exp_keys.shape[0] == 0:
+        raise ValueError(
+            "No successful experiments found. Please check the experiment logs."
+        )
 
     # Select the best performing model
     prep_champ_model = PrepChampModel()
