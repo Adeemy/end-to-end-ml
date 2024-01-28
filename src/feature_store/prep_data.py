@@ -47,10 +47,10 @@ def main(config_yaml_abs_path: str, data_dir: PosixPath) -> None:
     ]
     raw_dataset_file_name = config.params["files"]["params"]["raw_dataset_file_name"]
     preprocessed_dataset_features_file_name = config.params["files"]["params"][
-        "preprocessed_dataset_features_file_name"
+        "preprocessed_data_features_file_name"
     ]
     preprocessed_dataset_target_file_name = config.params["files"]["params"][
-        "preprocessed_dataset_target_file_name"
+        "preprocessed_data_target_file_name"
     ]
 
     #################################
