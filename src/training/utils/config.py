@@ -1,13 +1,24 @@
 """Defines a class that loads parameters from config.yml file."""
-from typing import Dict
-
 import yaml
 
 
 class PrettySafeLoader(yaml.SafeLoader):
-    """Custom loader for reading YAML files."""
+    """Custom loader for reading YAML files.
 
-    def construct_python_tuple(self, node):
+    Attributes:
+        None.
+    """
+
+    def construct_python_tuple(self, node) -> tuple:
+        """Override the default constructor to create tuples instead of lists.
+
+        Args:
+            node (str): yaml node.
+
+        Returns:
+            tuple: python tuple.
+        """
+
         return tuple(self.construct_sequence(node))
 
 
@@ -20,10 +31,19 @@ class Config:
     """A class that loads parameters from a yaml file.
 
     Args:
-    config_path (str): path of the config .yml file.
+        config_path (str): path of the config .yml file.
     """
 
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str) -> None:
+        """Creates a Config instance.
+
+        Args:
+            config_path (str): path of the config .yml file.
+
+        Raises:
+            FileNotFoundError: if config file doesn't exist.
+        """
+
         assert config_path.endswith(".yml")
         self.config_path = config_path
 
@@ -36,8 +56,17 @@ class Config:
             raise FileNotFoundError(f"{config_path} doesn't exist.") from exc
 
     @staticmethod
-    def _check_params(params: Dict):
-        """Check all training exp values"""
+    def _check_params(params: dict) -> None:
+        """Check all training exp values.
+
+        Args:
+            params (dict): dictionary of config parameters.
+
+        Raises:
+            AssertionError: if any required parameter is missing.
+            ValueError: if any parameter is of invalid type.
+        """
+
         assert "description" in params, "description is not included in config file"
         assert "data" in params, "data is not included in config file"
         assert "train" in params, "train is not included in config file"

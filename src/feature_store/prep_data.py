@@ -15,11 +15,15 @@ from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
 
 
 #################################
-def main(config_yaml_abs_path: str, data_dir: PosixPath):
+def main(config_yaml_abs_path: str, data_dir: PosixPath) -> None:
     """Imports data from feature store to be preprocessed and transformed.
-    feast_repo_dir (str): relative path to feature store repo.
-    config_yaml_abs_path (str): absolute path to config.yml file, which
-        includes dataset preprocessing configuration.
+
+    Args:
+        config_yaml_abs_path (str): path to the config yaml file.
+        data_dir (PosixPath): path to the data directory.
+
+    Returns:
+        None.
     """
 
     print(

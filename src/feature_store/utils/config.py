@@ -3,20 +3,19 @@ import yaml
 
 
 class PrettySafeLoader(yaml.SafeLoader):
-    """
-    A YAML loader that loads mappings into ordered dictionaries.
+    """A YAML loader that loads mappings into ordered dictionaries.
+
+    Attributes:
+        None.
     """
 
-    def construct_python_tuple(self, node: str):
-        """
-        Override the default constructor to create tuples instead of lists.
+    def construct_python_tuple(self, node: str) -> tuple:
+        """Override the default constructor to create tuples instead of lists.
 
         Args:
-        ----
             node (str): yaml node.
 
         Returns:
-        -------
             tuple: python tuple.
         """
         return tuple(self.construct_sequence(node))
@@ -28,15 +27,22 @@ PrettySafeLoader.add_constructor(
 
 
 class Config:
-    """
-    Loads parameters from config.yml file.
+    """Loads parameters from config.yml file.
 
-    Args:
-    ----
+    Attributes:
         config_path (str): path of the config .yml file.
     """
 
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str) -> None:
+        """Creates a Config instance.
+
+        Args:
+            config_path (str): path of the config .yml file.
+
+        Raises:
+            FileNotFoundError: if config file doesn't exist.
+        """
+
         assert config_path.endswith(".yml")
         self.config_path = config_path
 
@@ -53,15 +59,12 @@ class Config:
 
     @staticmethod
     def _check_params(params: dict) -> None:
-        """
-        Checks all required values exist.
+        """Checks all required values exist.
 
         Args:
-        ----
             params (dict): dictionary of parameters loaded from config file.
 
         Raises:
-        ------
             AssertionError: if any required value is missing.
         """
 

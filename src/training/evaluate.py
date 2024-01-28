@@ -30,7 +30,22 @@ def main(
     comet_api_key: str,
     data_dir: PosixPath,
     artifacts_dir: PosixPath,
-):
+) -> None:
+    """Selects the best model based on performance on validation set and evaluates it on testing set.
+
+    Args:
+        config_yaml_abs_path (str): path to the config yaml file.
+        comet_api_key (str): Comet API key.
+        data_dir (PosixPath): path to the data directory.
+        artifacts_dir (PosixPath): path to the artifacts directory.
+
+    Returns:
+        None.
+
+    Raises:
+        ValueError: if the best model score on the test set is lower than the deployment threshold.
+    """
+
     # Experiment settings
     config = Config(config_path=config_yaml_abs_path)
     COMET_API_KEY = comet_api_key

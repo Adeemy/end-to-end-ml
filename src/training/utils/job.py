@@ -50,6 +50,8 @@ def submit_train_exp(
     is_voting_ensemble: bool = False,
 ) -> Pipeline:
     """Submits an experiment to train a model using hyperparameter optimization.
+    The experiment logs the model metrics and artifacts to Comet workspace.
+
     Args:
         comet_api_key (str): Comet API key,
         comet_project_name (str): Comet project name,

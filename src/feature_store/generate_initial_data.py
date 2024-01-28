@@ -24,20 +24,16 @@ from src.feature_store.utils.prep import DataSplitter
 def main(
     config_yaml_abs_path: str,
     data_dir: PosixPath,
-):
-    """Imports original dataset from remote source and generates the following datasets:
+) -> None:
+    """Imports raw dataset from UCI data repository and creates training data and
+    inference set.
 
-    raw dataset: this dataset is meant to be preprocessed, transformed, and stored in
-    feature store. Think of this dataset as it's sourced from hospital EHR system.
-    inference: production data used to simulate inference data scored by deployed model.
-
-    config_yaml_abs_path (str): absolute path to config.yml file, which
-        includes dataset preprocessing configuration.
-    usci_dataset_id (int): UCI repo ID of dataset.
-    split_random_seed (int): seed for random number generator for random split.
+    Args:
+        config_yaml_abs_path (str): path to the config yaml file.
+        data_dir (PosixPath): path to the data directory.
 
     Returns:
-        Saves raw dataset and inference set in local path.
+        None.
     """
 
     print(
