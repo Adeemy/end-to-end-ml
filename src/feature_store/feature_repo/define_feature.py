@@ -5,11 +5,14 @@ store capability, but in this project feature
 store is created in local path.
 """
 
+import sys
 from datetime import timedelta
 from pathlib import Path
 
 from feast import Entity, FeatureView, Field, FileSource, ValueType
 from feast.types import Float32, String
+
+sys.path.append(str(Path(__file__).parent.resolve().parent.parent.parent))
 
 from src.config.path import DATA_DIR
 from src.feature_store.utils.config import Config
@@ -23,34 +26,47 @@ config = Config(
 PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
 CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
 EVENT_TIMESTAMP_COL_NAME = config.params["data"]["params"]["event_timestamp_col_name"]
+ENTITY_NAME = config.params["data"]["params"]["entity_name"]
+ENTITY_DESC = config.params["data"]["params"]["entity_description"]
+FEATURE_VIEW_NAME = config.params["data"]["params"]["feature_view_name"]
+TARGET_VIEW_NAME = config.params["data"]["params"]["target_view_name"]
+TTL_DURATION_IN_DAYS = config.params["data"]["params"]["ttl_duration_in_days"]
+VIEW_TAGS_NAME_1 = config.params["data"]["params"]["view_tags_name_1"]
+VIEW_TAGS_VAL_1 = config.params["data"]["params"]["view_tags_value_1"]
+TARGET_VIEW_DESC = config.params["data"]["params"]["target_view_description"]
+
+PREPROCESS_FEAT_FILE_NAME = config.params["files"]["params"][
+    "preprocessed_data_features_file_name"
+]
+PREPROCESS_TARGET_FILE_NAME = config.params["files"]["params"][
+    "preprocessed_data_target_file_name"
+]
 
 # TTL duration
-ttl_duration_in_days = timedelta(
-    days=float(config.params["data"]["params"]["ttl_duration_in_days"])
-)
+ttl_duration_in_days = timedelta(days=float(TTL_DURATION_IN_DAYS))
 
 # Specify path to features and target
-feat_path_source = f"{str(DATA_DIR)}/{config.params['files']['params']['preprocessed_dataset_features_file_name']}"
-target_path_source = f"{str(DATA_DIR)}/{config.params['files']['params']['preprocessed_dataset_target_file_name']}"
+FEAT_PATH_SOURCE = f"{str(DATA_DIR)}/{PREPROCESS_FEAT_FILE_NAME}"
+TARGET_PATH_SOURCE = f"{str(DATA_DIR)}/{PREPROCESS_TARGET_FILE_NAME}"
 
 #################################
 # Define an entity for encounters
 patient = Entity(
-    name=config.params["data"]["params"]["entity_name"],
+    name=ENTITY_NAME,
     join_keys=[PRIMARY_KEY],
     value_type=ValueType.STRING,
-    description=config.params["data"]["params"]["entity_description"],
+    description=ENTITY_DESC,
 )
 
 # Define the source of training set features
 feat_source = FileSource(
-    path=feat_path_source,
+    path=FEAT_PATH_SOURCE,
     timestamp_field=EVENT_TIMESTAMP_COL_NAME,
 )
 
 # Define a view for training set features
 _feat_view = FeatureView(
-    name=config.params["data"]["params"]["feature_view_name"],
+    name=FEATURE_VIEW_NAME,
     ttl=ttl_duration_in_days,
     entities=[patient],
     source=feat_source,
@@ -160,13 +176,13 @@ _feat_view = FeatureView(
 #################################
 # Define the source of training set target
 target_source = FileSource(
-    path=target_path_source,
+    path=TARGET_PATH_SOURCE,
     timestamp_field=EVENT_TIMESTAMP_COL_NAME,
 )
 
 # Define a view for training set target
 _target_view = FeatureView(
-    name=config.params["data"]["params"]["target_view_name"],
+    name=TARGET_VIEW_NAME,
     ttl=ttl_duration_in_days,
     entities=[patient],
     source=target_source,
@@ -175,10 +191,6 @@ _target_view = FeatureView(
         Field(name=CLASS_COL_NAME, dtype=String),
     ],
     online=True,
-    tags={
-        config.params["data"]["params"]["view_tags_name_1"]: config.params["data"][
-            "params"
-        ]["view_tags_value_1"]
-    },
-    description=config.params["data"]["params"]["target_view_description"],
+    tags={VIEW_TAGS_NAME_1: VIEW_TAGS_VAL_1},
+    description=TARGET_VIEW_DESC,
 )

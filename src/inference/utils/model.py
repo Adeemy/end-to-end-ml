@@ -6,7 +6,9 @@ its config params for scoring prod data.
 from pathlib import PosixPath
 
 import joblib
+import pandas as pd
 from comet_ml import API
+from fastapi import Body
 from sklearn.pipeline import Pipeline
 
 from src.training.utils.config import Config
@@ -87,3 +89,21 @@ class ModelLoader:
         model.download(model_versions[-1], artifacts_path, expand=True)
 
         return joblib.load(f"{str(artifacts_path)}/{model_name}.pkl")
+
+
+def predict(model: Pipeline, data: dict = Body(...)) -> dict:
+    """Predicts the probability of a positive outcome.
+
+    Args:
+        data (dict): dictionary containing the input data.
+        model (sklearn.pipeline.Pipeline): fitted model.
+
+    Returns:
+        dict: dictionary containing the predicted probability.
+    """
+
+    # Convert input dictionary to data frame required by the model
+    data_df = pd.json_normalize(data)
+
+    preds = model.predict_proba(data_df)[0]
+    return {"Predicted Probability": round(preds[1], 3)}

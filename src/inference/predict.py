@@ -3,56 +3,62 @@ This script wraps an API endpoint around a model to score
 production data via API calls.
 """
 
+import argparse
 import os
 
-import pandas as pd
 from dotenv import load_dotenv
-from fastapi import Body
 
-from src.config.path import ARTIFACTS_DIR, PARENT_DIR
-from src.inference.utils.model import ModelLoader
+from src.config.path import ARTIFACTS_DIR
+from src.inference.utils.model import ModelLoader, predict
 
 load_dotenv()
 
 ########################################################
-# Extracts config params
-load_model = ModelLoader()
-(
-    comet_ws,
-    champ_model_name,
-    *_,
-) = load_model.get_config_params(
-    config_yaml_abs_path=str(PARENT_DIR.parent) + "/src/config/training/config.yml"
-)
-
-# Download champion model
-model = load_model.download_model(
-    comet_workspace=comet_ws,
-    comet_api_key=os.environ["COMET_API_KEY"],
-    model_name=champ_model_name,
-    artifacts_path=ARTIFACTS_DIR,
-)
 
 
-def predict(data: dict = Body(...)) -> dict:
-    """Predicts the probability of having a heart disease or stroke.
+def main(config_yaml_path: str, api_key: str, input_data: dict) -> None:
+    """Loads the champion model and scores the input data.
 
     Args:
-        data (dict): dictionary containing the input data.
+        config_yaml_path (str): path to the config yaml file.
+        api_key (str): Comet API key.
+        input_data (dict): dictionary containing the input data.
 
     Returns:
-        dict: dictionary containing the predicted probability.
+        None.
     """
 
-    # Convert input dictionary to data frame required by the model
-    data_df = pd.json_normalize(data)
+    # Extracts config params
+    load_model = ModelLoader()
+    (
+        comet_ws,
+        champ_model_name,
+        *_,
+    ) = load_model.get_config_params(config_yaml_abs_path=config_yaml_path)
 
-    # Predict the probability using the model
-    preds = model.predict_proba(data_df)[0]
-    return {"Predicted Probability": round(preds[1], 3)}
+    # Download champion model
+    model = load_model.download_model(
+        comet_workspace=comet_ws,
+        comet_api_key=api_key,
+        model_name=champ_model_name,
+        artifacts_path=ARTIFACTS_DIR,
+    )
+
+    prediction = predict(model, input_data)
+    print(f"\n\n\n{prediction=}\n\n\n")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_yaml_path",
+        type=str,
+        default="./config.yml",
+        help="Path to the config yaml file.",
+    )
+
+    args = parser.parse_args()
+
     # Sample of prod data for testing
     sample_data = {
         "BMI": 29.0,
@@ -78,5 +84,8 @@ if __name__ == "__main__":
         "Income": "7",
     }
 
-    prediction = predict(sample_data)
-    print(f"\n\n\n{prediction=}\n\n\n")
+    main(
+        config_yaml_path=args.config_yaml_path,
+        api_key=os.environ["COMET_API_KEY"],
+        input_data=sample_data,
+    )

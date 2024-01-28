@@ -11,7 +11,7 @@ Note that this script is only used in the beginning of this project just to
 generate data for the project and it isn't part of feature or inference pipelines.
 """
 
-import sys
+import argparse
 from pathlib import PosixPath
 
 from ucimlrepo import fetch_ucirepo
@@ -22,14 +22,14 @@ from src.feature_store.utils.prep import DataSplitter
 
 
 def main(
-    config_yaml_abs_path: str,
+    config_yaml_path: str,
     data_dir: PosixPath,
 ) -> None:
     """Imports raw dataset from UCI data repository and creates training data and
     inference set.
 
     Args:
-        config_yaml_abs_path (str): path to the config yaml file.
+        config_yaml_path (str): path to the config yaml file.
         data_dir (PosixPath): path to the data directory.
 
     Returns:
@@ -45,12 +45,12 @@ def main(
 
     #################################
     # Import data preprocessing config params and check inputs
-    config = Config(config_path=config_yaml_abs_path)
+    config = Config(config_path=config_yaml_path)
 
     # Specify variable types and data source from config file
     uci_dataset_id = config.params["data"]["params"]["uci_raw_data_num"]
-    PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
-    CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
+    pk_col_name = config.params["data"]["params"]["pk_col_name"]
+    class_column_name = config.params["data"]["params"]["class_col_name"]
     date_col_names = config.params["data"]["params"]["date_col_names"]
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
@@ -63,17 +63,17 @@ def main(
     #################################
     # Import raw data
     required_input_col_names = (
-        [PRIMARY_KEY]
+        [pk_col_name]
         + date_col_names
         + datetime_col_names
         + num_col_names
         + cat_col_names
-        + [CLASS_COL_NAME]
+        + [class_column_name]
     )
     raw_data = fetch_ucirepo(id=uci_dataset_id)
     raw_dataset = raw_data.data.features.copy()
-    raw_dataset[PRIMARY_KEY] = raw_data.data.ids.loc[:, [PRIMARY_KEY]]
-    raw_dataset[CLASS_COL_NAME] = raw_data.data.targets.loc[:, [CLASS_COL_NAME]]
+    raw_dataset[pk_col_name] = raw_data.data.ids.loc[:, [pk_col_name]]
+    raw_dataset[class_column_name] = raw_data.data.targets.loc[:, [class_column_name]]
 
     # Select relevant columns by removing irrelevant or erroneous columns (if any)
     raw_dataset = raw_dataset[required_input_col_names]
@@ -83,8 +83,8 @@ def main(
     # Create inference set from raw dataset to simulate production data
     train_valid_splitter = DataSplitter(
         dataset=raw_dataset,
-        primary_key_col_name=PRIMARY_KEY,
-        class_col_name=CLASS_COL_NAME,
+        primary_key_col_name=pk_col_name,
+        class_col_name=class_column_name,
     )
 
     raw_dataset, inference_set = train_valid_splitter.split_dataset(
@@ -106,7 +106,17 @@ def main(
 
 ###########################################################
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_yaml_path",
+        type=str,
+        default="./config.yml",
+        help="Path to the config yaml file.",
+    )
+
+    args = parser.parse_args()
+
     main(
-        config_yaml_abs_path=sys.argv[1],
+        config_yaml_path=args.config_yaml_path,
         data_dir=DATA_DIR,
     )

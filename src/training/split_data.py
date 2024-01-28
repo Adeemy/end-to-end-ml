@@ -4,7 +4,7 @@ i.e., features and class labels, and creates data splits
 for model training. 
 """
 
-import sys
+import argparse
 from datetime import datetime
 from pathlib import PosixPath
 
@@ -20,12 +20,12 @@ from src.training.utils.data import PrepTrainingData
 #################################
 
 
-def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath) -> None:
+def main(feast_repo_dir: str, config_yaml_path: str, data_dir: PosixPath) -> None:
     """Splits dataset into train and test sets.
 
     Args:
         feast_repo_dir (str): path to the feature store repo.
-        config_yaml_abs_path (str): path to the config yaml file.
+        config_yaml_path (str): path to the config yaml file.
         data_dir (PosixPath): path to the data directory.
 
     Returns:
@@ -39,14 +39,10 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath) ->
     ---------------------------------------------------------------------\n"""
     )
 
-    # Specify required column names by data type
     feat_store = FeatureStore(repo_path=str(feast_repo_dir))
-    config = Config(config_path=config_yaml_abs_path)
-    DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
-    DATASET_SPLIT_SEED = int(config.params["data"]["params"]["split_rand_seed"])
-    TRAIN_SET_SIZE = config.params["data"]["params"]["train_set_size"]
-    PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
-    CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
+    config = Config(config_path=config_yaml_path)
+    pk_col_name = config.params["data"]["params"]["pk_col_name"]
+    class_column_name = config.params["data"]["params"]["class_col_name"]
     date_col_names = config.params["data"]["params"]["date_col_names"]
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
@@ -57,26 +53,28 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath) ->
     historical_data_file_name = config.params["files"]["params"][
         "historical_data_file_name"
     ]
-    TRAIN_FILE_NAME = config.params["files"]["params"]["train_set_file_name"]
-    VALID_FILE_NAME = config.params["files"]["params"]["valid_set_file_name"]
-    TEST_FILE_NAME = config.params["files"]["params"]["test_set_file_name"]
-
-    # Dataset split configuration, feature data types, and positive class label
-    DATASET_SPLIT_TYPE = config.params["data"]["params"]["split_type"]
-    DATASET_SPLIT_SEED = config.params["data"]["params"]["split_rand_seed"]
-    SPLIT_DATE_COL_NAME = config.params["data"]["params"]["split_date_col_name"]
-    SPLIT_CUTOFF_DATE = config.params["data"]["params"]["train_valid_split_curoff_date"]
-    SPLIT_DATE_FORMAT = config.params["data"]["params"]["split_date_col_format"]
-    CAT_FEAT_NAN_REPLACEMENT = config.params["data"]["params"][
+    train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
+    valid_set_file_name = config.params["files"]["params"]["valid_set_file_name"]
+    test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
+    dataset_split_type = config.params["data"]["params"]["split_type"]
+    split_rand_seed = int(config.params["data"]["params"]["split_rand_seed"])
+    train_set_ratio = config.params["data"]["params"]["train_set_size"]
+    dataset_split_date_col_name = config.params["data"]["params"]["split_date_col_name"]
+    train_valid_split_curoff_date = config.params["data"]["params"][
+        "train_valid_split_curoff_date"
+    ]
+    dataset_split_date_col_format = config.params["data"]["params"][
+        "split_date_col_format"
+    ]
+    cat_features_nan_replacement = config.params["data"]["params"][
         "cat_features_nan_replacement"
     ]
-    TRAIN_SIZE = config.params["data"]["params"]["train_set_size"]
 
     # Extract cut-off date for splitting train and test sets
     input_split_cutoff_date = None
-    if DATASET_SPLIT_TYPE == "time":
+    if dataset_split_type == "time":
         input_split_cutoff_date = datetime.strptime(
-            SPLIT_CUTOFF_DATE, SPLIT_DATE_FORMAT
+            train_valid_split_curoff_date, dataset_split_date_col_format
         ).date()
 
     # Get historical features and join them with target
@@ -125,37 +123,37 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath) ->
 
     # Select specified features
     required_input_col_names = (
-        [PRIMARY_KEY]
+        [pk_col_name]
         + date_col_names
         + datetime_col_names
         + num_col_names
         + cat_col_names
-        + [CLASS_COL_NAME]
+        + [class_column_name]
     )
     preprocessed_data = preprocessed_data[required_input_col_names].copy()
 
     # Split data into train and test sets
     data_splitter = DataSplitter(
         dataset=preprocessed_data,
-        primary_key_col_name=PRIMARY_KEY,
-        class_col_name=CLASS_COL_NAME,
+        primary_key_col_name=pk_col_name,
+        class_col_name=class_column_name,
     )
 
     training_set, testing_set = data_splitter.split_dataset(
-        split_type=DATASET_SPLIT_TYPE,
-        train_set_size=TRAIN_SET_SIZE,
-        split_random_seed=DATASET_SPLIT_SEED,
-        split_date_col_name=SPLIT_DATE_COL_NAME,
+        split_type=dataset_split_type,
+        train_set_size=train_set_ratio,
+        split_random_seed=split_rand_seed,
+        split_date_col_name=dataset_split_date_col_name,
         split_cutoff_date=input_split_cutoff_date,
-        split_date_col_format=SPLIT_DATE_FORMAT,
+        split_date_col_format=dataset_split_date_col_format,
     )
 
     # Prepare data for training
     data_prep = PrepTrainingData(
         train_set=training_set,
         test_set=testing_set,
-        primary_key=PRIMARY_KEY,
-        class_col_name=CLASS_COL_NAME,
+        primary_key=pk_col_name,
+        class_col_name=class_column_name,
         numerical_feature_names=num_col_names,
         categorical_feature_names=cat_col_names,
     )
@@ -163,33 +161,33 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath) ->
     # Preprocess train and test sets by enforcing data types of numerical and categorical features
     data_prep.select_relevant_columns()
     data_prep.enforce_data_types()
-    data_prep.replace_nans_in_cat_features(nan_replacement=CAT_FEAT_NAN_REPLACEMENT)
+    data_prep.replace_nans_in_cat_features(nan_replacement=cat_features_nan_replacement)
     data_prep.create_validation_set(
-        split_type=DATASET_SPLIT_TYPE,
-        train_set_size=TRAIN_SIZE,
-        split_random_seed=DATASET_SPLIT_SEED,
-        split_date_col_name=SPLIT_DATE_COL_NAME,
-        split_cutoff_date=SPLIT_CUTOFF_DATE,
-        split_date_col_format=SPLIT_DATE_FORMAT,
+        split_type=dataset_split_type,
+        train_set_size=train_set_ratio,
+        split_random_seed=split_rand_seed,
+        split_date_col_name=dataset_split_date_col_name,
+        split_cutoff_date=train_valid_split_curoff_date,
+        split_date_col_format=dataset_split_date_col_format,
     )
 
     # Store train, validation, and test sets locally
     # Note: should be registered and tagged for reproducibility.
     train_set = data_prep.get_train_set()
     train_set.to_parquet(
-        data_dir / TRAIN_FILE_NAME,
+        data_dir / train_set_file_name,
         index=False,
     )
 
     valid_set = data_prep.get_validation_set()
     valid_set.to_parquet(
-        data_dir / VALID_FILE_NAME,
+        data_dir / valid_set_file_name,
         index=False,
     )
 
     test_set = data_prep.get_test_set()
     test_set.to_parquet(
-        data_dir / TEST_FILE_NAME,
+        data_dir / test_set_file_name,
         index=False,
     )
 
@@ -198,8 +196,18 @@ def main(feast_repo_dir: str, config_yaml_abs_path: str, data_dir: PosixPath) ->
 
 ###########################################################
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_yaml_path",
+        type=str,
+        default="./config.yml",
+        help="Path to the config yaml file.",
+    )
+
+    args = parser.parse_args()
+
     main(
-        config_yaml_abs_path=sys.argv[1],
+        config_yaml_path=args.config_yaml_path,
         feast_repo_dir=FEATURE_REPO_DIR,
         data_dir=DATA_DIR,
     )
