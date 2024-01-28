@@ -43,48 +43,47 @@ def main(
         None.
 
     Raises:
+        ValueError: if no successful experiments are found.
         ValueError: if the best model score on the test set is lower than the deployment threshold.
     """
 
     # Experiment settings
     config = Config(config_path=config_yaml_abs_path)
-    COMET_API_KEY = comet_api_key
-    COMET_PROJECT_NAME = config.params["train"]["params"]["comet_project_name"]
-    COMET_WORKSPACE_NAME = config.params["train"]["params"]["comet_workspace_name"]
-    CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
-    F_BETA_SCORE_BETA_VAL = config.params["train"]["params"]["fbeta_score_beta_val"]
-    CALIB_CV_FOLDS = config.params["train"]["params"]["cross_val_folds"]
-    COMPARISON_METRIC = config.params["train"]["params"]["comparison_metric"]
-    EXP_KEY_FILE_NAME = config.params["files"]["params"]["experiments_keys_file_name"]
-    TRAIN_FILE_NAME = config.params["files"]["params"]["train_set_file_name"]
-    TEST_FILE_NAME = config.params["files"]["params"]["test_set_file_name"]
-    VOTING_ENSEMBLE_REGISTERED_MODEL_NAME = config.params["modelregistry"]["params"][
+    project_name = config.params["train"]["params"]["comet_project_name"]
+    workspace_name = config.params["train"]["params"]["comet_workspace_name"]
+    class_col_name = config.params["data"]["params"]["class_col_name"]
+    fbeta_score_beta_val = config.params["train"]["params"]["fbeta_score_beta_val"]
+    calib_cv_folds = config.params["train"]["params"]["cross_val_folds"]
+    comparison_metric_name = config.params["train"]["params"]["comparison_metric"]
+    exp_keys_file_name = config.params["files"]["params"]["experiments_keys_file_name"]
+    train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
+    test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
+    ve_registered_model_name = config.params["modelregistry"]["params"][
         "voting_ensemble_registered_model_name"
     ]
-    CHAMPION_MODEL_NAME = config.params["modelregistry"]["params"][
-        "champion_model_name"
-    ]
-    DEPLOYMENT_SCORE_THRESH = config.params["train"]["params"][
+    champ_model_name = config.params["modelregistry"]["params"]["champion_model_name"]
+    deployment_score_thresh = config.params["train"]["params"][
         "deployment_score_thresh"
     ]
 
     # Import train and test sets to evaluate best model on test set
     # Note: it requires class labels to be encoded.
     train_set = pd.read_parquet(
-        data_dir / TRAIN_FILE_NAME,
+        data_dir / train_set_file_name,
     )
 
     test_set = pd.read_parquet(
-        data_dir / TEST_FILE_NAME,
+        data_dir / test_set_file_name,
     )
 
     #############################################
     # Rename comparison metric if it's fbeta_score to include beta value
-    if COMPARISON_METRIC == "fbeta_score":
-        COMPARISON_METRIC = f"f_{F_BETA_SCORE_BETA_VAL}_score"
+    if comparison_metric_name == "fbeta_score":
+        comparison_metric_name = f"f_{fbeta_score_beta_val}_score"
 
     # Import experiment keys from artifacts folder
     successful_exp_keys = pd.read_csv(
+        f"{ARTIFACTS_DIR}/{exp_keys_file_name}.csv",
     )
 
     if successful_exp_keys.shape[0] == 0:
@@ -95,9 +94,9 @@ def main(
     # Select the best performing model
     prep_champ_model = PrepChampModel()
     best_model_name = prep_champ_model.select_best_performer(
-        comet_project_name=COMET_PROJECT_NAME,
-        comet_workspace_name=COMET_WORKSPACE_NAME,
-        comparison_metric=f"valid_{COMPARISON_METRIC}",
+        comet_project_name=project_name,
+        comet_workspace_name=workspace_name,
+        comparison_metric=f"valid_{comparison_metric_name}",
         comet_exp_keys=successful_exp_keys,
     )
 
@@ -106,7 +105,7 @@ def main(
         successful_exp_keys["0"] == best_model_name, "1"
     ].iloc[0]
     best_model_exp_obj = ExistingExperiment(
-        api_key=COMET_API_KEY, experiment_key=best_model_exp_key
+        api_key=comet_api_key, experiment_key=best_model_exp_key
     )
 
     #############################################
@@ -118,13 +117,13 @@ def main(
     best_model_evaluator = ModelEvaluator(
         comet_exp=best_model_exp_obj,
         pipeline=best_model_pipeline,
-        train_features=train_set.drop(CLASS_COL_NAME, axis=1),
-        train_class=np.array(train_set[CLASS_COL_NAME]),
-        valid_features=test_set.drop(CLASS_COL_NAME, axis=1),
-        valid_class=np.array(test_set[CLASS_COL_NAME]),
-        fbeta_score_beta=F_BETA_SCORE_BETA_VAL,
+        train_features=train_set.drop(class_col_name, axis=1),
+        train_class=np.array(train_set[class_col_name]),
+        valid_features=test_set.drop(class_col_name, axis=1),
+        valid_class=np.array(test_set[class_col_name]),
+        fbeta_score_beta=fbeta_score_beta_val,
         is_voting_ensemble=True
-        if best_model_name == VOTING_ENSEMBLE_REGISTERED_MODEL_NAME
+        if best_model_name == ve_registered_model_name
         else False,
     )
 
@@ -143,36 +142,36 @@ def main(
     best_model_exp_obj.log_metrics(test_scores)
 
     # Calibrate champ model before deployment
-    training_features = train_set.drop(CLASS_COL_NAME, axis=1)
-    training_class = np.array(train_set[CLASS_COL_NAME])
+    training_features = train_set.drop(class_col_name, axis=1)
+    training_class = np.array(train_set[class_col_name])
     calib_pipeline = prep_champ_model.calibrate_pipeline(
         train_features=training_features,
         train_class=training_class,
         preprocessor_step=best_model_pipeline.named_steps["preprocessor"],
         selector_step=best_model_pipeline.named_steps["selector"],
         model=best_model_pipeline.named_steps["classifier"],
-        cv_folds=CALIB_CV_FOLDS,
+        cv_folds=calib_cv_folds,
     )
 
     # Log and register champion model (in Comet, model must be logged first)
     # Note: the best model should not be deployed in production if its score
     # on the test set is below minimum score. Otherwise, prevent deploying
     # the model by raising error preventing build job.
-    BEST_MODEL_TEST_SCORE = test_scores.get(f"test_{COMPARISON_METRIC}")
-    if BEST_MODEL_TEST_SCORE >= DEPLOYMENT_SCORE_THRESH:
+    best_model_test_score = test_scores.get(f"test_{comparison_metric_name}")
+    if best_model_test_score >= deployment_score_thresh:
         prep_champ_model.log_and_register_champ_model(
             local_path=artifacts_dir,
-            champ_model_name=CHAMPION_MODEL_NAME,
+            champ_model_name=champ_model_name,
             pipeline=calib_pipeline,
             exp_obj=best_model_exp_obj,
         )
 
         # Save the champion model in local direcotry to be packaged in docker container
-        joblib.dump(best_model_pipeline, f"{ARTIFACTS_DIR}/{CHAMPION_MODEL_NAME}.pkl")
+        joblib.dump(best_model_pipeline, f"{ARTIFACTS_DIR}/{champ_model_name}.pkl")
 
     else:
         raise ValueError(
-            f"Best model score is {BEST_MODEL_TEST_SCORE}, which is lower than deployment threshold {DEPLOYMENT_SCORE_THRESH}."
+            f"Best model score is {best_model_test_score}, which is lower than deployment threshold {deployment_score_thresh}."
         )
 
 
