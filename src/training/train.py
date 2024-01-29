@@ -21,6 +21,7 @@ from xgboost import XGBClassifier
 from src.training.utils.config import Config
 from src.training.utils.data import PrepTrainingData
 from src.training.utils.job import create_voting_ensemble, submit_train_exp
+from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
 
 load_dotenv()
@@ -400,11 +401,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Load the configuration file
-    logging.config.fileConfig(args.logger_path)
-
     # Get the logger objects by name
-    console_logger = logging.getLogger("console_logger")
+    console_logger = get_console_logger("training_logger")
 
     console_logger.info("Hyperparameters Optimization Experiments Starts ...")
 

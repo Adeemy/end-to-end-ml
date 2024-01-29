@@ -3,7 +3,10 @@ import logging
 
 
 class LoggerWriter(io.TextIOBase):
-    """A file-like object that redirects printed messages to logger objects.
+    """Provider console logger and print logger that redirects printed messages
+    to logger objects. It can be used when all print messages are logged (like
+    message output by function or class methods) in addition to some select
+    events that need to be logged.
 
     Attributes:
         console_logger (logging.Logger): The logger object for console output.
@@ -53,28 +56,34 @@ class LoggerWriter(io.TextIOBase):
         pass
 
 
-# import logging
-# from typing import Optional
+def get_console_logger(name: str) -> logging.Logger:
+    """Creates a console logger. It can be used when only select
+    events only needs to be logged but not print messages.
 
+    Args:
+        name (str): name of logger.
 
-# def get_console_logger(name: Optional[str]) -> logging.Logger:
-#     # Create logger object
-#     logger = logging.getLogger(name)
+    Returns:
+        logger (logging.logger): console logger object.
+    """
 
-#     # Ensure the logger has only one handler
-#     if not logger.handlers:
-#         # Set logger level
-#         logger.setLevel(logging.DEBUG)
+    # Create logger object
+    logger = logging.getLogger(name)
 
-#         # Create console handler with formatting
-#         console_handler = logging.StreamHandler()
-#         console_handler.setLevel(logging.DEBUG)
-#         formatter = logging.Formatter(
-#             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-#         )
-#         console_handler.setFormatter(formatter)
+    # Ensure the logger has only one handler
+    if not logger.handlers:
+        # Set logger level
+        logger.setLevel(logging.DEBUG)
 
-#         # Add console handler to the logger
-#         logger.addHandler(console_handler)
+        # Create console handler with formatting
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        console_handler.setFormatter(formatter)
 
-#     return logger
+        # Add console handler to the logger
+        logger.addHandler(console_handler)
+
+    return logger
