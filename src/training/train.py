@@ -16,10 +16,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
 
-from src.config.path import ARTIFACTS_DIR, DATA_DIR
 from src.training.utils.config import Config
 from src.training.utils.data import PrepTrainingData
 from src.training.utils.job import create_voting_ensemble, submit_train_exp
+from src.utils.path import ARTIFACTS_DIR, DATA_DIR
 
 load_dotenv()
 

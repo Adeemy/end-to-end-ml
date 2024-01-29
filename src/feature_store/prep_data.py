@@ -9,9 +9,9 @@ from pathlib import PosixPath
 
 import pandas as pd
 
-from src.config.path import DATA_DIR
 from src.feature_store.utils.config import Config
 from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
+from src.utils.path import DATA_DIR
 
 
 #################################

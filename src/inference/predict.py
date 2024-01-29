@@ -8,8 +8,8 @@ import os
 
 from dotenv import load_dotenv
 
-from src.config.path import ARTIFACTS_DIR
 from src.inference.utils.model import ModelLoader, predict
+from src.utils.path import ARTIFACTS_DIR
 
 load_dotenv()
 
