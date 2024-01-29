@@ -222,4 +222,5 @@ if __name__ == "__main__":
         comet_api_key=os.environ["COMET_API_KEY"],
         data_dir=DATA_DIR,
         artifacts_dir=ARTIFACTS_DIR,
+        logger=console_logger,
     )

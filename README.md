@@ -44,6 +44,7 @@ Below is the project structure.
         ├── LICENSE
         ├── Makefile
         ├── README.md
+        ├── __init__.py
         ├── img
         │   └── feast_workflow.png
         ├── notebooks
@@ -52,13 +53,12 @@ Below is the project structure.
         │   └── utils.py
         ├── requirements.txt
         ├── src
+        │   ├── __init__.py
         │   ├── config
         │   │   ├── __init__.py
-        │   │   ├── feature_store
-        │   │   │   └── config.yml
-        │   │   ├── path.py
-        │   │   └── training
-        │   │       └── config.yml
+        │   │   ├── feature_store_config.yml
+        │   │   ├── logging.conf
+        │   │   └── training_config.yml
         │   ├── feature_store
         │   │   ├── README.md
         │   │   ├── feature_repo
@@ -88,28 +88,32 @@ Below is the project structure.
         │   │   └── utils
         │   │       ├── __init__.py
         │   │       └── model.py
-        │   └── training
-        │       ├── artifacts
-        │       │   ├── champion_model.pkl
-        │       │   ├── experiment_keys.csv
-        │       │   ├── lightgbm.pkl
-        │       │   ├── logistic-regression.pkl
-        │       │   ├── random-forest.pkl
-        │       │   ├── study_LGBMClassifier.csv
-        │       │   ├── study_LogisticRegression.csv
-        │       │   ├── study_RandomForestClassifier.csv
-        │       │   ├── study_XGBClassifier.csv
-        │       │   ├── voting-ensemble.pkl
-        │       │   └── xgboost.pkl
-        │       ├── evaluate.py
-        │       ├── split_data.py
-        │       ├── train.py
-        │       └── utils
-        │           ├── __init__.py
-        │           ├── config.py
-        │           ├── data.py
-        │           ├── job.py
-        │           └── model.py
+        │   ├── training
+        │   │   ├── artifacts
+        │   │   │   ├── champion_model.pkl
+        │   │   │   ├── experiment_keys.csv
+        │   │   │   ├── lightgbm.pkl
+        │   │   │   ├── logistic-regression.pkl
+        │   │   │   ├── random-forest.pkl
+        │   │   │   ├── study_LGBMClassifier.csv
+        │   │   │   ├── study_LogisticRegression.csv
+        │   │   │   ├── study_RandomForestClassifier.csv
+        │   │   │   ├── study_XGBClassifier.csv
+        │   │   │   ├── voting-ensemble.pkl
+        │   │   │   └── xgboost.pkl
+        │   │   ├── evaluate.py
+        │   │   ├── split_data.py
+        │   │   ├── train.py
+        │   │   └── utils
+        │   │       ├── __init__.py
+        │   │       ├── config.py
+        │   │       ├── data.py
+        │   │       ├── job.py
+        │   │       └── model.py
+        │   └── utils
+        │       ├── __init__.py
+        │       ├── logger.py
+        │       └── path.py
         └── tests
         └── test_feature_utils.py
 
