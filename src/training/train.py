@@ -4,6 +4,8 @@ hyperparameters optimization for multiple models.
 """
 
 import argparse
+import logging
+import logging.config
 import os
 from datetime import datetime
 from pathlib import PosixPath
@@ -30,6 +32,7 @@ def main(
     api_key: str,
     data_dir: PosixPath,
     artifacts_dir: PosixPath,
+    logger: logging.Logger,
 ) -> None:
     """
     Takes a config file as input and submits experiments to perform
@@ -48,12 +51,7 @@ def main(
         ValueError: if no model specified in config file.
     """
 
-    print(
-        """\n
-    ---------------------------------------------------------------------
-    --- Hyperparameters Optimization Experiments Starts ...
-    ---------------------------------------------------------------------\n"""
-    )
+    logger.info(f"Directory of training config file: {config_yaml_path}")
 
     # Experiment settings
     config = Config(config_path=config_yaml_path)
@@ -93,10 +91,10 @@ def main(
     pos_class = config.params["data"]["params"]["pos_class"]
     variance_threshold_val = config.params["data"]["params"]["variance_threshold_val"]
 
-    LR_PARAMS = config.params["logisticregression"]["params"]
-    RF_PARAMS = config.params["randomforest"]["params"]
-    LGBM_PARAMS = config.params["lgbm"]["params"]
-    XGB_PARAMS = config.params["xgboost"]["params"]
+    lr_params = config.params["logisticregression"]["params"]
+    rf_params = config.params["randomforest"]["params"]
+    lgbm_params = config.params["lgbm"]["params"]
+    xgb_params = config.params["xgboost"]["params"]
 
     # Import data splits
     training_set = pd.read_parquet(
@@ -204,7 +202,7 @@ def main(
             class_encoder=class_encoder,
             preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
             selector_step=data_transformation_pipeline.named_steps["selector"],
-            model=LogisticRegression(**LR_PARAMS),
+            model=LogisticRegression(**lr_params),
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
@@ -238,7 +236,7 @@ def main(
             class_encoder=class_encoder,
             preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
             selector_step=data_transformation_pipeline.named_steps["selector"],
-            model=RandomForestClassifier(**RF_PARAMS),
+            model=RandomForestClassifier(**rf_params),
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
@@ -272,7 +270,7 @@ def main(
             class_encoder=class_encoder,
             preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
             selector_step=data_transformation_pipeline.named_steps["selector"],
-            model=LGBMClassifier(**LGBM_PARAMS),
+            model=LGBMClassifier(**lgbm_params),
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
             cat_feature_names=cat_feature_names,
@@ -308,7 +306,7 @@ def main(
             selector_step=data_transformation_pipeline.named_steps["selector"],
             model=XGBClassifier(
                 scale_pos_weight=sum(train_class == 0) / sum(train_class == 1),
-                **XGB_PARAMS,
+                **xgb_params,
             ),
             artifacts_path=artifacts_dir,
             num_feature_names=num_feature_names,
@@ -381,6 +379,8 @@ def main(
     successful_exp = pd.DataFrame(exp_names_keys.items())
     successful_exp.to_csv(f"{ARTIFACTS_DIR}/{exp_key_file_name}.csv", index=False)
 
+    logger.info("Model Training Experiments Finished ...")
+
 
 ###########################################################
 if __name__ == "__main__":
@@ -389,14 +389,29 @@ if __name__ == "__main__":
         "--config_yaml_path",
         type=str,
         default="./config.yml",
-        help="Path to the config yaml file.",
+        help="Path to the configuration yaml file.",
+    )
+    parser.add_argument(
+        "--logger_path",
+        type=str,
+        default="./logger.conf",
+        help="Path to the logger configuration file.",
     )
 
     args = parser.parse_args()
+
+    # Load the configuration file
+    logging.config.fileConfig(args.logger_path)
+
+    # Get the logger objects by name
+    console_logger = logging.getLogger("console_logger")
+
+    console_logger.info("Hyperparameters Optimization Experiments Starts ...")
 
     main(
         config_yaml_path=args.config_yaml_path,
         api_key=os.environ["COMET_API_KEY"],
         data_dir=DATA_DIR,
         artifacts_dir=ARTIFACTS_DIR,
+        logger=console_logger,
     )

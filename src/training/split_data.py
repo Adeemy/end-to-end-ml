@@ -3,8 +3,10 @@ This script extracts preprocessed data from feature store,
 i.e., features and class labels, and creates data splits
 for model training. 
 """
-
 import argparse
+import logging
+import logging.config
+import sys
 from datetime import datetime
 from pathlib import PosixPath
 
@@ -15,12 +17,18 @@ from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 from src.feature_store.utils.prep import DataSplitter
 from src.training.utils.config import Config
 from src.training.utils.data import PrepTrainingData
+from src.utils.logger import LoggerWriter
 from src.utils.path import DATA_DIR, FEATURE_REPO_DIR
 
 #################################
 
 
-def main(feast_repo_dir: str, config_yaml_path: str, data_dir: PosixPath) -> None:
+def main(
+    feast_repo_dir: str,
+    config_yaml_path: str,
+    data_dir: PosixPath,
+    logger: logging.Logger,
+) -> None:
     """Splits dataset into train and test sets.
 
     Args:
@@ -32,12 +40,7 @@ def main(feast_repo_dir: str, config_yaml_path: str, data_dir: PosixPath) -> Non
         None.
     """
 
-    print(
-        """\n
-    ---------------------------------------------------------------------
-    --- Splitting Preprocessed Data into Train and Test Sets Starts ...
-    ---------------------------------------------------------------------\n"""
-    )
+    logger.info(f"Directory of training config file: {config_yaml_path}")
 
     feat_store = FeatureStore(repo_path=str(feast_repo_dir))
     config = Config(config_path=config_yaml_path)
@@ -191,7 +194,7 @@ def main(feast_repo_dir: str, config_yaml_path: str, data_dir: PosixPath) -> Non
         index=False,
     )
 
-    print("\nTrain and test sets were created.\n")
+    logger.info("Train and test sets were created.")
 
 
 ###########################################################
@@ -201,13 +204,37 @@ if __name__ == "__main__":
         "--config_yaml_path",
         type=str,
         default="./config.yml",
-        help="Path to the config yaml file.",
+        help="Path to the configuration yaml file.",
+    )
+    parser.add_argument(
+        "--logger_path",
+        type=str,
+        default="./logger.conf",
+        help="Path to the logger configuration file.",
     )
 
     args = parser.parse_args()
+
+    # Load the configuration file
+    logging.config.fileConfig(args.logger_path)
+
+    # Get the logger objects by name
+    console_logger = logging.getLogger("console_logger")
+    print_logger = logging.getLogger("print_logger")
+
+    # Create a LoggerWriter object using the console logger and the print logger
+    writer = LoggerWriter(console_logger, print_logger)
+
+    # Redirect sys.stdout to the LoggerWriter object
+    sys.stdout = writer
+
+    console_logger.info(
+        "Splitting Preprocessed Data into Train and Test Sets Starts ..."
+    )
 
     main(
         config_yaml_path=args.config_yaml_path,
         feast_repo_dir=FEATURE_REPO_DIR,
         data_dir=DATA_DIR,
+        logger=console_logger,
     )

@@ -12,18 +12,23 @@ generate data for the project and it isn't part of feature or inference pipeline
 """
 
 import argparse
+import logging
+import logging.config
+import sys
 from pathlib import PosixPath
 
 from ucimlrepo import fetch_ucirepo
 
 from src.feature_store.utils.config import Config
 from src.feature_store.utils.prep import DataSplitter
+from src.utils.logger import LoggerWriter
 from src.utils.path import DATA_DIR
 
 
 def main(
     config_yaml_path: str,
     data_dir: PosixPath,
+    logger: logging.Logger,
 ) -> None:
     """Imports raw dataset from UCI data repository and creates training data and
     inference set.
@@ -36,11 +41,8 @@ def main(
         None.
     """
 
-    print(
-        """\n
-    ----------------------------------------------------------------
-    --- Generating Initial Dataset Starts ...
-    ----------------------------------------------------------------\n"""
+    logger.info(
+        f"Directory of data perprocessing and transformation config file: {config_yaml_path}"
     )
 
     #################################
@@ -49,6 +51,9 @@ def main(
 
     # Specify variable types and data source from config file
     uci_dataset_id = config.params["data"]["params"]["uci_raw_data_num"]
+    inference_set_ratio = float(config.params["data"]["params"]["inference_set_ratio"])
+    random_seed = int(config.params["data"]["params"]["random_seed"])
+    original_split_type = config.params["data"]["params"]["original_split_type"]
     pk_col_name = config.params["data"]["params"]["pk_col_name"]
     class_column_name = config.params["data"]["params"]["class_col_name"]
     date_col_names = config.params["data"]["params"]["date_col_names"]
@@ -88,9 +93,9 @@ def main(
     )
 
     raw_dataset, inference_set = train_valid_splitter.split_dataset(
-        split_type="random",
-        train_set_size=0.95,
-        split_random_seed=123,
+        split_type=original_split_type,
+        train_set_size=1 - inference_set_ratio,
+        split_random_seed=random_seed,
     )
 
     # Save data splits in feature_repo before uploading
@@ -101,7 +106,15 @@ def main(
         index=False,
     )
 
-    print("\nRaw dataset was generated.\n")
+    logger.info("Inference and raw dataset (for model development) were generated.")
+    logger.info(
+        f"""Ratio of raw dataset out of original dataset: 
+                {'{:0.1f}'.format(100 * (1-inference_set_ratio))}% ({raw_dataset.shape[0]} rows)."""
+    )
+    logger.info(
+        f"""Ratio of inference set out of original dataset:
+                 {'{:0.1f}'.format(100 * inference_set_ratio)}% ({inference_set.shape[0]} rows)."""
+    )
 
 
 ###########################################################
@@ -111,12 +124,32 @@ if __name__ == "__main__":
         "--config_yaml_path",
         type=str,
         default="./config.yml",
-        help="Path to the config yaml file.",
+        help="Path to the configuration yaml file.",
+    )
+    parser.add_argument(
+        "--logger_path",
+        type=str,
+        default="./logger.conf",
+        help="Path to the logger configuration file.",
     )
 
     args = parser.parse_args()
 
+    # Load the configuration file
+    logging.config.fileConfig(args.logger_path)
+
+    # Get the logger objects by name
+    console_logger = logging.getLogger("console_logger")
+    print_logger = logging.getLogger("print_logger")
+
+    # Create a LoggerWriter object using the console logger and the print logger
+    writer = LoggerWriter(console_logger, print_logger)
+
+    # Redirect sys.stdout to the LoggerWriter object
+    sys.stdout = writer
+
+    console_logger.info("Generating Raw Dataset Starts ...")
+
     main(
-        config_yaml_path=args.config_yaml_path,
-        data_dir=DATA_DIR,
+        config_yaml_path=args.config_yaml_path, data_dir=DATA_DIR, logger=console_logger
     )

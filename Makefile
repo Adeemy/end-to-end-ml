@@ -32,11 +32,11 @@ check_code: install isort format test lint
 
 # Import raw dataset from source
 get_init_data:
-	python ./src/feature_store/generate_initial_data.py --config_yaml_path ./src/config/feature_store/config.yml
+	python ./src/feature_store/generate_initial_data.py --config_yaml_path ./src/config/feature_store/config.yml --logger_path ./src/config/logging.conf
 
 # Preprocess and transform data before ingestion by feature store
 prep_data:
-	python ./src/feature_store/prep_data.py --config_yaml_path ./src/config/feature_store/config.yml
+	python ./src/feature_store/prep_data.py --config_yaml_path ./src/config/feature_store/config.yml --logger_path ./src/config/logging.conf
 
 # Setup feature store, view entities and feature views
 teardown_feast:
@@ -64,19 +64,19 @@ setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 
 # Submit train experiment
 split_data:
-	python ./src/training/split_data.py --config_yaml_path ./src/config/training/config.yml
+	python ./src/training/split_data.py --config_yaml_path ./src/config/training/config.yml --logger_path ./src/config/logging.conf
 
 train:
-	python ./src/training/train.py --config_yaml_path ./src/config/training/config.yml
+	python ./src/training/train.py --config_yaml_path ./src/config/training/config.yml --logger_path ./src/config/logging.conf
 
 evaluate:
-	python ./src/training/evaluate.py --config_yaml_path ./src/config/training/config.yml
+	python ./src/training/evaluate.py --config_yaml_path ./src/config/training/config.yml --logger_path ./src/config/logging.conf
 
 submit_train: prep_data split_data train evaluate
 
 # Test model locally
 test_model:
-	python ./src/inference/predict.py --config_yaml_path ./src/config/training/config.yml
+	python ./src/inference/predict.py --config_yaml_path ./src/config/training/config.yml --logger_path ./src/config/logging.conf
 
 # Test model via API (go to http://localhost:8000/docs page to test sample)
 test_packaged_model:

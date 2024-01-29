@@ -1,4 +1,4 @@
-description: default config for training experiment
+description: default config for training
 logger:
   entity: adeemy
   project: diabetes-prediction
@@ -105,7 +105,7 @@ modelregistry:
 
 includedmodels:
   params:
-    include_logistic_regression: true # Should Logisitic Regression be included in training
+    include_logistic_regression: false # Should Logisitic Regression be included in training
     include_random_forest: true # Should Random Forest model be included in training
     include_lightgbm: false # Should LightGBM model be included in training
     include_xgboost: false # Should XGBoost model be included in training
