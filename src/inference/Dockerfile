@@ -4,11 +4,11 @@ COPY ./requirements.txt /src/inference/requirements.txt
 
 COPY src/training/artifacts/champion_model.pkl /src/inference/champion_model.pkl
 
+COPY src/inference/* /src/inference
+
 WORKDIR /src/inference
 
 RUN pip install -r requirements.txt
-
-COPY src/inference/* /src/inference
 
 EXPOSE 8000
 

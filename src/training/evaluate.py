@@ -8,7 +8,10 @@ on the test set is better than a required threshold value.
 """
 
 import argparse
+import logging
+import logging.config
 import os
+import sys
 from pathlib import PosixPath
 
 import joblib
@@ -17,9 +20,10 @@ import pandas as pd
 from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
 
-from src.config.path import ARTIFACTS_DIR, DATA_DIR
 from src.training.utils.config import Config
 from src.training.utils.model import ModelEvaluator, PrepChampModel
+from src.utils.logger import LoggerWriter
+from src.utils.path import ARTIFACTS_DIR, DATA_DIR
 
 load_dotenv()
 
@@ -30,6 +34,7 @@ def main(
     comet_api_key: str,
     data_dir: PosixPath,
     artifacts_dir: PosixPath,
+    logger: logging.Logger,
 ) -> None:
     """Selects the best model based on performance on validation set and evaluates it on testing set.
 
@@ -46,6 +51,8 @@ def main(
         ValueError: if no successful experiments are found.
         ValueError: if the best model score on the test set is lower than the deployment threshold.
     """
+
+    logger.info(f"Directory of training config file: {config_yaml_path}")
 
     # Experiment settings
     config = Config(config_path=config_yaml_path)
@@ -166,6 +173,8 @@ def main(
             exp_obj=best_model_exp_obj,
         )
 
+        logger.info(f"Champion model was registered in {workspace_name} workspace.")
+
         # Save the champion model in local direcotry to be packaged in docker container
         joblib.dump(best_model_pipeline, f"{ARTIFACTS_DIR}/{champ_model_name}.pkl")
 
@@ -182,14 +191,36 @@ if __name__ == "__main__":
         "--config_yaml_path",
         type=str,
         default="./config.yml",
-        help="Path to the config yaml file.",
+        help="Path to the configuration yaml file.",
+    )
+    parser.add_argument(
+        "--logger_path",
+        type=str,
+        default="./logger.conf",
+        help="Path to the logger configuration file.",
     )
 
     args = parser.parse_args()
+
+    # Load the configuration file
+    logging.config.fileConfig(args.logger_path)
+
+    # Get the logger objects by name
+    console_logger = logging.getLogger("console_logger")
+    print_logger = logging.getLogger("print_logger")
+
+    # Create a LoggerWriter object using the console logger and the print logger
+    writer = LoggerWriter(console_logger, print_logger)
+
+    # Redirect sys.stdout to the LoggerWriter object
+    sys.stdout = writer
+
+    console_logger.info("Models Evaluation Starts ...")
 
     main(
         config_yaml_path=args.config_yaml_path,
         comet_api_key=os.environ["COMET_API_KEY"],
         data_dir=DATA_DIR,
         artifacts_dir=ARTIFACTS_DIR,
+        logger=console_logger,
     )

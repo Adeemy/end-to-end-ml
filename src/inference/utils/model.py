@@ -17,7 +17,7 @@ from src.training.utils.config import Config
 class ModelLoader:
     """Loads scoring models for inference.
 
-    Args:
+    Attributes:
         None.
     """
 

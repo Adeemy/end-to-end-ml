@@ -4,18 +4,22 @@ for training.
 """
 
 import argparse
+import logging
+import logging.config
+import sys
 from datetime import datetime
 from pathlib import PosixPath
 
 import pandas as pd
 
-from src.config.path import DATA_DIR
 from src.feature_store.utils.config import Config
 from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
+from src.utils.logger import LoggerWriter
+from src.utils.path import DATA_DIR
 
 
 #################################
-def main(config_yaml_path: str, data_dir: PosixPath) -> None:
+def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> None:
     """Imports data from feature store to be preprocessed and transformed.
 
     Args:
@@ -26,11 +30,8 @@ def main(config_yaml_path: str, data_dir: PosixPath) -> None:
         None.
     """
 
-    print(
-        """\n
-    ----------------------------------------------------------------
-    --- Transforming for Feature Store Starts ...
-    ----------------------------------------------------------------\n"""
+    logger.info(
+        f"Directory of data perprocessing and transformation config file: {config_yaml_path}"
     )
 
     # Get initiated FeatureStore
@@ -80,7 +81,7 @@ def main(config_yaml_path: str, data_dir: PosixPath) -> None:
         date_cols_names=date_col_names,
         datetime_cols_names=datetime_col_names,
         num_feature_names=num_col_names,
-        cat_feature_names=cat_col_names,  # If None, cat. vars are all cols except num., date, & datetime cols.
+        cat_feature_names=cat_col_names,
     )
 
     # Preprecess data for missing values, duplicates, and specify data types
@@ -120,7 +121,7 @@ def main(config_yaml_path: str, data_dir: PosixPath) -> None:
         index=False,
     )
 
-    print("\n\nPreprocessed features and target were saved in feature store.")
+    logger.info("Preprocessed features and target were saved in feature store.")
 
 
 ###########################################################
@@ -130,9 +131,32 @@ if __name__ == "__main__":
         "--config_yaml_path",
         type=str,
         default="./config.yml",
-        help="Path to the config yaml file.",
+        help="Path to the configuration yaml file.",
+    )
+    parser.add_argument(
+        "--logger_path",
+        type=str,
+        default="./logger.conf",
+        help="Path to the logger configuration file.",
     )
 
     args = parser.parse_args()
 
-    main(config_yaml_path=args.config_yaml_path, data_dir=DATA_DIR)
+    # Load the configuration file
+    logging.config.fileConfig(args.logger_path)
+
+    # Get the logger objects by name
+    console_logger = logging.getLogger("console_logger")
+    print_logger = logging.getLogger("print_logger")
+
+    # Create a LoggerWriter object using the console logger and the print logger
+    writer = LoggerWriter(console_logger, print_logger)
+
+    # Redirect sys.stdout to the LoggerWriter object
+    sys.stdout = writer
+
+    console_logger.info("Transforming for Feature Store Starts ...")
+
+    main(
+        config_yaml_path=args.config_yaml_path, data_dir=DATA_DIR, logger=console_logger
+    )

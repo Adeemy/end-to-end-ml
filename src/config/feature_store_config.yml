@@ -12,6 +12,9 @@ data:
     pos_class: "Diabetic"
     date_col_names: []
     datetime_col_names: []
+    inference_set_ratio: 0.05  # Percentage of data to be used for inference
+    original_split_type: "random" # Type of split to create inference set. Can be either "random" or "date"
+    random_seed: 123 # Random seed to select inference data from raw dataset 
     event_timestamp_col_name: "event_timestamp"
     num_col_names:
       - BMI

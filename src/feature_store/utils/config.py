@@ -46,11 +46,6 @@ class Config:
         assert config_path.endswith(".yml")
         self.config_path = config_path
 
-        print(
-            f"""\n\nDirectory of data perprocessing and transformation config
-             file: {self.config_path}\n\n"""
-        )
-
         try:
             with open(self.config_path, "r", encoding="UTF-8") as f:
                 self.params = yaml.load(f, Loader=PrettySafeLoader)

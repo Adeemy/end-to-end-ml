@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse
 
-from src.config.path import ARTIFACTS_DIR, PARENT_DIR
 from src.inference.utils.model import ModelLoader
+from src.utils.path import ARTIFACTS_DIR, PARENT_DIR
 
 load_dotenv()
 

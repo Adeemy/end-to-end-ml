@@ -1,4 +1,4 @@
-description: default config for training experiment
+description: default config for training
 logger:
   entity: adeemy
   project: diabetes-prediction
@@ -74,7 +74,7 @@ randomforest:
 lgbm:
   params:
     objective: "binary"
-    n_jobs: -1 # -1 means use all threads
+    n_jobs: -1 # -1 Means use all threads
     min_data_in_leaf: 100 # Larger values speeds up training.
     num_leaves: 80 # Lower values speeds up training.
     min_split_gain: 1e-8 # Larger values speeds up training.

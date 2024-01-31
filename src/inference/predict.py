@@ -4,19 +4,25 @@ production data via API calls.
 """
 
 import argparse
+import logging
+import logging.config
 import os
+import sys
 
 from dotenv import load_dotenv
 
-from src.config.path import ARTIFACTS_DIR
 from src.inference.utils.model import ModelLoader, predict
+from src.utils.logger import LoggerWriter
+from src.utils.path import ARTIFACTS_DIR
 
 load_dotenv()
 
 ########################################################
 
 
-def main(config_yaml_path: str, api_key: str, input_data: dict) -> None:
+def main(
+    config_yaml_path: str, api_key: str, input_data: dict, logger: logging.Logger
+) -> None:
     """Loads the champion model and scores the input data.
 
     Args:
@@ -45,20 +51,10 @@ def main(config_yaml_path: str, api_key: str, input_data: dict) -> None:
     )
 
     prediction = predict(model, input_data)
-    print(f"\n\n\n{prediction=}\n\n\n")
+    logger.info(f"\n\n\n{prediction=}\n\n\n")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config_yaml_path",
-        type=str,
-        default="./config.yml",
-        help="Path to the config yaml file.",
-    )
-
-    args = parser.parse_args()
-
     # Sample of prod data for testing
     sample_data = {
         "BMI": 29.0,
@@ -84,8 +80,38 @@ if __name__ == "__main__":
         "Income": "7",
     }
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_yaml_path",
+        type=str,
+        default="./config.yml",
+        help="Path to the configuration yaml file.",
+    )
+    parser.add_argument(
+        "--logger_path",
+        type=str,
+        default="./logger.conf",
+        help="Path to the logger configuration file.",
+    )
+
+    args = parser.parse_args()
+
+    # Load the configuration file
+    logging.config.fileConfig(args.logger_path)
+
+    # Get the logger objects by name
+    console_logger = logging.getLogger("console_logger")
+    print_logger = logging.getLogger("print_logger")
+
+    # Create a LoggerWriter object using the console logger and the print logger
+    writer = LoggerWriter(console_logger, print_logger)
+
+    # Redirect sys.stdout to the LoggerWriter object
+    sys.stdout = writer
+
     main(
         config_yaml_path=args.config_yaml_path,
         api_key=os.environ["COMET_API_KEY"],
         input_data=sample_data,
+        logger=console_logger,
     )
