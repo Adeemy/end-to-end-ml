@@ -74,7 +74,7 @@ randomforest:
 lgbm:
   params:
     objective: "binary"
-    n_jobs: -1 # -1 means use all threads
+    n_jobs: -1 # -1 Means use all threads
     min_data_in_leaf: 100 # Larger values speeds up training.
     num_leaves: 80 # Lower values speeds up training.
     min_split_gain: 1e-8 # Larger values speeds up training.
@@ -106,7 +106,7 @@ modelregistry:
 includedmodels:
   params:
     include_logistic_regression: true # Should Logisitic Regression be included in training
-    include_random_forest: false # Should Random Forest model be included in training
-    include_lightgbm: true # Should LightGBM model be included in training
+    include_random_forest: true # Should Random Forest model be included in training
+    include_lightgbm: false # Should LightGBM model be included in training
     include_xgboost: false # Should XGBoost model be included in training
     include_voting_ensemble: false # Should Voting Ensemble model be included in training
