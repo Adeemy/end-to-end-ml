@@ -105,8 +105,8 @@ modelregistry:
 
 includedmodels:
   params:
-    include_logistic_regression: false # Should Logisitic Regression be included in training
-    include_random_forest: true # Should Random Forest model be included in training
-    include_lightgbm: false # Should LightGBM model be included in training
+    include_logistic_regression: true # Should Logisitic Regression be included in training
+    include_random_forest: false # Should Random Forest model be included in training
+    include_lightgbm: true # Should LightGBM model be included in training
     include_xgboost: false # Should XGBoost model be included in training
     include_voting_ensemble: false # Should Voting Ensemble model be included in training
