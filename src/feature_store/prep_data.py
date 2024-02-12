@@ -102,7 +102,7 @@ def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> 
     )
 
     data_transformer.map_categorical_features()
-    data_transformer.rename_class_labels(class_col_name=class_column_name)
+    data_transformer.map_class_labels(class_col_name=class_column_name)
     preprocessed_data = data_transformer.preprocessed_data
 
     # Save features and target in a separate parquet files

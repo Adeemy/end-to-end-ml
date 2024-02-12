@@ -55,7 +55,6 @@ def test_split_dataset_random(split_dataset_data):
     # Extract class column and test data
     class_col_name, input_data = split_dataset_data
 
-    # Create an instance of the class that contains the split_dataset function
     data_splitter_class = DataSplitter(
         dataset=input_data,
         primary_key_col_name="feature_1",
@@ -106,7 +105,6 @@ def test_split_dataset_time(split_dataset_data):
     # Extract class column and test data
     class_col_name, input_data = split_dataset_data
 
-    # Create an instance of the class that contains the split_dataset function
     data_splitter_class = DataSplitter(
         dataset=input_data,
         primary_key_col_name="feature_1",

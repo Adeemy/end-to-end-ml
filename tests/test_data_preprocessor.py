@@ -165,7 +165,6 @@ def test_replace_blank_values_with_nan(replace_blank_values_with_nan_data):
     with pd.nan. Columns with other data types should be kept unchanged.
     """
 
-    # Create a class instance
     replace_blanks_class = DataPreprocessor(
         input_data=replace_blank_values_with_nan_data,
         primary_key_names=None,

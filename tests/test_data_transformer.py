@@ -59,10 +59,7 @@ def data_transformer_input_data():
 
 
 def test_map_categorical_features(data_transformer_input_data):
-    # Create a class instance
     data_transformer = DataTransformer(data_transformer_input_data)
-
-    # Call the map_categorical_features method
     data_transformer.map_categorical_features()
 
     # Check if categorical features are mapped correctly
@@ -113,14 +110,11 @@ def test_map_categorical_features(data_transformer_input_data):
     ]
 
 
-def test_rename_class_labels(data_transformer_input_data):
-    # Create a class instance
+def test_map_class_labels(data_transformer_input_data):
     data_transformer = DataTransformer(data_transformer_input_data)
+    data_transformer.map_class_labels("Class")
 
-    # Call the rename_class_labels method
-    data_transformer.rename_class_labels("Class")
-
-    # Check if class labels are renamed correctly
+    # Check if class labels are mapped correctly
     assert data_transformer.preprocessed_data["Class"].tolist() == [
         "Non-Diabetic",
         "Diabetic",

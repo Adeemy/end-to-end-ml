@@ -528,8 +528,8 @@ class DataTransformer:
                 }
             )
 
-    def rename_class_labels(self, class_col_name: str) -> None:
-        """Renames class labels to 'Diabetic' or 'Non-Diabetic'.
+    def map_class_labels(self, class_col_name: str) -> None:
+        """Maps class labels to expressive names: 'Diabetic' or 'Non-Diabetic'.
 
         Args:
             class_col_name (str): name of the class column.
@@ -539,8 +539,8 @@ class DataTransformer:
         """
 
         if class_col_name in self.preprocessed_data.columns:
-            self.preprocessed_data.loc[:, class_col_name] = (
-                self.preprocessed_data.loc[:, class_col_name]
+            self.preprocessed_data[class_col_name] = (
+                self.preprocessed_data[class_col_name]
                 .astype("string")
                 .replace({"0": "Non-Diabetic", "1": "Diabetic"})
             )
