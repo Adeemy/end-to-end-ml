@@ -239,23 +239,18 @@ class DataPreprocessor:
         """
 
         duplicates_count = self._data.duplicated().sum()
-        if duplicates_count > 0:
-            print(f"\nThere are {duplicates_count} duplicate rows in input data.")
-        else:
-            print("\nThere are no duplicate rows in input data.")
+        if self.primary_key_names is None and duplicates_count > 0:
+            raise ValueError(f"\n{duplicates_count} duplicate rows.")
 
         # Check if there is duplicated primary_key_names
-        if len(self.primary_key_names) > 0:
+        if self.primary_key_names is not None:
             duplicates_by_id_count = self._data.duplicated(
                 subset=self.primary_key_names
             ).sum()
             if duplicates_by_id_count > 0:
-                print(
-                    f"""\n{duplicates_by_id_count} rows with non-unique {self.primary_key_names} 
-                    in input data."""
+                raise ValueError(
+                    f"\n{duplicates_by_id_count} rows with duplicate {self.primary_key_names}."
                 )
-            else:
-                print(f"\nNo duplicate rows by {self.primary_key_names} in input data.")
 
     def remove_duplicates_by_primary_key(self) -> None:
         """Removes duplicate rows by primary key. It returns the number of duplicate

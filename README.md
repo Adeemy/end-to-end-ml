@@ -8,7 +8,7 @@ This project is an end-to-end ML project on tabular data that incorporates softw
 
 The project leverages the Diabetes Health Indicators public dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), which was originally sourced from CDC. The dataset comprises various information about patients, such as demographics, lab results, and self-reported health history. The goal is to develop a classifier that can discern whether a patient has diabetes, is pre-diabetic, or healthy.
 
-The project adheres to best software engineering practices in machine learning, such as modular code, documentation, testing, logging, configuration, and version control. The project also demonstrates how to utilize various tools and frameworks, such as pandas, scikit-learn, [feast](https://feast.dev), [optuna](https://optuna.org), experiment tracking using [Comet](https://www.comet.com/site/), and Docker, to facilitate the ML workflow and enhance the model performance.
+The project adheres to best practices of machine learning engineering, such as modular code, documentation, testing, logging, configuration, and version control. The project also demonstrates how to utilize various tools and frameworks, such as pandas, scikit-learn, [feast](https://feast.dev), [optuna](https://optuna.org), experiment tracking using [Comet](https://www.comet.com/site/), and Docker, to facilitate the ML workflow and enhance the model performance.
 
 Some of the notable features of the project are:
 
@@ -22,21 +22,23 @@ Some of the notable features of the project are:
 
 5. The project uses **experiment tracking and logging** using Comet, which is a platform for managing and comparing ML experiments. The project logs model performance, hyperparameters, and artifacts to Comet, which can be accessed through a web dashboard. The user can also visualize and compare different experiments using Comet.
 
-6. This project uses a makefile to provide convenient CLI commands to improve the efficiency, reliability, and quality of development, testing, and deployment. For instance, running the command `make prep_data` will transform the raw data into features and stores them in local file to be ingested by feature store, whereas running `make setup_feast` will apply the feature definitions to the feature store.
+6. This project uses a makefile to provide convenient CLI commands to improve the efficiency, reliability, and quality of development, testing, and deployment. For instance, running the command `make prep_data` will transform the raw data into features and stores them in local file to be ingested by feature store, whereas running `make setup_feast` will setup feature store and apply its feature definitions.
 
 ### Project structure
 
 The project consists of the following folders and files:
 
-- config: contains configuration files that includes parameters for data preprocessing and transformation, and model training.
+- `notebooks`: contains a notebook (eda.ipynb) that conducts exploratory data analysis (EDA) on the dataset, such as descriptive statistics, data visualization, and correlation analysis. It also establishes a baseline model (logistic regression) using scikit-learn, which achieves high precision and recall scores (above 0.80) on the test set. This project, however, does not focus on achieving higher accuracy, as that is beyond the scope of this project. Other notebooks can be added to this folder if needed.
 
-- notebooks: contains a notebook (eda.ipynb) that conducts exploratory data analysis (EDA) on the dataset, such as descriptive statistics, data visualization, and correlation analysis. It also establishes a baseline model (logistic regression) using scikit-learn, which achieves high precision and recall scores (above 0.80) on the test set. This project, however, does not focus on achieving higher accuracy, as that is beyond the scope of this project. Other notebooks can be added to this folder if needed.
+- `src/config`: contains configuration files that includes parameters for data preprocessing and transformation, and model training.
 
-- src/feature_store: contains the scripts for data ingestion and transformation. The script (generate_initial_data.py) imports the original dataset from the source [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), and creates inference set (5% of the original dataset). The inference set is used to simulate production data, which is scored using the deployed model via a REST API call. The script (prep_data.py) preprocesses and transforms the raw dataset before ingesting it by feature store. For more details about feature store setup, see README.md in the feature_store folder.
+- `src/feature_store`: contains the scripts for data ingestion and transformation. The script (generate_initial_data.py) imports the original dataset from the source [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), and creates inference set (5% of the original dataset). The inference set is used to simulate production data, which is scored using the deployed model via a REST API call. The script (prep_data.py) preprocesses and transforms the raw dataset before ingesting it by feature store. For more details about feature store setup, see README.md in the feature_store folder.
 
-- src/training: contains the scripts for data splitting, model training, evaluation, and selection. The script (split_data.py) splits the train set into a training set, to train models, and a validation set for model selection. The test set is used to assess the generalization capability of the best model (used only once). The script (train.py) applies data preprocessing on the training set using a sklearn pipeline, such as handling missing values, feature scaling, feature engineering, feature selection, and categorical features encoding. It also implements hyperparameter optimization, using optuna, for the following models: Logistic Regression, Random Forest, LightGBM, and XGBoost, with the ability to exclude models. The training pipeline is tracked and managed by [Comet](https://www.comet.com/site/), which records model parameters, metrics, and artifacts. Once the best model is selected and calibrated in evaluate.py, it is registered in Comet workspace as champion model if its score on the test set is better than a required threshold value. Otherwise, an error is raise that cancels build job.
+- `src/training`: contains the scripts for data splitting, model training, evaluation, and selection. The script (split_data.py) splits the train set into a training set, to train models, and a validation set for model selection. The test set is used to assess the generalization capability of the best model (used only once). The script (train.py) applies data preprocessing on the training set using a sklearn pipeline, such as handling missing values, feature scaling, feature engineering, feature selection, and categorical features encoding. It also implements hyperparameter optimization, using optuna, for the following models: Logistic Regression, Random Forest, LightGBM, and XGBoost, with the ability to exclude models. The training pipeline is tracked and managed by [Comet](https://www.comet.com/site/), which records model parameters, metrics, and artifacts. Once the best model is selected and calibrated in evaluate.py, it is registered in Comet workspace as champion model if its score on the test set is better than a required threshold value. Otherwise, an error is raise that cancels build job.
 
-- src/inference: contains the script for scoring new data via REST API using containerized model, which is deployed using GitHub Actions CI/CD pipeline.
+- `src/inference`: contains the script for scoring new data via REST API using containerized model, which is deployed using GitHub Actions CI/CD pipeline.
+
+- `tests`: contains test scripts to validate the functionality of the ML components in the project. By having a dedicated tests folder, it promotes code quality, reliability, and helps in identifying and fixing issues early in the development process.
 
 Below is the project structure.
 
@@ -115,7 +117,9 @@ Below is the project structure.
         │       ├── logger.py
         │       └── path.py
         └── tests
-        └── test_feature_utils.py
+        └── __init__.py
+        └── test_data_preprocessor.py
+        └── test_data_splitter.py
 
 ### Setup environment & Usage
 
