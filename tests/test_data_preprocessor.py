@@ -70,7 +70,7 @@ def test_check_duplicate_rows(remove_duplicates_by_unique_id_data, capsys):
     test_instance_without_id = DataPreprocessor(
         input_data=test_data_with_non_unique_id,
         primary_key_names=None,
-        cat_feature_names=input_data_id,
+        cat_feature_names=input_data_id,  # specified to pass assertion that at least one feature must be specified.
     )
 
     with pytest.raises(ValueError, match=re.escape(f"\n1 duplicate rows.")):
@@ -79,7 +79,7 @@ def test_check_duplicate_rows(remove_duplicates_by_unique_id_data, capsys):
     test_instance_with_id = DataPreprocessor(
         input_data=test_data_with_non_unique_id,
         primary_key_names=input_data_id,
-        cat_feature_names=input_data_id,
+        cat_feature_names=input_data_id,  # specified to pass assertion that at least one feature must be specified.
     )
 
     with pytest.raises(
