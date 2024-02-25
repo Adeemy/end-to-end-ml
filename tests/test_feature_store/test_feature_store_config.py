@@ -53,7 +53,7 @@ def test_config_check_params_missing_raw_dataset_source():
 def test_config_check_params_missing_pk_col_name():
     """Tests if Config class _check_params method raises ValueError
     when pk_col_name is not specified."""
-    
+
     params = {
         "description": "Sample description",
         "data": {
