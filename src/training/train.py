@@ -20,7 +20,7 @@ from xgboost import XGBClassifier
 
 from src.training.utils.config import Config
 from src.training.utils.data import PrepTrainingData
-from src.training.utils.job import create_voting_ensemble, submit_train_exp
+from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
 
@@ -186,36 +186,39 @@ def main(
             api_key=api_key,
         )
 
+    # Initialize training class
+    model_trainer = ModelTrainer(
+        train_features=train_features,
+        train_class=train_class,
+        valid_features=valid_features,
+        valid_class=valid_class,
+        train_features_preprocessed=train_features_preprocessed,
+        valid_features_preprocessed=valid_features_preprocessed,
+        n_features=train_features_preprocessed.shape[1],
+        class_encoder=class_encoder,
+        preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
+        selector_step=data_transformation_pipeline.named_steps["selector"],
+        artifacts_path=artifacts_dir,
+        num_feature_names=num_feature_names,
+        cat_feature_names=cat_feature_names,
+        fbeta_score_beta=f_beta_score_beta_val,
+        encoded_pos_class_label=encoded_positive_class_label,
+    )
+
     #############################################
     # Train Logistic Regression model
     if config.params["includedmodels"]["params"]["include_logistic_regression"]:
-        lr_calibrated_pipeline, lr_experiment = submit_train_exp(
+        lr_calibrated_pipeline, lr_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
             comet_project_name=project_name,
             comet_exp_name=f"logistic_regression_{datetime.now()}",
-            train_features_preprocessed=train_features_preprocessed,
-            train_class=train_class,
-            valid_features_preprocessed=valid_features_preprocessed,
-            valid_class=valid_class,
-            train_features=train_features,
-            valid_features=valid_features,
-            n_features=train_features_preprocessed.shape[1],
-            class_encoder=class_encoder,
-            preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
-            selector_step=data_transformation_pipeline.named_steps["selector"],
             model=LogisticRegression(**lr_params),
-            artifacts_path=artifacts_dir,
-            num_feature_names=num_feature_names,
-            cat_feature_names=cat_feature_names,
-            fbeta_score_beta=f_beta_score_beta_val,
-            encoded_pos_class_label=encoded_positive_class_label,
             max_search_iters=search_max_iters,
             optimize_in_parallel=True if parallel_jobs_count > 1 else False,
             n_parallel_jobs=parallel_jobs_count,
             model_opt_timeout_secs=exp_timeout_in_secs,
             registered_model_name=lr_registered_model_name,
         )
-        lr_experiment.end()
     else:
         lr_calibrated_pipeline = None
         lr_experiment = None
@@ -223,33 +226,17 @@ def main(
     #############################################
     # Train Random Forest model
     if config.params["includedmodels"]["params"]["include_random_forest"]:
-        rf_calibrated_pipeline, rf_experiment = submit_train_exp(
+        rf_calibrated_pipeline, rf_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
             comet_project_name=project_name,
             comet_exp_name=f"random_forest_{datetime.now()}",
-            train_features_preprocessed=train_features_preprocessed,
-            train_class=train_class,
-            valid_features_preprocessed=valid_features_preprocessed,
-            valid_class=valid_class,
-            train_features=train_features,
-            valid_features=valid_features,
-            n_features=train_features_preprocessed.shape[1],
-            class_encoder=class_encoder,
-            preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
-            selector_step=data_transformation_pipeline.named_steps["selector"],
             model=RandomForestClassifier(**rf_params),
-            artifacts_path=artifacts_dir,
-            num_feature_names=num_feature_names,
-            cat_feature_names=cat_feature_names,
-            fbeta_score_beta=f_beta_score_beta_val,
-            encoded_pos_class_label=encoded_positive_class_label,
             max_search_iters=search_max_iters,
             optimize_in_parallel=True if parallel_jobs_count > 1 else False,
             n_parallel_jobs=parallel_jobs_count,
             model_opt_timeout_secs=exp_timeout_in_secs,
             registered_model_name=rf_registered_model_name,
         )
-        rf_experiment.end()
     else:
         rf_calibrated_pipeline = None
         rf_experiment = None
@@ -257,33 +244,17 @@ def main(
     #############################################
     # Train LightGBM model
     if config.params["includedmodels"]["params"]["include_lightgbm"]:
-        lgbm_calibrated_pipeline, lgbm_experiment = submit_train_exp(
+        lgbm_calibrated_pipeline, lgbm_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
             comet_project_name=project_name,
-            comet_exp_name=f"lightgbm_{datetime.now()}",
-            train_features_preprocessed=train_features_preprocessed,
-            train_class=train_class,
-            valid_features_preprocessed=valid_features_preprocessed,
-            valid_class=valid_class,
-            train_features=train_features,
-            valid_features=valid_features,
-            n_features=train_features_preprocessed.shape[1],
-            class_encoder=class_encoder,
-            preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
-            selector_step=data_transformation_pipeline.named_steps["selector"],
+            comet_exp_name=f"random_forest_{datetime.now()}",
             model=LGBMClassifier(**lgbm_params),
-            artifacts_path=artifacts_dir,
-            num_feature_names=num_feature_names,
-            cat_feature_names=cat_feature_names,
-            fbeta_score_beta=f_beta_score_beta_val,
-            encoded_pos_class_label=encoded_positive_class_label,
             max_search_iters=search_max_iters,
             optimize_in_parallel=True if parallel_jobs_count > 1 else False,
             n_parallel_jobs=parallel_jobs_count,
             model_opt_timeout_secs=exp_timeout_in_secs,
             registered_model_name=lgbm_registered_model_name,
         )
-        lgbm_experiment.end()
     else:
         lgbm_calibrated_pipeline = None
         lgbm_experiment = None
@@ -291,36 +262,20 @@ def main(
     #############################################
     # Train XGBoost model
     if config.params["includedmodels"]["params"]["include_xgboost"]:
-        xgb_calibrated_pipeline, xgb_experiment = submit_train_exp(
+        xgb_calibrated_pipeline, xgb_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
             comet_project_name=project_name,
-            comet_exp_name=f"xgboost_{datetime.now()}",
-            train_features_preprocessed=train_features_preprocessed,
-            train_class=train_class,
-            valid_features_preprocessed=valid_features_preprocessed,
-            valid_class=valid_class,
-            train_features=train_features,
-            valid_features=valid_features,
-            n_features=train_features_preprocessed.shape[1],
-            class_encoder=class_encoder,
-            preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
-            selector_step=data_transformation_pipeline.named_steps["selector"],
+            comet_exp_name=f"random_forest_{datetime.now()}",
             model=XGBClassifier(
                 scale_pos_weight=sum(train_class == 0) / sum(train_class == 1),
                 **xgb_params,
             ),
-            artifacts_path=artifacts_dir,
-            num_feature_names=num_feature_names,
-            cat_feature_names=cat_feature_names,
-            fbeta_score_beta=f_beta_score_beta_val,
-            encoded_pos_class_label=encoded_positive_class_label,
             max_search_iters=search_max_iters,
             optimize_in_parallel=True if parallel_jobs_count > 1 else False,
             n_parallel_jobs=parallel_jobs_count,
             model_opt_timeout_secs=exp_timeout_in_secs,
             registered_model_name=xgb_registered_model_name,
         )
-        xgb_experiment.end()
     else:
         xgb_calibrated_pipeline = None
         xgb_experiment = None
@@ -328,14 +283,10 @@ def main(
     #############################################
     # Create a voting ensmble model with LR, RF, LightGBM, and XGBoost as base estimators
     if config.params["includedmodels"]["params"]["include_voting_ensemble"]:
-        ve_experiment = create_voting_ensemble(
+        ve_creator = VotingEnsembleCreator(
             comet_api_key=api_key,
             comet_project_name=project_name,
             comet_exp_name=f"voting_ensemble_{datetime.now()}",
-            lr_calib_pipeline=lr_calibrated_pipeline,
-            rf_calib_pipeline=rf_calibrated_pipeline,
-            lgbm_calib_pipeline=lgbm_calibrated_pipeline,
-            xgb_calib_pipeline=xgb_calibrated_pipeline,
             train_features=train_features,
             valid_features=valid_features,
             train_class=train_class,
@@ -347,7 +298,14 @@ def main(
             fbeta_score_beta=f_beta_score_beta_val,
             registered_model_name=ve_registered_model_name,
         )
-        ve_experiment.end()
+
+        _, ve_experiment = ve_creator.create_voting_ensemble(
+            lr_calib_pipeline=lr_calibrated_pipeline,
+            rf_calib_pipeline=rf_calibrated_pipeline,
+            lgbm_calib_pipeline=lgbm_calibrated_pipeline,
+            xgb_calib_pipeline=xgb_calibrated_pipeline,
+        )
+
     else:
         ve_experiment = None
 

@@ -22,7 +22,7 @@ format:
 	black ./tests
 
 test:	
-	pytest -vvv
+# pytest -vvv
 	coverage run -m pytest -vvv
 	coverage report -m
 
@@ -32,7 +32,7 @@ debug:
 lint:
 	pylint --disable=R,C,E1120 ./src/feature_store ./src/training ./src/inference ./tests
 
-scan: install isort format test lint
+all: install isort format test lint
 
 
 # Import raw dataset from source
