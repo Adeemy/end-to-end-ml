@@ -789,7 +789,7 @@ class ModelEvaluator(ModelOptimizer):
         self,
         class_encoder: Optional[LabelEncoder] = None,
         pos_class_label_thresh: float = 0.5,
-    ) -> Union[pd.DataFrame, pd.DataFrame, Pipeline, list]:
+    ) -> Union[pd.DataFrame, pd.DataFrame]:
         """Evaluates the best model returned by hyperparameters optimization procedure
         on both training and validation set.
 
@@ -947,7 +947,7 @@ class ModelEvaluator(ModelOptimizer):
             figure_name="Lift Curve", figure=lift_curve_fig, overwrite=True
         )
 
-        return (train_scores, valid_scores)
+        return train_scores, valid_scores
 
     @staticmethod
     def calc_expected_calibration_error(
