@@ -24,9 +24,8 @@ from src.training.utils.model import ModelEvaluator, ModelOptimizer
 
 
 class ModelTrainer:
-    """This class is used to train a single classifier. It uses ModelOptimizer and
-    ModelEvaluator classes to tune and evaluate the model and logs the model metrics
-    to Comet experiment.
+    """Trains an sklearn classifier using ModelOptimizer and ModelEvaluator classes
+    and evaluates the model and logs its metrics to Comet experiment.
 
     Attributes:
         train_features (pd.DataFrame): training features,
@@ -48,9 +47,6 @@ class ModelTrainer:
         fbeta_score_beta (float): beta value (weight of recall) in fbeta_score(),
         encoded_pos_class_label (int): encoded label of positive class using LabelEncoder().
                 Default to 1.
-
-    Raises:
-        Exception: if model training fails.
     """
 
     def __init__(
@@ -115,7 +111,7 @@ class ModelTrainer:
             raise ValueError(f"Comet experiment creation error --> {e}") from e
         return comet_exp
 
-    def optimize_model(
+    def _optimize_model(
         self,
         comet_exp: Experiment,
         model: Callable,
@@ -173,7 +169,7 @@ class ModelTrainer:
 
         return study, optimizer
 
-    def log_study_trials(
+    def _log_study_trials(
         self,
         comet_exp: Experiment,
         study: optuna.study.Study,
@@ -203,7 +199,7 @@ class ModelTrainer:
             file_name=f"study_{classifier_name}",
         )
 
-    def fit_best_model(
+    def _fit_best_model(
         self,
         study: optuna.study.Study,
         optimizer: ModelOptimizer,
@@ -229,7 +225,7 @@ class ModelTrainer:
         )
         return fitted_pipeline
 
-    def evaluate_model(
+    def _evaluate_model(
         self,
         evaluator: ModelEvaluator,
         fitted_pipeline: Pipeline,
@@ -259,7 +255,7 @@ class ModelTrainer:
 
         return train_scores, valid_scores
 
-    def log_model_metrics(
+    def _log_model_metrics(
         self,
         comet_exp: Experiment,
         evaluator: ModelEvaluator,
@@ -292,7 +288,7 @@ class ModelTrainer:
         metrics_to_log.update({"model_ece": model_ece})
         comet_exp.log_metrics(metrics_to_log)
 
-    def register_model(
+    def _register_model(
         self,
         comet_exp: Experiment,
         fitted_pipeline: Pipeline,
@@ -382,7 +378,7 @@ class ModelTrainer:
 
         try:
             # Tune model
-            study, optimizer = self.optimize_model(
+            study, optimizer = self._optimize_model(
                 comet_exp=comet_exp,
                 model=model,
                 max_search_iters=max_search_iters,
@@ -393,14 +389,14 @@ class ModelTrainer:
             )
 
             # Log study trials
-            self.log_study_trials(
+            self._log_study_trials(
                 comet_exp=comet_exp,
                 study=study,
                 classifier_name=classifier_name,
             )
 
             # Fit best model pipeline
-            fitted_pipeline = self.fit_best_model(
+            fitted_pipeline = self._fit_best_model(
                 study=study,
                 optimizer=optimizer,
                 model=model,
@@ -426,7 +422,7 @@ class ModelTrainer:
                 is_voting_ensemble=is_voting_ensemble,
             )
 
-            train_scores, valid_scores = self.evaluate_model(
+            train_scores, valid_scores = self._evaluate_model(
                 evaluator=evaluator,
                 fitted_pipeline=fitted_pipeline,
             )
@@ -443,7 +439,7 @@ class ModelTrainer:
             )
             metrics_to_log.update(valid_metric_values)
 
-            self.log_model_metrics(
+            self._log_model_metrics(
                 comet_exp=comet_exp,
                 evaluator=evaluator,
                 fitted_pipeline=fitted_pipeline,
@@ -451,7 +447,7 @@ class ModelTrainer:
             )
 
             # Save and register model
-            self.register_model(
+            self._register_model(
                 comet_exp=comet_exp,
                 fitted_pipeline=fitted_pipeline,
                 registered_model_name=registered_model_name,
@@ -468,9 +464,8 @@ class ModelTrainer:
 
 
 class VotingEnsembleCreator:
-    """This class is used to create a voting ensemble classifier. It uses
-    ModelEvaluator class to evaluate the model and logs the model and its
-    metrics to Comet experiment.
+    """Creates a voting ensemble classifier. It uses ModelEvaluator class to
+    evaluate the model and logs the model and its metrics to Comet experiment.
 
     Attributes:
         comet_api_key (str): Comet API key,
@@ -491,9 +486,6 @@ class VotingEnsembleCreator:
         fbeta_score_beta (float, optional): beta value (weight of recall) in fbeta_score().
             Default to 1 (same as F1).
         registered_model_name (str, optional): name used for the registered model.
-
-    Raises:
-        Exception: if model training fails.
     """
 
     def __init__(
