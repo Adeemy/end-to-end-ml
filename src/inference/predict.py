@@ -35,7 +35,7 @@ def main(
     """
 
     # Extracts config params
-    load_model = ModelLoader()
+    load_model = ModelLoader(comet_api_key=api_key)
     (
         comet_ws,
         champ_model_name,
@@ -45,7 +45,6 @@ def main(
     # Download champion model
     model = load_model.download_model(
         comet_workspace=comet_ws,
-        comet_api_key=api_key,
         model_name=champ_model_name,
         artifacts_path=ARTIFACTS_DIR,
     )

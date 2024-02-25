@@ -1,6 +1,7 @@
 # Run this file in project root directory
 
 # Update requirements.txt
+#https://stackoverflow.com/questions/62496083/pipreqs-has-the-unicode-error-under-a-virtualenv
 update_reqs:
 	pipreqs --force --ignore bin,etc,include,lib,lib64 "./"
 
@@ -22,14 +23,14 @@ format:
 
 test:	
 	pytest -vvv
-# coverage run -m pytest -vvv
-# coverage report -m
+	coverage run -m pytest -vvv
+	coverage report -m
 
 debug:
 	pytest -vvv --pdb
 
 lint:
-	pylint --disable=R,C,E1120 ./src/feature_store ./src/training ./src/inference 
+	pylint --disable=R,C,E1120 ./src/feature_store ./src/training ./src/inference ./tests
 
 scan: install isort format test lint
 

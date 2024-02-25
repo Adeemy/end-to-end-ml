@@ -18,8 +18,16 @@ class ModelLoader:
     """Loads scoring models for inference.
 
     Attributes:
-        None.
+        comet_api (comet_ml.API): Comet API instance needed to download models.
     """
+
+    def __init__(self, comet_api_key: str = None) -> None:
+        # Create Comet API instance if comet_api is not provided
+        # Note: comet_api_key was made an attribute to make easier to mock
+        # it during unit testing download_model method compared to creating
+        # it inside the method.
+        if comet_api_key is not None:
+            self.comet_api = API(api_key=comet_api_key)
 
     def get_config_params(self, config_yaml_abs_path: str) -> tuple:
         """Extracts training and model configurations, like workspace info
@@ -58,7 +66,6 @@ class ModelLoader:
     def download_model(
         self,
         comet_workspace: str,
-        comet_api_key: str,
         model_name: str,
         artifacts_path: PosixPath,
     ) -> Pipeline:
@@ -66,7 +73,6 @@ class ModelLoader:
 
         Args:
             comet_workspace (str): Comet workspace name.
-            comet_api_key (str): Comet API key.
             model_name (str): registered model name.
             artifacts_path (PosixPath): path to save model artifacts.
 
@@ -74,15 +80,12 @@ class ModelLoader:
             model (sklearn.pipeline.Pipeline): trained model.
         """
 
-        # Create Comet API instance
-        comet_api = API(api_key=comet_api_key)
-
         # Download a registered model from Comet workspace
-        model = comet_api.get_model(
+        model = self.comet_api.get_model(
             workspace=comet_workspace,
             model_name=model_name,
         )
-        model_versions = comet_api.get_registry_model_versions(
+        model_versions = self.comet_api.get_registry_model_versions(
             workspace=comet_workspace,
             registry_name=model_name,
         )

@@ -3,8 +3,6 @@ This script wraps an API endpoint around a model to score
 production data via API calls.
 """
 
-import os
-
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI
@@ -54,7 +52,6 @@ load_model = ModelLoader()
 # Download champion model
 model = load_model.download_model(
     comet_workspace=comet_ws,
-    comet_api_key=os.environ["COMET_API_KEY"],
     model_name=champ_model_name,
     artifacts_path=ARTIFACTS_DIR,
 )
