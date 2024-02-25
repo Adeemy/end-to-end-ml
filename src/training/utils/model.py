@@ -556,9 +556,8 @@ class ModelEvaluator(ModelOptimizer):
             Exception: if any error occurs during feature importance extraction.
         """
 
-        # Catch any error raised in this function to prevent experiment
-        # from registering a model as it's not worth failing experiment for
-        # an error in this function.
+        # Catch any error raised in this method to prevent experiment
+        # from registering a model as it's not worth failing experiment.
         try:
             # Get feature names
             if num_feature_names is None and cat_feature_names is not None:
@@ -740,8 +739,7 @@ class ModelEvaluator(ModelOptimizer):
     def plot_lift_curve(
         y_true: np.array, y_pred: np.array, fig_size: tuple = (6, 6)
     ) -> None:
-        """
-        This function plots the lift curve for a binary classification model.
+        """Plots the lift curve for a binary classification model.
         It shows the ratio of the positive cases captured by the model to the
         baseline (random) model as a function of the percentage of the sample
         that is predicted as positive.

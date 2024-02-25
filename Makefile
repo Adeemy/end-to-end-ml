@@ -1,5 +1,9 @@
 # Run this file in project root directory
 
+# Update requirements.txt
+update_reqs:
+	pipreqs --force --ignore bin,etc,include,lib,lib64 "./"
+
 # Install packages, format code, sort imports, and run unit tests
 install:
 	pip install --upgrade pip &&\
@@ -27,7 +31,7 @@ debug:
 lint:
 	pylint --disable=R,C,E1120 ./src/feature_store ./src/training ./src/inference 
 
-check_code: install isort format test lint
+scan: install isort format test lint
 
 
 # Import raw dataset from source
