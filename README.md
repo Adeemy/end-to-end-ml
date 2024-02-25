@@ -53,6 +53,7 @@ Below is the project structure.
         │   ├── eda.ipynb
         │   ├── eda_requirements.txt
         │   └── utils.py
+        ├── pytest.ini
         ├── requirements.txt
         ├── src
         │   ├── __init__.py
@@ -117,9 +118,14 @@ Below is the project structure.
         │       ├── logger.py
         │       └── path.py
         └── tests
-        └── __init__.py
-        └── test_data_preprocessor.py
-        └── test_data_splitter.py
+        ├── __init__.py
+        ├── test_feature_store
+        │   ├── test_data_preprocessor.py
+        │   ├── test_data_splitter.py
+        │   ├── test_data_transformer.py
+        │   └── test_feature_store_config.py
+        └── test_inference
+                └── test_model.py
 
 ### Setup environment & Usage
 

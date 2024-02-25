@@ -3,6 +3,8 @@ This script wraps an API endpoint around a model to score
 production data via API calls.
 """
 
+import os
+
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI
@@ -40,7 +42,7 @@ load_dotenv()
 # }
 
 # Extracts config params
-load_model = ModelLoader()
+load_model = ModelLoader(comet_api_key=os.environ["COMET_API_KEY"])
 (
     comet_ws,
     champ_model_name,
