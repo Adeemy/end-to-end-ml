@@ -637,13 +637,15 @@ class VotingEnsembleCreator:
         """
 
         # Copy fitted data transformation steps from any base pipeline
-        if "lr_calib_pipeline" in locals():
+        if hasattr(self, "lr_calib_pipeline") and self.lr_calib_pipeline is not None:
             data_pipeline = deepcopy(self.lr_calib_pipeline)
-        elif "rf_calib_pipeline" in locals():
+        elif hasattr(self, "rf_calib_pipeline") and self.lr_calib_pipeline is not None:
             data_pipeline = deepcopy(self.rf_calib_pipeline)
-        elif "lgbm_calib_pipeline" in locals():
+        elif (
+            hasattr(self, "lgbm_calib_pipeline") and self.lr_calib_pipeline is not None
+        ):
             data_pipeline = deepcopy(self.lgbm_calib_pipeline)
-        elif "xgb_calib_pipeline" in locals():
+        elif hasattr(self, "xgb_calib_pipeline") and self.lr_calib_pipeline is not None:
             data_pipeline = deepcopy(self.xgb_calib_pipeline)
         else:
             raise ValueError("No base model pipelines found!")
