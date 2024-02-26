@@ -614,25 +614,45 @@ class ModelEvaluator(ModelOptimizer):
                 ].feature_importances_
 
             # Log feature importance figure
-            if classifier_name not in ["VotingClassifier"]:
-                feature_importance_fig = plt.figure(figsize=figure_size)
-                feature_importance_fig = self.plot_feature_importance(
-                    feature_importance_scores=feature_importance_scores,
-                    feature_names=col_names,
-                    figure_obj=feature_importance_fig,
-                    n_top_features=n_top_features,
-                    font_size=font_size,
-                    fig_size=figure_size,
-                )
-                self.comet_exp.log_figure(
-                    figure_name="Feature Importance",
-                    figure=feature_importance_fig,
-                    overwrite=True,
-                )
+            self._log_feature_importance_fig(
+                classifier_name=classifier_name,
+                feature_importance_scores=feature_importance_scores,
+                col_names=col_names,
+                n_top_features=n_top_features,
+                figure_size=figure_size,
+                font_size=font_size,
+            )
 
         except Exception as e:  # pylint: disable=W0718
             print(f"Feature importance extraction error --> {e}")
-            feature_importance_fig, col_names = None, None
+            col_names = None
+
+    def _log_feature_importance_fig(
+        self,
+        classifier_name: str,
+        feature_importance_scores: np.ndarray,
+        col_names: list,
+        n_top_features: int = 30,
+        figure_size: tuple = (24, 36),
+        font_size: float = 10.0,
+        fig_name: str = "Feature Importance",
+    ) -> None:
+        # Log feature importance figure
+        if classifier_name not in ["VotingClassifier"]:
+            feature_importance_fig = plt.figure(figsize=figure_size)
+            feature_importance_fig = self.plot_feature_importance(
+                feature_importance_scores=feature_importance_scores,
+                feature_names=col_names,
+                figure_obj=feature_importance_fig,
+                n_top_features=n_top_features,
+                font_size=font_size,
+                fig_size=figure_size,
+            )
+            self.comet_exp.log_figure(
+                figure_name=fig_name,
+                figure=feature_importance_fig,
+                overwrite=True,
+            )
 
     @staticmethod
     def plot_roc_curve(
