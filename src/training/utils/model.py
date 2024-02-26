@@ -121,10 +121,10 @@ class ModelOptimizer:
             if isinstance(values[0], list):
                 params[param] = trial.suggest_categorical(param, values[0])
             elif isinstance(values[0], int):
-                params[param] = trial.suggest_int(param, values[0], values[1])
+                params[param] = trial.suggest_int(param, int(values[0]), int(values[1]))
             else:
                 params[param] = trial.suggest_float(
-                    param, values[0], values[1], log=values[2]
+                    param, float(values[0]), float(values[1]), log=bool(values[2])
                 )
 
         return params
