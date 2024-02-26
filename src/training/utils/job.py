@@ -489,6 +489,10 @@ class VotingEnsembleCreator:
         valid_class (np.ndarray): The target labels for the validation set.
         class_encoder (LabelEncoder): encoder object that maps the class labels to integers.
         artifacts_path (str): path to save training artificats, e.g., .pkl and .png files.
+        lr_calib_pipeline (Pipeline): calibrated pipeline for logistic regression model,
+        rf_calib_pipeline (Pipeline): calibrated pipeline for random forest model,
+        lgbm_calib_pipeline (Pipeline): calibrated pipeline for LightGBM model,
+        xgb_calib_pipeline (Pipeline): calibrated pipeline for XGBoost model,
         voting_rule (Literal["hard", "soft"], optional): voting rule for the ensemble classifier.
             Default to "soft".
         encoded_pos_class_label (int, optional): encoded label of positive class using LabelEncoder().
@@ -799,10 +803,7 @@ class VotingEnsembleCreator:
         using ModelEvaluator class. It logs the model metrics to Comet experiment.
 
         Args:
-            lr_calib_pipeline (Pipeline): calibrated pipeline for logistic regression model,
-            rf_calib_pipeline (Pipeline): calibrated pipeline for random forest model,
-            lgbm_calib_pipeline (Pipeline): calibrated pipeline for LightGBM model,
-            xgb_calib_pipeline (Pipeline): calibrated pipeline for XGBoost model,
+            None
 
         Returns:
             Pipeline: calibrated pipeline object that contains the model transformation pipeline
