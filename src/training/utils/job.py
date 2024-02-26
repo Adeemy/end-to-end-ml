@@ -22,7 +22,6 @@ from src.training.utils.model import ModelEvaluator, ModelOptimizer
 
 ###########################################################
 
-
 class ModelTrainer:
     """Trains an sklearn classifier using ModelOptimizer and ModelEvaluator classes
     and evaluates the model and logs its metrics to Comet experiment.
@@ -105,7 +104,7 @@ class ModelTrainer:
             comet_exp = Experiment(
                 api_key=comet_api_key, project_name=comet_project_name
             )
-            comet_exp.log_code(folder=".")
+            comet_exp.log_code(folder="training/")
             comet_exp.set_name(comet_exp_name)
         except ValueError as e:
             raise ValueError(f"Comet experiment creation error --> {e}") from e
@@ -553,7 +552,7 @@ class VotingEnsembleCreator:
             comet_exp = Experiment(
                 api_key=comet_api_key, project_name=comet_project_name
             )
-            comet_exp.log_code(folder=".")
+            comet_exp.log_code(folder="training/")
             comet_exp.set_name(comet_exp_name)
         except ValueError as e:
             raise ValueError(f"Comet experiment creation error --> {e}") from e
