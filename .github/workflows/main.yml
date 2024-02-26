@@ -2,10 +2,10 @@
 name: CI/CD
 
 on:
-  # push:
-  #   branches: ["main"]
-  #   pull_request:
-  #     branches: ["main"]
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
   # Run workflow manually from the Actions tab
   workflow_dispatch:
@@ -41,6 +41,12 @@ jobs:
         run: |
           make test
 
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: Adeemy/end-to-end-tabular-ml
+
       - name: Lint with pylint
         run: |
           make lint
@@ -57,21 +63,21 @@ jobs:
         run: |
           make split_data
 
-      # - name: Train
-      #   env:
-      #     COMET_API_KEY: ${{secrets.COMET_API_KEY}}
-      #   run: |
-      #     make train
+      - name: Train
+        env:
+          COMET_API_KEY: ${{ secrets.COMET_API_KEY }}
+        run: |
+          make train
 
-      # - name: Evaluate models
-      #   env:
-      #     COMET_API_KEY: ${{secrets.COMET_API_KEY}}
-      #   run: |
-      #     make evaluate
+      - name: Evaluate models
+        env:
+          COMET_API_KEY: ${{ secrets.COMET_API_KEY }}
+        run: |
+          make evaluate
 
       - name: Test champion model
         env:
-          COMET_API_KEY: ${{secrets.COMET_API_KEY}}
+          COMET_API_KEY: ${{ secrets.COMET_API_KEY }}
         run: |
           make test_model
 
