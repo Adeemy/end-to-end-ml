@@ -22,6 +22,7 @@ from src.training.utils.model import ModelEvaluator, ModelOptimizer
 
 ###########################################################
 
+
 class ModelTrainer:
     """Trains an sklearn classifier using ModelOptimizer and ModelEvaluator classes
     and evaluates the model and logs its metrics to Comet experiment.
@@ -119,7 +120,7 @@ class ModelTrainer:
         n_parallel_jobs: int = 4,
         model_opt_timeout_secs: int = 600,
         is_voting_ensemble: bool = False,
-    ) -> Union[optuna.study.Study, tuple]:
+    ) -> Union[optuna.study.Study, ModelOptimizer]:
         """Optimizes the model using ModelOptimizer class.
 
         Args:
@@ -565,7 +566,7 @@ class VotingEnsembleCreator:
         lgbm_calib_pipeline: Pipeline,
         xgb_calib_pipeline: Pipeline,
     ) -> list:
-        """Creates a list of tuples of base models for the voting ensemble.
+        """Creates a list of base models for the voting ensemble.
 
         Args:
             lr_calib_pipeline (Pipeline): calibrated pipeline for logistic regression model,
@@ -574,7 +575,7 @@ class VotingEnsembleCreator:
             xgb_calib_pipeline (Pipeline): calibrated pipeline for XGBoost model,
 
         Returns:
-            base_models (list): list of tuples of base models.
+            base_models (list): list of base models.
 
         Raises:
             ValueError: if less than two base models are provided.
@@ -606,7 +607,7 @@ class VotingEnsembleCreator:
         model. It assumes all base models have the same data transformation pipeline.
 
         Args:
-            base_models (list): list of tuples of base models.
+            base_models (list): list of base models.
 
         Returns:
             data_pipeline (Pipeline): data transformation pipeline object.
@@ -621,7 +622,7 @@ class VotingEnsembleCreator:
         base models) and fits the pipeline to the training set.
 
         Args:
-            base_models (list): list of tuples of base models.
+            base_models (list): list of base models.
 
         Returns:
             ve_model (VotingClassifier): voting ensemble classifier object,

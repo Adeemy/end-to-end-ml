@@ -789,7 +789,7 @@ class ModelEvaluator(ModelOptimizer):
         self,
         class_encoder: Optional[LabelEncoder] = None,
         pos_class_label_thresh: float = 0.5,
-    ) -> Union[pd.DataFrame, pd.DataFrame]:
+    ) -> Union[pd.DataFrame, pd.DataFrame, list]:
         """Evaluates the best model returned by hyperparameters optimization procedure
         on both training and validation set.
 
@@ -800,22 +800,17 @@ class ModelEvaluator(ModelOptimizer):
         Returns:
             train_scores (pd.DataFrame): training scores.
             valid_scores (pd.DataFrame): validation scores.
-            pipeline (Pipeline): fitted pipeline.
             original_class_labels (list): list of original class labels.
         """
 
         # Generate class labels for validation set based on decision threshold value (0.5)
         pred_train_probs = self.pipeline.predict_proba(self.train_features)
-        pred_train_class = np.where(
-            pred_train_probs[:, self.encoded_pos_class_label] > pos_class_label_thresh,
-            1,
-            0,
+        pred_train_class = self._get_pred_class(
+            pred_train_probs, pos_class_label_thresh
         )
         pred_valid_probs = self.pipeline.predict_proba(self.valid_features)
-        pred_valid_class = np.where(
-            pred_valid_probs[:, self.encoded_pos_class_label] > pos_class_label_thresh,
-            1,
-            0,
+        pred_valid_class = self._get_pred_class(
+            pred_valid_probs, pos_class_label_thresh
         )
 
         # Calculate performance metrics on train and validation sets
@@ -828,30 +823,78 @@ class ModelEvaluator(ModelOptimizer):
             pred_class=pred_valid_class,
         )
 
-        # Extract original class label names, which can be expressive, i.e., not encoded.
-        if class_encoder is None:  # Class labels are already encoded
-            original_class_labels = self.pipeline.classes_
+        # Extract original class label names
+        original_class_labels = self._get_original_class_labels(class_encoder)
 
-            # Extract expressive class names for confusion matrix
-            original_train_class = self.train_class
-            original_valid_class = self.valid_class
-            pred_original_train_class = pred_train_class
-            pred_original_valid_class = pred_valid_class
+        # Log confusion matrices
+        self._log_confusion_matrix(
+            original_train_class=self.train_class,
+            pred_original_train_class=pred_train_class,
+            original_valid_class=self.valid_class,
+            pred_original_valid_class=pred_valid_class,
+            original_class_labels=original_class_labels,
+        )
 
+        # Log calibration curve and plots
+        self._log_calibration_curve(pred_valid_probs)
+        self._log_roc_curve(pred_valid_probs, self.encoded_pos_class_label)
+        self._log_precision_recall_curve(pred_valid_probs, self.encoded_pos_class_label)
+        self._log_cumulative_gains(pred_valid_probs, self.valid_class)
+        self._log_lift_curve(pred_valid_probs, self.valid_class)
+
+        return train_scores, valid_scores
+
+    def _get_pred_class(self, pred_probs: np.ndarray, threshold: float) -> np.ndarray:
+        """Returns predicted class labels based on decision threshold value.
+        Args:
+            pred_probs (np.ndarray): predicted probabilities of the positive class.
+            threshold (float): decision threshold value for positive class.
+        Returns:
+            pred_class (np.ndarray): predicted class labels.
+        """
+
+        pred_class = np.where(
+            pred_probs[:, self.encoded_pos_class_label] > threshold, 1, 0
+        )
+
+        return pred_class
+
+    def _get_original_class_labels(self, class_encoder: Optional[LabelEncoder]) -> list:
+        """Returns original class labels from encoded class labels.
+
+        Args:
+            class_encoder (LabelEncoder): class encoder object.
+
+        Returns:
+            original_class_labels (list): list of original class labels.
+        """
+
+        if class_encoder is None:
+            return list(self.pipeline.classes_)
         else:
-            original_class_labels = list(
-                class_encoder.inverse_transform(self.pipeline.classes_)
-            )
+            return list(class_encoder.inverse_transform(self.pipeline.classes_))
 
-            # Extract expressive class names for confusion matrix
-            original_train_class = class_encoder.inverse_transform(self.train_class)
-            original_valid_class = class_encoder.inverse_transform(self.valid_class)
-            pred_original_train_class = class_encoder.inverse_transform(
-                pred_train_class
-            )
-            pred_original_valid_class = class_encoder.inverse_transform(
-                pred_valid_class
-            )
+    def _log_confusion_matrix(
+        self,
+        original_train_class: np.ndarray,
+        pred_original_train_class: np.ndarray,
+        original_valid_class: np.ndarray,
+        pred_original_valid_class: np.ndarray,
+        original_class_labels: list,
+    ) -> None:
+        """Logs confusion matrices (normalized and non-normalized) for the best model on
+        both the training and validation sets.
+
+        Args:
+            original_train_class (np.ndarray): original class labels for training set.
+            pred_original_train_class (np.ndarray): predicted class labels for training set.
+            original_valid_class (np.ndarray): original class labels for validation set.
+            pred_original_valid_class (np.ndarray): predicted class labels for validation set.
+            original_class_labels (list): list of original class labels.
+
+        Returns:
+            None
+        """
 
         train_cm = confusion_matrix(
             y_true=original_train_class,
@@ -859,7 +902,6 @@ class ModelEvaluator(ModelOptimizer):
             labels=original_class_labels,
             normalize=None,
         )
-
         self.comet_exp.log_confusion_matrix(
             matrix=train_cm,
             title="Train Set Confusion Matrix",
@@ -902,52 +944,107 @@ class ModelEvaluator(ModelOptimizer):
             file_name="Validation Set Normalized Confusion Matrix.json",
         )
 
-        # Plot claibration curve
+    def _log_calibration_curve(self, pred_probs: np.ndarray) -> None:
+        """Logs calibration curve for the best model on the validation set.
+
+        Args:
+            pred_probs (np.ndarray): predicted probabilities of the positive class
+            of the best model on the validation set.
+
+        Returns:
+            None
+        """
+
         calib_curve = CalibrationDisplay.from_predictions(
             self.valid_class,
-            pred_valid_probs[:, self.encoded_pos_class_label],
+            pred_probs[:, self.encoded_pos_class_label],
             n_bins=10,
         )
-
         self.comet_exp.log_figure(
             figure_name="Calibration Curve", figure=calib_curve.figure_, overwrite=True
         )
 
-        # Plot ROC and precision-recall curves
+    def _log_roc_curve(
+        self, pred_probs: np.ndarray, encoded_pos_class_label: int
+    ) -> None:
+        """Logs ROC curve for the best model on the validation set.
+
+        Args:
+            pred_probs (np.ndarray): predicted probabilities of the positive class.
+            encoded_pos_class_label (int): encoded positive class label.
+
+        Returns:
+            None
+        """
+
         roc_curve_fig = self.plot_roc_curve(
             y_true=self.valid_class,
-            y_pred=pred_valid_probs[:, self.encoded_pos_class_label],
+            y_pred=pred_probs[:, encoded_pos_class_label],
             fig_size=(6, 6),
         )
         self.comet_exp.log_figure(
             figure_name="ROC Curve", figure=roc_curve_fig, overwrite=True
         )
 
+    def _log_precision_recall_curve(
+        self, pred_probs: np.ndarray, encoded_pos_class_label: int
+    ) -> None:
+        """Logs precision-recall curve for the best model on the validation set.
+
+        Args:
+            pred_probs (np.ndarray): predicted probabilities of the positive class.
+            encoded_pos_class_label (int): encoded positive class label.
+
+        Returns:
+            None
+        """
+
         prec_recall_fig = self.plot_precision_recall_curve(
             y_true=self.valid_class,
-            y_pred=pred_valid_probs[:, self.encoded_pos_class_label],
+            y_pred=pred_probs[:, encoded_pos_class_label],
             fig_size=(6, 6),
         )
         self.comet_exp.log_figure(
             figure_name="Precision-Recall Curve", figure=prec_recall_fig, overwrite=True
         )
 
-        # Plot cumulative gain and lift plot
+    def _log_cumulative_gains(
+        self, pred_probs: np.ndarray, valid_class: np.ndarray
+    ) -> None:
+        """Logs cumulative gains curve for the best model on the validation set.
+
+        Args:
+            pred_probs (np.ndarray): predicted probabilities of the positive class.
+            valid_class (np.ndarray): validation class labels.
+
+        Returns:
+            None
+        """
+
         cum_gain_fig = self.plot_cumulative_gains(
-            y_true=self.valid_class, y_pred=pred_valid_probs, fig_size=(6, 6)
+            y_true=valid_class, y_pred=pred_probs, fig_size=(6, 6)
         )
         self.comet_exp.log_figure(
             figure_name="Cumulative Gain", figure=cum_gain_fig, overwrite=True
         )
 
+    def _log_lift_curve(self, pred_probs: np.ndarray, valid_class: np.ndarray) -> None:
+        """Logs lift curve for the best model on the validation set.
+
+        Args:
+            pred_probs (np.ndarray): predicted probabilities of the positive class.
+            valid_class (np.ndarray): validation class labels.
+
+        Returns:
+            None
+        """
+
         lift_curve_fig = self.plot_lift_curve(
-            y_true=self.valid_class, y_pred=pred_valid_probs, fig_size=(6, 6)
+            y_true=valid_class, y_pred=pred_probs, fig_size=(6, 6)
         )
         self.comet_exp.log_figure(
             figure_name="Lift Curve", figure=lift_curve_fig, overwrite=True
         )
-
-        return train_scores, valid_scores
 
     @staticmethod
     def calc_expected_calibration_error(
