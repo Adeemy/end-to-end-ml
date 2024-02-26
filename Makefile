@@ -3,12 +3,13 @@
 # Update requirements.txt
 #https://stackoverflow.com/questions/62496083/pipreqs-has-the-unicode-error-under-a-virtualenv
 update_reqs:
+	pip install pipreqs
 	pipreqs --force --ignore bin,etc,include,lib,lib64 "./"
 
 # Install packages, format code, sort imports, and run unit tests
 install:
 	pip install --upgrade pip &&\
-		pip install black[jupyter] pytest pylint isort pytest-cov &&\
+		pip install black[jupyter] pytest pylint isort pytest-cov pytest-mock &&\
 		pip install -r requirements.txt
 
 isort:
