@@ -76,7 +76,7 @@ randomforest:
     class_weight: "balanced"
 
   search_space_params: # Search space parameters for hyperparams optimization
-    max_features: [1, "n_features", false]
+    max_features: [1, 10, false]
     min_samples_leaf: [3, 8, false]
     min_samples_split: [0, 1, false]
     max_depth: [3, 8, false]
