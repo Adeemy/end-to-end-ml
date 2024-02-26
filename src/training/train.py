@@ -293,18 +293,17 @@ def main(
             valid_class=valid_class,
             class_encoder=class_encoder,
             artifacts_path=artifacts_dir,
+            lr_calib_pipeline=lr_calibrated_pipeline,
+            rf_calib_pipeline=rf_calibrated_pipeline,
+            lgbm_calib_pipeline=lgbm_calibrated_pipeline,
+            xgb_calib_pipeline=xgb_calibrated_pipeline,
             voting_rule=ve_voting_rule,
             encoded_pos_class_label=encoded_positive_class_label,
             fbeta_score_beta=f_beta_score_beta_val,
             registered_model_name=ve_registered_model_name,
         )
 
-        _, ve_experiment = ve_creator.create_voting_ensemble(
-            lr_calib_pipeline=lr_calibrated_pipeline,
-            rf_calib_pipeline=rf_calibrated_pipeline,
-            lgbm_calib_pipeline=lgbm_calibrated_pipeline,
-            xgb_calib_pipeline=xgb_calibrated_pipeline,
-        )
+        _, ve_experiment = ve_creator.create_voting_ensemble()
 
     else:
         ve_experiment = None

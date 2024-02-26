@@ -105,7 +105,7 @@ class ModelTrainer:
             comet_exp = Experiment(
                 api_key=comet_api_key, project_name=comet_project_name
             )
-            comet_exp.log_code(folder="training/")
+            comet_exp.log_code(folder=".")
             comet_exp.set_name(comet_exp_name)
         except ValueError as e:
             raise ValueError(f"Comet experiment creation error --> {e}") from e
@@ -510,6 +510,10 @@ class VotingEnsembleCreator:
         valid_class: np.ndarray,
         class_encoder: LabelEncoder,
         artifacts_path: str,
+        lr_calib_pipeline: Pipeline = None,
+        rf_calib_pipeline: Pipeline = None,
+        lgbm_calib_pipeline: Pipeline = None,
+        xgb_calib_pipeline: Pipeline = None,
         voting_rule: Literal["hard", "soft"] = "soft",
         encoded_pos_class_label: int = 1,
         fbeta_score_beta: float = 1.0,
@@ -525,6 +529,10 @@ class VotingEnsembleCreator:
         self.valid_class = valid_class
         self.class_encoder = class_encoder
         self.artifacts_path = artifacts_path
+        self.lr_calib_pipeline = lr_calib_pipeline
+        self.rf_calib_pipeline = rf_calib_pipeline
+        self.lgbm_calib_pipeline = lgbm_calib_pipeline
+        self.xgb_calib_pipeline = xgb_calib_pipeline
         self.voting_rule = voting_rule
         self.encoded_pos_class_label = encoded_pos_class_label
         self.fbeta_score_beta = fbeta_score_beta
@@ -553,7 +561,7 @@ class VotingEnsembleCreator:
             comet_exp = Experiment(
                 api_key=comet_api_key, project_name=comet_project_name
             )
-            comet_exp.log_code(folder="training/")
+            comet_exp.log_code(folder=".")
             comet_exp.set_name(comet_exp_name)
         except ValueError as e:
             raise ValueError(f"Comet experiment creation error --> {e}") from e
@@ -561,18 +569,11 @@ class VotingEnsembleCreator:
 
     def _get_base_models(
         self,
-        lr_calib_pipeline: Pipeline,
-        rf_calib_pipeline: Pipeline,
-        lgbm_calib_pipeline: Pipeline,
-        xgb_calib_pipeline: Pipeline,
     ) -> list:
         """Creates a list of base models for the voting ensemble.
 
         Args:
-            lr_calib_pipeline (Pipeline): calibrated pipeline for logistic regression model,
-            rf_calib_pipeline (Pipeline): calibrated pipeline for random forest model,
-            lgbm_calib_pipeline (Pipeline): calibrated pipeline for LightGBM model,
-            xgb_calib_pipeline (Pipeline): calibrated pipeline for XGBoost model,
+            None
 
         Returns:
             base_models (list): list of base models.
@@ -585,25 +586,25 @@ class VotingEnsembleCreator:
         # Note: some base models may not exist if all its losses are zero.
         base_models = []
         try:
-            model_lr = lr_calib_pipeline.named_steps["classifier"]
+            model_lr = self.lr_calib_pipeline.named_steps["classifier"]
             base_models.append(("LR", model_lr))
         except Exception:  # pylint: disable=W0718
             print("RF model does not exist or not in required type!")
 
         try:
-            model_rf = rf_calib_pipeline.named_steps["classifier"]
+            model_rf = self.rf_calib_pipeline.named_steps["classifier"]
             base_models.append(("RF", model_rf))
         except Exception:  # pylint: disable=W0718
             print("RF model does not exist or not in required type!")
 
         try:
-            model_lgbm = lgbm_calib_pipeline.named_steps["classifier"]
+            model_lgbm = self.lgbm_calib_pipeline.named_steps["classifier"]
             base_models.append(("LightGBM", model_lgbm))
         except Exception:  # pylint: disable=W0718
             print("LightGBM model does not exist or not in required type!")
 
         try:
-            model_xgb = xgb_calib_pipeline.named_steps["classifier"]
+            model_xgb = self.xgb_calib_pipeline.named_steps["classifier"]
             base_models.append(("XGBoost", model_xgb))
         except Exception:  # pylint: disable=W0718
             print("XGBoost model does not exist or not in required type!")
@@ -617,19 +618,12 @@ class VotingEnsembleCreator:
 
     def _copy_data_transform_pipeline(
         self,
-        lr_calib_pipeline: Pipeline,
-        rf_calib_pipeline: Pipeline,
-        lgbm_calib_pipeline: Pipeline,
-        xgb_calib_pipeline: Pipeline,
     ) -> Pipeline:
         """Copies (deep copy) the data transformation pipeline from the first base
         model. It assumes all base models have the same data transformation pipeline.
 
         Args:
-            lr_calib_pipeline (Pipeline): calibrated pipeline for logistic regression model,
-            rf_calib_pipeline (Pipeline): calibrated pipeline for random forest model,
-            lgbm_calib_pipeline (Pipeline): calibrated pipeline for LightGBM model,
-            xgb_calib_pipeline (Pipeline): calibrated pipeline for XGBoost model.
+            None
 
         Returns:
             data_pipeline (Pipeline): data transformation pipeline object.
@@ -640,24 +634,27 @@ class VotingEnsembleCreator:
 
         # Copy fitted data transformation steps from any base pipeline
         if "lr_calib_pipeline" in locals():
-            data_pipeline = deepcopy(lr_calib_pipeline)
+            data_pipeline = deepcopy(self.lr_calib_pipeline)
         elif "rf_calib_pipeline" in locals():
-            data_pipeline = deepcopy(rf_calib_pipeline)
+            data_pipeline = deepcopy(self.rf_calib_pipeline)
         elif "lgbm_calib_pipeline" in locals():
-            data_pipeline = deepcopy(lgbm_calib_pipeline)
+            data_pipeline = deepcopy(self.lgbm_calib_pipeline)
         elif "xgb_calib_pipeline" in locals():
-            data_pipeline = deepcopy(xgb_calib_pipeline)
+            data_pipeline = deepcopy(self.xgb_calib_pipeline)
         else:
             raise ValueError("No base model pipelines found!")
 
         return data_pipeline
 
-    def _create_fitted_ensemble_pipeline(self, base_models: list) -> Pipeline:
+    def _create_fitted_ensemble_pipeline(
+        self,
+        base_models: list,
+    ) -> Pipeline:
         """Creates a voting ensemble pipeline (data transformation pipeline and
         base models) and fits the pipeline to the training set.
 
         Args:
-            base_models (list): list of base models.
+            base_models (list): list of base models,
 
         Returns:
             ve_model (VotingClassifier): voting ensemble classifier object,
@@ -667,7 +664,7 @@ class VotingEnsembleCreator:
         ve_model = VotingClassifier(estimators=base_models, voting=self.voting_rule)
         if len(base_models) > 1:
             # Copy data transformation pipeline from a base model (all must have same data pipeline)
-            ve_pipeline = self._copy_data_transform_pipeline(base_models)
+            ve_pipeline = self._copy_data_transform_pipeline()
 
             # Drop base classifier and recreate pipeline by adding voing ensemble
             # with fitted base classfiers
@@ -797,10 +794,6 @@ class VotingEnsembleCreator:
 
     def create_voting_ensemble(
         self,
-        lr_calib_pipeline: Pipeline = None,
-        rf_calib_pipeline: Pipeline = None,
-        lgbm_calib_pipeline: Pipeline = None,
-        xgb_calib_pipeline: Pipeline = None,
     ) -> Pipeline:
         """Creates a voting ensemble classifier using the base models and evaluates the model
         using ModelEvaluator class. It logs the model metrics to Comet experiment.
@@ -828,12 +821,7 @@ class VotingEnsembleCreator:
 
         try:
             # Create voting ensemble pipeline (data transformation pipeline and base models)
-            base_models = self._get_base_models(
-                lr_calib_pipeline=lr_calib_pipeline,
-                rf_calib_pipeline=rf_calib_pipeline,
-                lgbm_calib_pipeline=lgbm_calib_pipeline,
-                xgb_calib_pipeline=xgb_calib_pipeline,
-            )
+            base_models = self._get_base_models()
             ve_pipeline = self._create_fitted_ensemble_pipeline(base_models)
 
             # Evaluate voting ensemble classifier

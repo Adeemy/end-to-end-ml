@@ -844,14 +844,32 @@ class ModelEvaluator(ModelOptimizer):
         )
 
         # Extract original class label names
-        original_class_labels = self._get_original_class_labels(class_encoder)
+        (
+            original_train_class,
+            pred_original_train_class,
+            original_class_labels,
+        ) = self._get_original_class_labels(
+            true_class=self.train_class,
+            pred_class=pred_train_class,
+            class_encoder=class_encoder,
+        )
+
+        (
+            original_valid_class,
+            pred_original_valid_class,
+            _,
+        ) = self._get_original_class_labels(
+            true_class=self.valid_class,
+            pred_class=pred_valid_class,
+            class_encoder=class_encoder,
+        )
 
         # Log confusion matrices
         self._log_confusion_matrix(
-            original_train_class=self.train_class,
-            pred_original_train_class=pred_train_class,
-            original_valid_class=self.valid_class,
-            pred_original_valid_class=pred_valid_class,
+            original_train_class=original_train_class,
+            pred_original_train_class=pred_original_train_class,
+            original_valid_class=original_valid_class,
+            pred_original_valid_class=pred_original_valid_class,
             original_class_labels=original_class_labels,
         )
 
@@ -879,20 +897,36 @@ class ModelEvaluator(ModelOptimizer):
 
         return pred_class
 
-    def _get_original_class_labels(self, class_encoder: Optional[LabelEncoder]) -> list:
+    def _get_original_class_labels(
+        self,
+        true_class: np.ndarray,
+        pred_class: np.ndarray,
+        class_encoder: Optional[LabelEncoder],
+    ) -> list:
         """Returns original class labels from encoded class labels.
 
         Args:
+            pred_class (np.ndarray): predicted class labels.
             class_encoder (LabelEncoder): class encoder object.
 
         Returns:
             original_class_labels (list): list of original class labels.
         """
 
-        if class_encoder is None:
-            return list(self.pipeline.classes_)
+        # Extract original class label names, which can be expressive, i.e., not encoded.
+        if class_encoder is None:  # Class labels are already encoded
+            original_class_labels = self.pipeline.classes_
+
         else:
-            return list(class_encoder.inverse_transform(self.pipeline.classes_))
+            original_class_labels = list(
+                class_encoder.inverse_transform(self.pipeline.classes_)
+            )
+
+            # Extract expressive class names for confusion matrix
+            true_original_class = class_encoder.inverse_transform(true_class)
+            pred_original_class = class_encoder.inverse_transform(pred_class)
+
+        return true_original_class, pred_original_class, original_class_labels
 
     def _log_confusion_matrix(
         self,
@@ -903,14 +937,15 @@ class ModelEvaluator(ModelOptimizer):
         original_class_labels: list,
     ) -> None:
         """Logs confusion matrices (normalized and non-normalized) for the best model on
-        both the training and validation sets.
+        both the training and validation sets using expressive labels, e.g., Y/N, instead
+        of encoded class labels.
 
         Args:
-            original_train_class (np.ndarray): original class labels for training set.
-            pred_original_train_class (np.ndarray): predicted class labels for training set.
-            original_valid_class (np.ndarray): original class labels for validation set.
-            pred_original_valid_class (np.ndarray): predicted class labels for validation set.
-            original_class_labels (list): list of original class labels.
+            original_train_class (np.ndarray): true class labels for training set (expressive labels).
+            pred_original_train_class (np.ndarray): predicted class labels for training set (expressive labels).
+            original_valid_class (np.ndarray): true class labels for validation set (expressive labels).
+            pred_original_valid_class (np.ndarray): predicted class labels for validation set (expressive labels).
+            original_class_labels (list): list of expressive class labels.
 
         Returns:
             None
