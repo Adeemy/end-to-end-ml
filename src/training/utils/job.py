@@ -581,19 +581,32 @@ class VotingEnsembleCreator:
             ValueError: if less than two base models are provided.
         """
 
+        # Conditionally add each base model to the list
+        # Note: some base models may not exist if all its losses are zero.
         base_models = []
-        if lr_calib_pipeline:
+        try:
             model_lr = lr_calib_pipeline.named_steps["classifier"]
             base_models.append(("LR", model_lr))
-        if rf_calib_pipeline:
+        except Exception:  # pylint: disable=W0718
+            print("RF model does not exist or not in required type!")
+
+        try:
             model_rf = rf_calib_pipeline.named_steps["classifier"]
             base_models.append(("RF", model_rf))
-        if lgbm_calib_pipeline:
+        except Exception:  # pylint: disable=W0718
+            print("RF model does not exist or not in required type!")
+
+        try:
             model_lgbm = lgbm_calib_pipeline.named_steps["classifier"]
             base_models.append(("LightGBM", model_lgbm))
-        if xgb_calib_pipeline:
+        except Exception:  # pylint: disable=W0718
+            print("LightGBM model does not exist or not in required type!")
+
+        try:
             model_xgb = xgb_calib_pipeline.named_steps["classifier"]
             base_models.append(("XGBoost", model_xgb))
+        except Exception:  # pylint: disable=W0718
+            print("XGBoost model does not exist or not in required type!")
 
         if len(base_models) < 2:
             raise ValueError(
@@ -602,19 +615,41 @@ class VotingEnsembleCreator:
 
         return base_models
 
-    def _copy_data_transform_pipeline(self, base_models: list) -> Pipeline:
+    def _copy_data_transform_pipeline(
+        self,
+        lr_calib_pipeline: Pipeline,
+        rf_calib_pipeline: Pipeline,
+        lgbm_calib_pipeline: Pipeline,
+        xgb_calib_pipeline: Pipeline,
+    ) -> Pipeline:
         """Copies (deep copy) the data transformation pipeline from the first base
         model. It assumes all base models have the same data transformation pipeline.
 
         Args:
-            base_models (list): list of base models.
+            lr_calib_pipeline (Pipeline): calibrated pipeline for logistic regression model,
+            rf_calib_pipeline (Pipeline): calibrated pipeline for random forest model,
+            lgbm_calib_pipeline (Pipeline): calibrated pipeline for LightGBM model,
+            xgb_calib_pipeline (Pipeline): calibrated pipeline for XGBoost model.
 
         Returns:
             data_pipeline (Pipeline): data transformation pipeline object.
+
+        Raises:
+            ValueError: if no base model pipelines are found.
         """
 
-        data_pipeline = base_models[0][1].steps[:-1]
-        data_pipeline = deepcopy(data_pipeline)
+        # Copy fitted data transformation steps from any base pipeline
+        if "lr_calib_pipeline" in locals():
+            data_pipeline = deepcopy(lr_calib_pipeline)
+        elif "rf_calib_pipeline" in locals():
+            data_pipeline = deepcopy(rf_calib_pipeline)
+        elif "lgbm_calib_pipeline" in locals():
+            data_pipeline = deepcopy(lgbm_calib_pipeline)
+        elif "xgb_calib_pipeline" in locals():
+            data_pipeline = deepcopy(xgb_calib_pipeline)
+        else:
+            raise ValueError("No base model pipelines found!")
+
         return data_pipeline
 
     def _create_fitted_ensemble_pipeline(self, base_models: list) -> Pipeline:
@@ -630,11 +665,24 @@ class VotingEnsembleCreator:
         """
 
         ve_model = VotingClassifier(estimators=base_models, voting=self.voting_rule)
-        ve_pipeline = None
         if len(base_models) > 1:
+            # Copy data transformation pipeline from a base model (all must have same data pipeline)
             ve_pipeline = self._copy_data_transform_pipeline(base_models)
-            ve_pipeline.steps.append(["classifier", ve_model])
+
+            # Drop base classifier and recreate pipeline by adding voing ensemble
+            # with fitted base classfiers
+            _ = ve_pipeline.steps.pop(len(ve_pipeline) - 1)
+            ve_pipeline.steps.insert(
+                len(ve_pipeline) + 1,
+                ["classifier", ve_model],
+            )
             ve_pipeline.fit(self.train_features, self.train_class)
+
+        else:
+            raise ValueError(
+                "At least two base models are needed for a voting ensemble."
+            )
+
         return ve_pipeline
 
     def _evaluate_model(
