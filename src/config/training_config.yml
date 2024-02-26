@@ -78,7 +78,7 @@ randomforest:
   search_space_params: # Search space parameters for hyperparams optimization
     max_features: [1, 10, false]
     min_samples_leaf: [3, 8, false]
-    min_samples_split: [0, 1, false]
+    min_samples_split: [2, 1, false]
     max_depth: [3, 8, false]
     criterion: [["gini", "entropy"], false]
     n_estimators: [20, 100, false]
