@@ -60,7 +60,7 @@ class ModelOptimizer:
     # List of supported models in this class
     # Note: this private variable shouldn't be mutated outside the class. It
     # should be updated when a new model is added to the class, which requires
-    # adding its search space definition to generate_search_space method.
+    # adding its search space definition to generate_trial_params method.
     _supported_models = (
         "LogisticRegression",
         "RandomForestClassifier",
@@ -105,14 +105,15 @@ class ModelOptimizer:
                 self.classifier_name in self._supported_models
             ), f"Supported models are: {self._supported_models}. Got {self.classifier_name}!"
 
-    def generate_search_space(self, trial: optuna.trial.Trial) -> dict:
-        """Returns search space using params specified in config.
+    def generate_trial_params(self, trial: optuna.trial.Trial) -> dict:
+        """Samples model parameters values from search space as specified in
+        config file.
 
         Args:
             trial (optuna.trial.Trial): an optuna trial object.
 
-        Raises:
-            AssertionError: if the specified model name is not supported.
+        Returns:
+            params (dict): a dictionary of model parameters and their values.
         """
 
         params = {}
@@ -125,8 +126,6 @@ class ModelOptimizer:
                 params[param] = trial.suggest_float(
                     param, values[0], values[1], log=values[2]
                 )
-
-        print(f"params:{params}")
 
         return params
 
@@ -178,8 +177,10 @@ class ModelOptimizer:
         self,
         trial: optuna.trial.Trial,
     ) -> float:
-        """Performs hyperparameters optimization for a specified model, where the
-        search metric is fbeta score.
+        """Objective function that evaluates the provided hyperparameters for a
+        specified model, where the search metric being optimized is fbeta score.
+        A trial hyperparameters are sampled from the search space using generate_trial_params
+        method and then the model is fitted and evaluated on the validation set.
 
         Args:
             trial (optuna.trial.Trial): an optuna trial object.
@@ -189,7 +190,7 @@ class ModelOptimizer:
         """
 
         # Define parameters search space
-        params = self.generate_search_space(trial=trial)
+        params = self.generate_trial_params(trial=trial)
 
         # Fit model and calculate training score
         self.model.set_params(**params)
