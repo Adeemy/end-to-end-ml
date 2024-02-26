@@ -109,4 +109,4 @@ includedmodels:
     include_random_forest: true # Should Random Forest model be included in training
     include_lightgbm: false # Should LightGBM model be included in training
     include_xgboost: false # Should XGBoost model be included in training
-    include_voting_ensemble: false # Should Voting Ensemble model be included in training
+    include_voting_ensemble: true # Should Voting Ensemble model be included in training
