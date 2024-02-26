@@ -180,7 +180,8 @@ class ModelOptimizer:
         """Objective function that evaluates the provided hyperparameters for a
         specified model, where the search metric being optimized is fbeta score.
         A trial hyperparameters are sampled from the search space using generate_trial_params
-        method and then the model is fitted and evaluated on the validation set.
+        method and then the model is fitted on training set and evaluated on the
+        validation set.
 
         Args:
             trial (optuna.trial.Trial): an optuna trial object.
@@ -228,7 +229,7 @@ class ModelOptimizer:
         max_search_iters: int = 100,
         model_opt_timeout_secs: int = 180,
     ) -> optuna.study.Study:
-        """Tunes model hyperparameters using Optuna package.
+        """Performs hyperparameters optimization using Optuna package.
 
         Args:
             max_search_iters (int): maximum number of search iterations.
