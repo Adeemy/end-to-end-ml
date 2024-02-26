@@ -97,6 +97,11 @@ def main(
     lgbm_params = config.params["lgbm"]["params"]
     xgb_params = config.params["xgboost"]["params"]
 
+    lr_search_space_params = config.params["logisticregression"]["search_space_params"]
+    rf_search_space_params = config.params["randomforest"]["search_space_params"]
+    lgbm_search_space_params = config.params["lgbm"]["search_space_params"]
+    xgb_search_space_params = config.params["xgboost"]["search_space_params"]
+
     # Import data splits
     training_set = pd.read_parquet(
         data_dir / train_file_name,
@@ -213,6 +218,7 @@ def main(
             comet_project_name=project_name,
             comet_exp_name=f"logistic_regression_{datetime.now()}",
             model=LogisticRegression(**lr_params),
+            search_space_params=lr_search_space_params,
             max_search_iters=search_max_iters,
             optimize_in_parallel=True if parallel_jobs_count > 1 else False,
             n_parallel_jobs=parallel_jobs_count,
@@ -231,6 +237,7 @@ def main(
             comet_project_name=project_name,
             comet_exp_name=f"random_forest_{datetime.now()}",
             model=RandomForestClassifier(**rf_params),
+            search_space_params=rf_search_space_params,
             max_search_iters=search_max_iters,
             optimize_in_parallel=True if parallel_jobs_count > 1 else False,
             n_parallel_jobs=parallel_jobs_count,
@@ -249,6 +256,7 @@ def main(
             comet_project_name=project_name,
             comet_exp_name=f"random_forest_{datetime.now()}",
             model=LGBMClassifier(**lgbm_params),
+            search_space_params=lgbm_search_space_params,
             max_search_iters=search_max_iters,
             optimize_in_parallel=True if parallel_jobs_count > 1 else False,
             n_parallel_jobs=parallel_jobs_count,
@@ -270,6 +278,7 @@ def main(
                 scale_pos_weight=sum(train_class == 0) / sum(train_class == 1),
                 **xgb_params,
             ),
+            search_space_params=xgb_search_space_params,
             max_search_iters=search_max_iters,
             optimize_in_parallel=True if parallel_jobs_count > 1 else False,
             n_parallel_jobs=parallel_jobs_count,

@@ -77,6 +77,7 @@ class ModelOptimizer:
         valid_class: np.ndarray,
         n_features: int,
         model: Callable,
+        search_space_params: dict,
         fbeta_score_beta: float = 1.0,
         encoded_pos_class_label: int = 1,
         is_voting_ensemble: bool = False,
@@ -93,6 +94,7 @@ class ModelOptimizer:
         self.valid_class = valid_class
         self.n_features = n_features
         self.model = model
+        self.search_space_params = search_space_params
         self.fbeta_score_beta = fbeta_score_beta
         self.encoded_pos_class_label = encoded_pos_class_label
         self.is_voting_ensemble = is_voting_ensemble
@@ -104,7 +106,7 @@ class ModelOptimizer:
             ), f"Supported models are: {self._supported_models}. Got {self.classifier_name}!"
 
     def generate_search_space(self, trial: optuna.trial.Trial) -> dict:
-        """Returns search space provided model name.
+        """Returns search space using params specified in config.
 
         Args:
             trial (optuna.trial.Trial): an optuna trial object.
@@ -113,79 +115,18 @@ class ModelOptimizer:
             AssertionError: if the specified model name is not supported.
         """
 
-        if self.classifier_name == "LogisticRegression":
-            params = {
-                "C": trial.suggest_float("C", 0.001, 1000, log=False),
-                "l1_ratio": trial.suggest_float(
-                    "l1_ratio", 0.001, 1, log=False
-                ),  # alpha param in elastic net, 0 means L2 and 1 means L1.
-            }
+        params = {}
+        for param, values in self.search_space_params.items():
+            if isinstance(values[0], list):
+                params[param] = trial.suggest_categorical(param, values[0])
+            elif isinstance(values[0], int):
+                params[param] = trial.suggest_int(param, values[0], values[1])
+            else:
+                params[param] = trial.suggest_float(
+                    param, values[0], values[1], log=values[2]
+                )
 
-        elif self.classifier_name == "RandomForestClassifier":
-            params = {
-                "max_features": trial.suggest_int(
-                    "max_features",
-                    int(max(1, 0.1 * self.n_features)),
-                    self.n_features,
-                ),
-                "min_samples_leaf": trial.suggest_int("min_samples_leaf", 3, 8),
-                "min_samples_split": trial.suggest_float(
-                    "min_samples_split", 0, 1, log=False
-                ),
-                "max_depth": trial.suggest_int("max_depth", 3, 8),
-                "criterion": trial.suggest_categorical(
-                    "criterion", ["gini", "entropy"]
-                ),
-                "n_estimators": trial.suggest_int("n_estimators", 20, 100),
-            }
-
-        elif self.classifier_name == "LGBMClassifier":
-            params = {
-                "max_depth": trial.suggest_int("max_depth", 3, 8),
-                "max_bin": trial.suggest_int("max_depth", 100, 512),
-                "min_child_weight": trial.suggest_float(
-                    "min_child_weight", 1e-5, 1e2, log=True
-                ),  # Min. sum of instance weight (hessian) needed in a child.
-                "subsample": trial.suggest_float(
-                    "subsample", 0.5, 1, log=False
-                ),  # Subsample ratio of the training instances.
-                "colsample_bytree": trial.suggest_float(
-                    "colsample_bytree", 0.3, 1, log=False
-                ),  # Subsample ratio of columns when constructing each tree.
-                "lambda_l1": trial.suggest_float("lambda_l1", 1e-8, 10.0, log=True),
-                "lambda_l2": trial.suggest_float("lambda_l2", 1e-8, 10.0, log=True),
-                "learning_rate": trial.suggest_float(
-                    "learning_rate", 1e-4, 1e-1, log=True
-                ),
-                "n_estimators": trial.suggest_int("n_estimators", 20, 100),
-            }
-
-        elif self.classifier_name == "XGBClassifier":
-            params = {
-                "max_depth": trial.suggest_int("max_depth", 3, 8),
-                "min_child_weight": trial.suggest_float(
-                    "min_child_weight", 1e-5, 1e2, log=True
-                ),  # Min. sum of instance weight (hessian) needed in a child.
-                "subsample": trial.suggest_float(
-                    "subsample", 0.5, 1, log=False
-                ),  # Subsample ratio of the training instances.
-                "colsample_bytree": trial.suggest_float(
-                    "colsample_bytree", 0.5, 1, log=False
-                ),  # Subsample ratio of columns when constructing each tree.
-                "reg_alpha": trial.suggest_float(
-                    "reg_alpha", 0, 10, log=False
-                ),  # L1 regularization term.
-                "reg_lambda": trial.suggest_float(
-                    "reg_lambda", 1, 10, log=False
-                ),  # L2 regularization term.
-                "gamma": trial.suggest_float(
-                    "gamma", 1e-5, 1e2, log=True
-                ),  # Minimum loss reduction required to make a further partition on a leaf node.
-                "learning_rate": trial.suggest_float(
-                    "learning_rate", 1e-5, 1e2, log=True
-                ),
-                "n_estimators": trial.suggest_int("n_estimators", 20, 100),
-            }
+        print(f"params:{params}")
 
         return params
 
@@ -476,6 +417,7 @@ class ModelEvaluator(ModelOptimizer):
             model=pipeline.named_steps["classifier"]
             if is_voting_ensemble
             else pipeline.named_steps["classifier"],
+            search_space_params=None,
             is_voting_ensemble=is_voting_ensemble,
         )
 

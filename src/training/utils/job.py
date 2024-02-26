@@ -115,6 +115,7 @@ class ModelTrainer:
         self,
         comet_exp: Experiment,
         model: Callable,
+        search_space_params: dict,
         max_search_iters: int = 100,
         optimize_in_parallel: bool = False,
         n_parallel_jobs: int = 4,
@@ -126,6 +127,7 @@ class ModelTrainer:
         Args:
             comet_exp (Experiment): Comet experiment object,
             model (Callable): model object that implements the fit and predict methods,
+            search_space_params (dict): hyperparameter search space for the model,
             max_search_iters (int, optional): maximum number of iterations for the hyperparameter
                 optimization algorithm. Default to 100,
             optimize_in_parallel (bool, optional): should optimization be run in parallel. Defaults
@@ -150,6 +152,7 @@ class ModelTrainer:
             valid_class=self.valid_class,
             n_features=self.n_features,
             model=model,
+            search_space_params=search_space_params,
             fbeta_score_beta=self.fbeta_score_beta,
             encoded_pos_class_label=self.encoded_pos_class_label,
             is_voting_ensemble=is_voting_ensemble,
@@ -352,6 +355,7 @@ class ModelTrainer:
         comet_project_name: str,
         comet_exp_name: str,
         model: Callable,
+        search_space_params: dict,
         max_search_iters: int = 100,
         optimize_in_parallel: bool = False,
         n_parallel_jobs: int = 4,
@@ -372,6 +376,7 @@ class ModelTrainer:
             comet_project_name (str): Comet project name,
             comet_exp_name (str)L Comet experiment name,
             model (Callable): model object that implements the fit and predict methods.
+            search_space_params (dict): hyperparameter search space for the model.
             artifacts_path (str): path to save training artificats, e.g., .pkl and .png files.
             max_search_iters (int, optional): maximum number of iterations for the hyperparameter
                 optimization algorithm. Default to 100.
@@ -412,6 +417,7 @@ class ModelTrainer:
             study, optimizer = self._optimize_model(
                 comet_exp=comet_exp,
                 model=model,
+                search_space_params=search_space_params,
                 max_search_iters=max_search_iters,
                 optimize_in_parallel=optimize_in_parallel,
                 n_parallel_jobs=n_parallel_jobs,

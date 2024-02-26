@@ -59,20 +59,32 @@ train:
     deployment_score_thresh: 0.8 # Min. score for the best model acheive to be deployed in production
 
 logisticregression:
-  params:
+  params: # Fixed params for logistic regression
     n_jobs: -1
     class_weight: "balanced"
     solver: "saga"
     penalty: "elasticnet"
     max_iter: 200
 
+  search_space_params: # Search space parameters for hyperparams optimization
+    C: [0.001, 1000, false]
+    l1_ratio: [0.001, 1, false]
+
 randomforest:
-  params:
+  params: # Fixed params for logistic regression
     n_jobs: -1
     class_weight: "balanced"
 
+  search_space_params: # Search space parameters for hyperparams optimization
+    max_features: [1, "n_features", false]
+    min_samples_leaf: [3, 8, false]
+    min_samples_split: [0, 1, false]
+    max_depth: [3, 8, false]
+    criterion: [["gini", "entropy"], false]
+    n_estimators: [20, 100, false]
+
 lgbm:
-  params:
+  params: # Fixed params for logistic regression
     objective: "binary"
     n_jobs: -1 # -1 Means use all threads
     min_data_in_leaf: 100 # Larger values speeds up training.
@@ -80,9 +92,31 @@ lgbm:
     min_split_gain: 1e-8 # Larger values speeds up training.
     class_weight: "balanced" # Adjusts weights inversely proportional to class freqs
 
+  search_space_params: # Search space parameters for hyperparams optimization
+    max_depth: [3, 8, false]
+    max_bin: [100, 512, false]
+    min_child_weight: [1e-5, 1e2, true]
+    subsample: [0.5, 1, false]
+    colsample_bytree: [0.3, 1, false]
+    lambda_l1: [1e-8, 10.0, true]
+    lambda_l2: [1e-8, 10.0, true]
+    learning_rate: [1e-4, 1e-1, true]
+    n_estimators: [20, 100, false]
+
 xgboost:
-  params:
+  params: # Fixed params for logistic regression
     objective: "binary:logistic"
+
+  search_space_params: # Search space parameters for hyperparams optimization
+    max_depth: [3, 8, false]
+    min_child_weight: [1e-5, 1e2, true]
+    subsample: [0.5, 1, false]
+    colsample_bytree: [0.5, 1, false]
+    reg_alpha: [0, 10, false]
+    reg_lambda: [1, 10, false]
+    gamma: [1e-5, 1e2, true]
+    learning_rate: [1e-5, 1e2, true]
+    n_estimators: [20, 100, false]
 
 files:
   params:
