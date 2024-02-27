@@ -386,7 +386,7 @@ class ModelEvaluator(ModelOptimizer):
     importance plots and confusion matrices that are not produced
     by ModelOptimizer class.
 
-    Args:
+    Attributes:
         ModelOptimizer (ModelOptimizer): ModelOptimizer class.
         comet_exp (Experiment): Comet experiment object.
         pipeline (Pipeline): fitted pipeline.
@@ -788,34 +788,37 @@ class ModelEvaluator(ModelOptimizer):
         )
 
         # Extract original class label names
-        (
-            original_train_class,
-            pred_original_train_class,
-            original_class_labels,
-        ) = self._get_original_class_labels(
-            true_class=self.train_class,
-            pred_class=pred_train_class,
-            class_encoder=class_encoder,
-        )
+        # Note: only if class_encoder is provided so expressive class
+        # labels can be used for confusion matrix.
+        if class_encoder is not None:
+            (
+                original_train_class,
+                pred_original_train_class,
+                original_class_labels,
+            ) = self._get_original_class_labels(
+                true_class=self.train_class,
+                pred_class=pred_train_class,
+                class_encoder=class_encoder,
+            )
 
-        (
-            original_valid_class,
-            pred_original_valid_class,
-            _,
-        ) = self._get_original_class_labels(
-            true_class=self.valid_class,
-            pred_class=pred_valid_class,
-            class_encoder=class_encoder,
-        )
+            (
+                original_valid_class,
+                pred_original_valid_class,
+                _,
+            ) = self._get_original_class_labels(
+                true_class=self.valid_class,
+                pred_class=pred_valid_class,
+                class_encoder=class_encoder,
+            )
 
-        # Log confusion matrices
-        self._log_confusion_matrix(
-            original_train_class=original_train_class,
-            pred_original_train_class=pred_original_train_class,
-            original_valid_class=original_valid_class,
-            pred_original_valid_class=pred_original_valid_class,
-            original_class_labels=original_class_labels,
-        )
+            # Log confusion matrices
+            self._log_confusion_matrix(
+                original_train_class=original_train_class,
+                pred_original_train_class=pred_original_train_class,
+                original_valid_class=original_valid_class,
+                pred_original_valid_class=pred_original_valid_class,
+                original_class_labels=original_class_labels,
+            )
 
         # Log calibration curve and plots
         self._log_calibration_curve(pred_valid_probs)
@@ -845,7 +848,7 @@ class ModelEvaluator(ModelOptimizer):
         self,
         true_class: np.ndarray,
         pred_class: np.ndarray,
-        class_encoder: Optional[LabelEncoder],
+        class_encoder: LabelEncoder,
     ) -> list:
         """Returns original class labels from encoded class labels.
 
@@ -858,17 +861,13 @@ class ModelEvaluator(ModelOptimizer):
         """
 
         # Extract original class label names, which can be expressive, i.e., not encoded.
-        if class_encoder is None:  # Class labels are already encoded
-            original_class_labels = self.pipeline.classes_
+        original_class_labels = list(
+            class_encoder.inverse_transform(self.pipeline.classes_)
+        )
 
-        else:
-            original_class_labels = list(
-                class_encoder.inverse_transform(self.pipeline.classes_)
-            )
-
-            # Extract expressive class names for confusion matrix
-            true_original_class = class_encoder.inverse_transform(true_class)
-            pred_original_class = class_encoder.inverse_transform(pred_class)
+        # Extract expressive class names for confusion matrix
+        true_original_class = class_encoder.inverse_transform(true_class)
+        pred_original_class = class_encoder.inverse_transform(pred_class)
 
         return true_original_class, pred_original_class, original_class_labels
 
