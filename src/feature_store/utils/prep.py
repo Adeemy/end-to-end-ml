@@ -260,7 +260,7 @@ class DataPreprocessor:
 
         # Check if there is duplicated primary_key_names and remove duplicate rows if any
         if len(self.primary_key_names) == 0:
-            print("No primary key column(s) provided!")
+            raise ValueError("No primary key column(s) provided!")
         else:
             duplicates_by_id_count = self._data.duplicated(
                 subset=self.primary_key_names
