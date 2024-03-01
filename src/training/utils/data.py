@@ -13,10 +13,12 @@ from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import (  # StandardScaler, RobustScaler,
+from sklearn.preprocessing import (
     LabelEncoder,
     MinMaxScaler,
     OneHotEncoder,
+    RobustScaler,
+    StandardScaler,
 )
 
 from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
@@ -26,20 +28,28 @@ class DataPipelineCreator:
     """Create a data preprocessing pipeline using sklearn.
 
     Attributes:
-        num_features_imputer (str): strategy to impute missing values in numerical features.
-        num_features_scaler (Optional[Union[Callable, None]]): scaler to scale numerical features.
-        cat_features_imputer (str): strategy to impute missing values in categorical features.
-        cat_features_ohe_handle_unknown (str): strategy to handle unknown categories in categorical features.
-        cat_features_nans_replacement (float): value to replace NaNs in categorical features.
+        num_features_imputer (str): strategy to impute missing values in numerical features. Defaults to "median".
+        num_features_scaler (Optional[Union[RobustScaler, StandardScaler, MinMaxScaler]]): scaler to scale
+            numerical features. Defaults to RobustScaler().
+        cat_features_imputer (str): strategy to impute missing values in categorical features. Defaults to "constant".
+        cat_features_ohe_handle_unknown (str): strategy to handle unknown categories in categorical features. Defaults
+            to "infrequent_if_exist".
+        cat_features_nans_replacement (str): value to replace NaNs in categorical features. Defaults to np.nan.
     """
 
     def __init__(
         self,
-        num_features_imputer: str = "median",
-        num_features_scaler: Optional[Union[Callable, None]] = None,
-        cat_features_imputer: str = "constant",
-        cat_features_ohe_handle_unknown: str = "infrequent_if_exist",
-        cat_features_nans_replacement: float = np.nan,
+        num_features_imputer: Literal[
+            "mean", "median", "most_frequent", "constant"
+        ] = "median",
+        num_features_scaler: Optional[
+            Union[RobustScaler, StandardScaler, MinMaxScaler]
+        ] = RobustScaler(),
+        cat_features_imputer: Literal["most_frequent", "constant"] = "constant",
+        cat_features_ohe_handle_unknown: Literal[
+            "error", "ignore", "infrequent_if_exist"
+        ] = "infrequent_if_exist",
+        cat_features_nans_replacement: str = np.nan,
     ):
         """Initializes an instance for data preprocessing pipeline using sklearn."""
 
@@ -49,7 +59,7 @@ class DataPipelineCreator:
         self.cat_features_ohe_handle_unknown = cat_features_ohe_handle_unknown
         self.cat_features_nans_replacement = cat_features_nans_replacement
 
-    def create_num_features_pipeline(
+    def create_num_features_transformer(
         self,
     ) -> Pipeline:
         """Creates sklearn pipeline for numerical features.
@@ -100,8 +110,8 @@ class DataPipelineCreator:
 
     def extract_col_names_after_preprocessing(
         self,
-        cat_feat_col_names: list,
         num_feat_col_names: list,
+        cat_feat_col_names: list,
         selector: VarianceThreshold,
         data_pipeline: Pipeline,
     ) -> list:
@@ -112,8 +122,8 @@ class DataPipelineCreator:
         have a 'preprocessor' step that includes a 'onehot_encoder' step.
 
         Args:
-            cat_feat_col_names (list): list of categorical feature names.
             num_feat_col_names (list): list of numerical feature names.
+            cat_feat_col_names (list): list of categorical feature names.
             selector (VarianceThreshold): variance threshold selector.
             data_pipeline (Pipeline): data transformation pipeline.
 
@@ -121,12 +131,13 @@ class DataPipelineCreator:
             col_names: list of one-hot encoded feature names.
         """
 
-        # Extract numerical and one-hot encoded features names
+        # The transformers_ attribute is only available after fitting
+        # ColumnTransformer
         col_names = []
         if len(cat_feat_col_names) > 0:
             col_names = num_feat_col_names + list(
                 data_pipeline.named_steps["preprocessor"]
-                .transformers_[1][1]   # This attribute is only available after fitting ColumnTransformer
+                .transformers_[1][1]
                 .named_steps["onehot_encoder"]
                 .get_feature_names_out(cat_feat_col_names)
             )
@@ -175,7 +186,7 @@ class DataPipelineCreator:
 
         # Create a numerical features transformer
         if len(num_feature_col_names) > 0:
-            numeric_transformer = self.create_num_features_pipeline()
+            numeric_transformer = self.create_num_features_transformer()
         else:
             numeric_transformer = Pipeline(
                 steps=[
@@ -213,12 +224,17 @@ class DataPipelineCreator:
         transformed_data = pd.DataFrame(transformed_data)
 
         # Extract numerical and one-hot encoded features names
-        transformed_data.columns = self.extract_col_names_after_preprocessing(
-            cat_feat_col_names=cat_feature_col_names,
-            num_feat_col_names=num_feature_col_names,
-            selector=selector,
-            data_pipeline=data_pipeline,
-        )
+        try:
+            transformed_data.columns = self.extract_col_names_after_preprocessing(
+                num_feat_col_names=num_feature_col_names,
+                cat_feat_col_names=cat_feature_col_names,
+                selector=selector,
+                data_pipeline=data_pipeline,
+            )
+        except ValueError as e:
+            raise ValueError(
+                f"An error occurred while extracting feature names after preprocessing: {e}"
+            ) from e
 
         return transformed_data, data_pipeline
 
@@ -506,6 +522,15 @@ class PrepTrainingData:
 
     def create_data_transformation_pipeline(
         self,
+        num_features_imputer: Literal[
+            "mean", "median", "most_frequent", "constant"
+        ] = "median",
+        num_features_scaler: Optional[Union[Callable, None]] = RobustScaler(),
+        cat_features_imputer: Literal["most_frequent", "constant"] = "constant",
+        cat_features_ohe_handle_unknown: Literal[
+            "error", "ignore", "infrequent_if_exist"
+        ] = "infrequent_if_exist",
+        cat_features_nans_replacement: str = np.nan,
         var_thresh_val: float = 0.05,
     ) -> Pipeline:
         """Creates a data transformation pipeline and fit it on training set.
@@ -515,11 +540,11 @@ class PrepTrainingData:
         """
 
         train_set_transformer = DataPipelineCreator(
-            num_features_imputer="median",
-            num_features_scaler=MinMaxScaler(),
-            cat_features_imputer="constant",
-            cat_features_ohe_handle_unknown="infrequent_if_exist",
-            cat_features_nans_replacement=np.nan,
+            num_features_imputer=num_features_imputer,
+            num_features_scaler=num_features_scaler,
+            cat_features_imputer=cat_features_imputer,
+            cat_features_ohe_handle_unknown=cat_features_ohe_handle_unknown,
+            cat_features_nans_replacement=cat_features_nans_replacement,
         )
         (
             self.train_features_preprocessed,
