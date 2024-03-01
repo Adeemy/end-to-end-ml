@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 from xgboost import XGBClassifier
 
 from src.training.utils.config import Config
@@ -65,6 +66,23 @@ def main(
     class_column_name = config.params["data"]["params"]["class_col_name"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
+
+    num_features_imputer = config.params["data"]["preprocessing"][
+        "num_features_imputer"
+    ]
+    num_features_scaler = config.params["data"]["preprocessing"]["num_features_scaler"]
+    scaler_params = config.params["data"]["preprocessing"].get("scaler_params", {})
+    cat_features_imputer = config.params["data"]["preprocessing"][
+        "cat_features_imputer"
+    ]
+    cat_features_ohe_handle_unknown = config.params["data"]["preprocessing"][
+        "cat_features_ohe_handle_unknown"
+    ]
+    cat_features_nans_replacement = config.params["data"]["preprocessing"][
+        "cat_features_nans_replacement"
+    ]
+    var_thresh_val = config.params["data"]["preprocessing"]["var_thresh_val"]
+
     search_max_iters = config.params["train"]["params"]["search_max_iters"]
     parallel_jobs_count = config.params["train"]["params"]["parallel_jobs_count"]
     exp_timeout_in_secs = config.params["train"]["params"]["exp_timout_secs"]
@@ -90,7 +108,6 @@ def main(
         "voting_ensemble_registered_model_name"
     ]
     pos_class = config.params["data"]["params"]["pos_class"]
-    variance_threshold_val = config.params["data"]["params"]["variance_threshold_val"]
 
     lr_params = config.params["logisticregression"]["params"]
     rf_params = config.params["randomforest"]["params"]
@@ -149,19 +166,35 @@ def main(
     valid_features = data_prep.get_validation_features()
     test_features = data_prep.get_testing_features()
 
+    # Define the mapping from strings to scaler classes
+    scaler_mapping = {
+        "robust": RobustScaler,
+        "standard": StandardScaler,
+        "minmax": MinMaxScaler,
+        "none": None,
+    }
+    scaler_class = scaler_mapping[num_features_scaler]
+    scaler_params = {k: v for d in scaler_params for k, v in d.items()}
+
     # Create data transformation pipeline
     data_transformation_pipeline = data_prep.create_data_transformation_pipeline(
-        var_thresh_val=variance_threshold_val
+        num_features_imputer=num_features_imputer,
+        num_features_scaler=scaler_class(**scaler_params),
+        cat_features_imputer=cat_features_imputer,
+        cat_features_ohe_handle_unknown=cat_features_ohe_handle_unknown,
+        cat_features_nans_replacement=cat_features_nans_replacement,
+        var_thresh_val=var_thresh_val,
     )
     data_prep.clean_up_feature_names()
     num_feature_names, cat_feature_names = data_prep.get_feature_names()
 
-    # Return preprocessed train and validation features, which are needed during
-    # hyperparams optimization to avoid applying data transformation in each iteration.
+    # Preprocessed train and validation features are needed during hyperparams
+    # optimization to avoid applying data transformation in each iteration.
     train_features_preprocessed = data_prep.get_train_features_preprocessed()
     valid_features_preprocessed = data_prep.get_valid_features_preprocessed()
 
-    # Save data splits with encoded class
+    # Save data splits with encoded class to be used in models evaluation
+    # TODO: an integration test should be added to check if the saved files.
     train_set = train_features
     train_set[class_column_name] = train_class
     train_set.to_parquet(
