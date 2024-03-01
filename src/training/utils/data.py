@@ -100,7 +100,7 @@ class DataPipelineCreator:
 
     def extract_col_names_after_preprocessing(
         self,
-        cat_fea_col_names: list,
+        cat_feat_col_names: list,
         num_feat_col_names: list,
         selector: VarianceThreshold,
         data_pipeline: Pipeline,
@@ -112,7 +112,7 @@ class DataPipelineCreator:
         have a 'preprocessor' step that includes a 'onehot_encoder' step.
 
         Args:
-            cat_fea_col_names (list): list of categorical feature names.
+            cat_feat_col_names (list): list of categorical feature names.
             num_feat_col_names (list): list of numerical feature names.
             selector (VarianceThreshold): variance threshold selector.
             data_pipeline (Pipeline): data transformation pipeline.
@@ -123,12 +123,12 @@ class DataPipelineCreator:
 
         # Extract numerical and one-hot encoded features names
         col_names = []
-        if len(cat_fea_col_names) > 0:
+        if len(cat_feat_col_names) > 0:
             col_names = num_feat_col_names + list(
                 data_pipeline.named_steps["preprocessor"]
-                .transformers_[1][1]
+                .transformers_[1][1]   # This attribute is only available after fitting ColumnTransformer
                 .named_steps["onehot_encoder"]
-                .get_feature_names_out(cat_fea_col_names)
+                .get_feature_names_out(cat_feat_col_names)
             )
         else:
             col_names = num_feat_col_names
@@ -214,7 +214,7 @@ class DataPipelineCreator:
 
         # Extract numerical and one-hot encoded features names
         transformed_data.columns = self.extract_col_names_after_preprocessing(
-            cat_fea_col_names=cat_feature_col_names,
+            cat_feat_col_names=cat_feature_col_names,
             num_feat_col_names=num_feature_col_names,
             selector=selector,
             data_pipeline=data_pipeline,
