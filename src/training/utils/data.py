@@ -41,6 +41,8 @@ class DataPipelineCreator:
         cat_features_ohe_handle_unknown: str = "infrequent_if_exist",
         cat_features_nans_replacement: float = np.nan,
     ):
+        """Initializes an instance for data preprocessing pipeline using sklearn."""
+
         self.num_features_imputer = num_features_imputer
         self.num_features_scaler = num_features_scaler
         self.cat_features_imputer = cat_features_imputer
@@ -55,6 +57,7 @@ class DataPipelineCreator:
         Returns:
             num_transformer (Pipeline): sklearn pipeline for numerical features.
         """
+
         num_transformer = Pipeline(
             steps=[
                 ("imputer", SimpleImputer(strategy=self.num_features_imputer)),
@@ -95,6 +98,46 @@ class DataPipelineCreator:
 
         return cat_transformer
 
+    def extract_col_names_after_preprocessing(
+        self,
+        cat_fea_col_names: list,
+        num_feat_col_names: list,
+        selector: VarianceThreshold,
+        data_pipeline: Pipeline,
+    ) -> list:
+        """Extracts one-hot encoded feature names from the data transformation pipeline.
+        If no categorical features are provided, it returns numerical feature names.
+
+        Note: if categorical features are provided the data transformation pipeline must
+        have a 'preprocessor' step that includes a 'onehot_encoder' step.
+
+        Args:
+            cat_fea_col_names (list): list of categorical feature names.
+            num_feat_col_names (list): list of numerical feature names.
+            selector (VarianceThreshold): variance threshold selector.
+            data_pipeline (Pipeline): data transformation pipeline.
+
+        Returns:
+            col_names: list of one-hot encoded feature names.
+        """
+
+        # Extract numerical and one-hot encoded features names
+        col_names = []
+        if len(cat_fea_col_names) > 0:
+            col_names = num_feat_col_names + list(
+                data_pipeline.named_steps["preprocessor"]
+                .transformers_[1][1]
+                .named_steps["onehot_encoder"]
+                .get_feature_names_out(cat_fea_col_names)
+            )
+        else:
+            col_names = num_feat_col_names
+
+        # Get feature names that were selected by selector step
+        col_names = [i for (i, v) in zip(col_names, list(selector.get_support())) if v]
+
+        return col_names
+
     ###########################################################
     def create_data_pipeline(
         self,
@@ -116,7 +159,6 @@ class DataPipelineCreator:
             AssertionError: if no numerical or categorical features are specified.
         """
 
-        # Copy input data
         features_set = input_features.copy()
 
         # Set column names to [] if None was provided
@@ -127,7 +169,6 @@ class DataPipelineCreator:
             [] if cat_feature_col_names is None else cat_feature_col_names
         )
 
-        # Assert that at least one numerical or categorical feature is specified
         assert (
             len(num_feature_col_names + cat_feature_col_names) > 0
         ), "At least one numerical or categorical feature name must be specified!"
@@ -172,22 +213,12 @@ class DataPipelineCreator:
         transformed_data = pd.DataFrame(transformed_data)
 
         # Extract numerical and one-hot encoded features names
-        col_names = []
-        if len(cat_feature_col_names) > 0:
-            col_names = num_feature_col_names + list(
-                data_pipeline.named_steps["preprocessor"]
-                .transformers_[1][1]
-                .named_steps["onehot_encoder"]
-                .get_feature_names_out(cat_feature_col_names)
-            )
-        else:
-            col_names = num_feature_col_names
-
-        # Get feature names that were selected by selector step
-        col_names = [i for (i, v) in zip(col_names, list(selector.get_support())) if v]
-
-        # Rename transformed dataframe columns
-        transformed_data.columns = col_names
+        transformed_data.columns = self.extract_col_names_after_preprocessing(
+            cat_fea_col_names=cat_feature_col_names,
+            num_feat_col_names=num_feature_col_names,
+            selector=selector,
+            data_pipeline=data_pipeline,
+        )
 
         return transformed_data, data_pipeline
 
