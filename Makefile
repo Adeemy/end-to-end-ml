@@ -23,15 +23,15 @@ format:
 	black ./tests
 
 test:	
-# pytest -vvv
 	coverage run -m pytest -vvv
 	coverage report -m
 
 debug:
 	pytest -vvv --pdb
 
+# Exclude W0511 (fixme) and E1120 (no value for argument in function call) in .pylintrc file
 lint:
-	pylint --disable=R,C,E1120 ./src/feature_store ./src/training ./src/inference ./tests
+	pylint ./src/feature_store ./src/training ./src/inference ./tests
 
 all: install isort format test lint
 
