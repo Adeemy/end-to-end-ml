@@ -2,6 +2,7 @@
 Data preprocessing and transformation classes.
 """
 
+import warnings
 from datetime import datetime
 from typing import Literal, Optional, Union
 
@@ -488,57 +489,27 @@ class DataTransformer:
         if self.cat_feature_names is None:
             self.cat_feature_names = []
 
-    def map_categorical_features(self) -> None:
-        """Maps categorical features to expressive values."""
+    def map_categorical_features(self, col_name: str, mapping_values: dict) -> None:
+        """Maps categorical features to expressive values. It applies only to
+        columns that exists in the preprocessed data. Otherwise, it return a
+        warning message.
 
-        if "GenHlth" in self.preprocessed_data.columns:
-            self.preprocessed_data.loc[:, "GenHlth"] = self.preprocessed_data.loc[
-                :, "GenHlth"
-            ].replace(
-                {
-                    "1": "Poor",
-                    "2": "Fair",
-                    "3": "Good",
-                    "4": "Very Good",
-                    "5": "Excellent",
-                }
-            )
+        Args:
+            col_name (str): name of the categorical column.
+            mapping_values (dict): dictionary of mapping values.
 
-        if "Education" in self.preprocessed_data.columns:
-            self.preprocessed_data.loc[:, "Education"] = self.preprocessed_data.loc[
-                :, "Education"
-            ].replace(
-                {
-                    "1": "Never Attended School",
-                    "2": "Elementary",
-                    "3": "High School",
-                    "4": "Some College Degree",
-                    "5": "Advanced Degree",
-                }
-            )
+        Returns:
+            None
+        """
 
-        if "Age" in self.preprocessed_data.columns:
-            self.preprocessed_data.loc[:, "Age"] = self.preprocessed_data.loc[
-                :, "Age"
-            ].replace(
-                {
-                    "1": "18 to 24",
-                    "2": "25 to 29",
-                    "3": "30 to 34",
-                    "4": "35 to 39",
-                    "5": "40 to 44",
-                    "6": "45 to 49",
-                    "7": "50 to 54",
-                    "8": "55 to 59",
-                    "9": "60 to 64",
-                    "10": "65 to 69",
-                    "11": "70 to 74",
-                    "12": "75 to 79",
-                    "13": "80 or older",
-                }
-            )
+        if col_name in self.preprocessed_data.columns:
+            self.preprocessed_data.loc[:, col_name] = self.preprocessed_data.loc[
+                :, col_name
+            ].replace(mapping_values)
+        else:
+            warnings.warn(f"Column {col_name} doesn't exist in data.")
 
-    def map_class_labels(self, class_col_name: str) -> None:
+    def map_class_labels(self, class_col_name: str, mapping_values: dict) -> None:
         """Maps class labels to expressive names: 'Diabetic' or 'Non-Diabetic'.
 
         Args:
@@ -552,7 +523,7 @@ class DataTransformer:
             self.preprocessed_data[class_col_name] = (
                 self.preprocessed_data[class_col_name]
                 .astype("string")
-                .replace({"0": "Non-Diabetic", "1": "Diabetic"})
+                .replace(mapping_values)
             )
         else:
             raise ValueError(f"Class column {class_col_name} doesn't exist in data.")

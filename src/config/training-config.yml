@@ -42,6 +42,29 @@ data:
       - Sex
       - Education
       - Income
+      
+    historical_features:  # Features of historical data pulled from feature store for training
+      - features_view:BMI
+      - features_view:PhysHlth
+      - features_view:Age
+      - features_view:HighBP
+      - features_view:HighChol
+      - features_view:CholCheck
+      - features_view:Smoker
+      - features_view:Stroke
+      - features_view:HeartDiseaseorAttack
+      - features_view:PhysActivity
+      - features_view:Fruits
+      - features_view:Veggies
+      - features_view:HvyAlcoholConsump
+      - features_view:AnyHealthcare
+      - features_view:NoDocbcCost
+      - features_view:GenHlth
+      - features_view:MentHlth
+      - features_view:DiffWalk
+      - features_view:Sex
+      - features_view:Education
+      - features_view:Income
 
   preprocessing:
     num_features_imputer: "median" # Can be "mean", "median", "most_frequent", or "constant"

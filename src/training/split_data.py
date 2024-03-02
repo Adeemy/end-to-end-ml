@@ -50,6 +50,8 @@ def main(
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
+    historical_features = config.params["data"]["params"]["historical_features"]
+
     preprocessed_dataset_target_file_name = config.params["files"]["params"][
         "preprocessed_dataset_target_file_name"
     ]
@@ -85,29 +87,7 @@ def main(
     target_data = pd.read_parquet(path=data_dir / preprocessed_dataset_target_file_name)
     historical_data = feat_store.get_historical_features(
         entity_df=target_data,
-        features=[
-            "features_view:BMI",
-            "features_view:PhysHlth",
-            "features_view:Age",
-            "features_view:HighBP",
-            "features_view:HighChol",
-            "features_view:CholCheck",
-            "features_view:Smoker",
-            "features_view:Stroke",
-            "features_view:HeartDiseaseorAttack",
-            "features_view:PhysActivity",
-            "features_view:Fruits",
-            "features_view:Veggies",
-            "features_view:HvyAlcoholConsump",
-            "features_view:AnyHealthcare",
-            "features_view:NoDocbcCost",
-            "features_view:GenHlth",
-            "features_view:MentHlth",
-            "features_view:DiffWalk",
-            "features_view:Sex",
-            "features_view:Education",
-            "features_view:Income",
-        ],
+        features=historical_features,
     )
 
     # Retrieve historical dataset into a dataframe
@@ -115,9 +95,7 @@ def main(
     preprocessed_data = feat_store.create_saved_dataset(
         from_=historical_data,
         name="historical_data",
-        storage=SavedDatasetFileStorage(
-            str(data_dir) + "/" + historical_data_file_name
-        ),
+        storage=SavedDatasetFileStorage(f"{str(data_dir)}/{historical_data_file_name}"),
         allow_overwrite=True,
     ).to_df()
 

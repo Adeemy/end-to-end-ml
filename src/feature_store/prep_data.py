@@ -43,6 +43,9 @@ def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> 
     datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
     num_col_names = config.params["data"]["params"]["num_col_names"]
     cat_col_names = config.params["data"]["params"]["cat_col_names"]
+    feature_mappings = config.params["feature_mappings"]
+    class_mappings = config.params["class_mappings"]
+
     event_timestamp_col_name = config.params["data"]["params"][
         "event_timestamp_col_name"
     ]
@@ -101,8 +104,23 @@ def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> 
         cat_feature_names=data_preprocessor.cat_feature_names,
     )
 
-    data_transformer.map_categorical_features()
-    data_transformer.map_class_labels(class_col_name=class_column_name)
+    if feature_mappings is not None:
+        column_names = [
+            key for key in feature_mappings.keys() if key.endswith("_column")
+        ]
+        for i in range(0, len(column_names)):
+            column_name = column_names[i].removesuffix("_column")
+            data_transformer.map_categorical_features(
+                col_name=column_name,
+                mapping_values=feature_mappings[f"{column_name}_values"],
+            )
+
+    if class_mappings is not None:
+        data_transformer.map_class_labels(
+            class_col_name=class_column_name,
+            mapping_values=class_mappings["class_values"],
+        )
+
     preprocessed_data = data_transformer.preprocessed_data
 
     # Save features and target in a separate parquet files

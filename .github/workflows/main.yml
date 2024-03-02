@@ -28,6 +28,7 @@ jobs:
         id: pip-cache
         run: echo "PIP_CACHE_DIR=$(pip cache dir)" >> $GITHUB_ENV
 
+      # Use cache action to cache the virtual environment
       - name: Cache pip dependencies
         uses: actions/cache@v2
         with:
