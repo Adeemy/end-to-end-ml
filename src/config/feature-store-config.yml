@@ -12,9 +12,9 @@ data:
     pos_class: "Diabetic"
     date_col_names: []
     datetime_col_names: []
-    inference_set_ratio: 0.05  # Percentage of data to be used for inference
+    inference_set_ratio: 0.05 # Percentage of data to be used for inference
     original_split_type: "random" # Type of split to create inference set. Can be either "random" or "date"
-    random_seed: 123 # Random seed to select inference data from raw dataset 
+    random_seed: 123 # Random seed to select inference data from raw dataset
     event_timestamp_col_name: "event_timestamp"
     num_col_names:
       - BMI
@@ -48,6 +48,49 @@ data:
     view_tags_name_1: "patient" # For feature store
     view_tags_value_1: "population_health" # For feature store
     ttl_duration_in_days: 30
+
+# Provide categorical feature mappings here. Must use actual column name as a prefix
+# for "_column" and "_values" keys. For example, for "GenHlth" column, use "GenHlth_column"
+# and "GenHlth_values" keys.
+feature_mappings:
+  GenHlth_column: GenHlth
+  GenHlth_values:
+    "1": "Poor"
+    "2": "Fair"
+    "3": "Good"
+    "4": "Very Good"
+    "5": "Excellent"
+  Education_column: Education
+  Education_values:
+    "1": "Never Attended School"
+    "2": "Elementary"
+    "3": "High School"
+    "4": "Some College Degree"
+    "5": "Advanced Degree"
+    "6": "Advanced Degree"
+  Age_column: "Age"
+  Age_values:
+    "1": "18 to 24"
+    "2": "25 to 29"
+    "3": "30 to 34"
+    "4": "35 to 39"
+    "5": "40 to 44"
+    "6": "45 to 49"
+    "7": "50 to 54"
+    "8": "55 to 59"
+    "9": "60 to 64"
+    "10": "65 to 69"
+    "11": "70 to 74"
+    "12": "75 to 79"
+    "13": "80 or older"
+
+# Provide class mappings here. Must use "class" as a prefix for "_column"
+# and "_values" keys, e.g., class_column and class_values
+class_mappings:
+  class_column: Diabetes_binary
+  class_values:
+    "0": "Non-Diabetic"
+    "1": "Diabetic"
 
 files:
   params:
