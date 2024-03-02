@@ -260,7 +260,7 @@ class DataPreprocessor:
 
         # Check if there is duplicated primary_key_names and remove duplicate rows if any
         if len(self.primary_key_names) == 0:
-            print("No primary key column(s) provided!")
+            raise ValueError("No primary key column(s) provided!")
         else:
             duplicates_by_id_count = self._data.duplicated(
                 subset=self.primary_key_names
@@ -276,28 +276,11 @@ class DataPreprocessor:
             else:
                 print(f"\nNo duplicate rows by {self.primary_key_names} in input data.")
 
-    def specify_data_types(
-        self,
-        desired_date_format: str = "%Y-%d-%m",
-        desired_datetime_format: str = "%Y-%d-%m %H:%M:%S",
-    ) -> None:
-        """Specifies data types for date, datetime, numerical and categorical columns
-        with their proper missing value indicator. If date, datetime, and numerical
-        columns are not provided, all columns will be converted to categorical
-        data type (categorical type).
-
-        Args:
-            desired_date_format (str): desired date format.
-            desired_datetime_format (str): desired datetime format.
+    def replace_common_missing_values(self) -> None:
+        """Replaces common missing values with np.nan. It is useful when reading data
+        from csv files where common missing values are represented by different strings.
         """
 
-        # Categorical variables are all veriables that are not numerical or date
-        input_data_vars_names = self._data.columns.tolist()
-        non_cat_col_names = (
-            self.date_cols_names + self.datetime_cols_names + self.num_feature_names
-        )
-
-        # Replace common missing values representations with with np.nan
         self._data = self._data.replace(
             {
                 "": np.nan,
@@ -311,6 +294,33 @@ class DataPreprocessor:
                 pd.NA: np.nan,
             }
         )
+
+    def specify_data_types(
+        self,
+        desired_date_format: str = "%Y-%d-%m",
+        desired_datetime_format: str = "%Y-%d-%m %H:%M:%S",
+    ) -> None:
+        """Specifies data types for date, datetime, numerical and categorical columns
+        with their proper missing value indicator. If date, datetime, and numerical
+        columns are not provided, all columns will be converted to categorical
+        data type (categorical type).
+
+        Args:
+            desired_date_format (str): desired date format.
+            desired_datetime_format (str): desired datetime format.
+
+        Returns:
+            None
+        """
+
+        # Categorical variables are all veriables that are not numerical or date
+        input_data_vars_names = self._data.columns.tolist()
+        non_cat_col_names = (
+            self.date_cols_names + self.datetime_cols_names + self.num_feature_names
+        )
+
+        # Replace common missing values with np.nan
+        self.replace_common_missing_values()
 
         # Identify categorical variables if not provided
         if len(self.cat_feature_names) == 0:

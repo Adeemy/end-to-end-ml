@@ -13,10 +13,12 @@ from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import (  # StandardScaler, RobustScaler,
+from sklearn.preprocessing import (
     LabelEncoder,
     MinMaxScaler,
     OneHotEncoder,
+    RobustScaler,
+    StandardScaler,
 )
 
 from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
@@ -26,28 +28,38 @@ class DataPipelineCreator:
     """Create a data preprocessing pipeline using sklearn.
 
     Attributes:
-        num_features_imputer (str): strategy to impute missing values in numerical features.
-        num_features_scaler (Optional[Union[Callable, None]]): scaler to scale numerical features.
-        cat_features_imputer (str): strategy to impute missing values in categorical features.
-        cat_features_ohe_handle_unknown (str): strategy to handle unknown categories in categorical features.
-        cat_features_nans_replacement (float): value to replace NaNs in categorical features.
+        num_features_imputer (str): strategy to impute missing values in numerical features. Defaults to "median".
+        num_features_scaler (Optional[Union[RobustScaler, StandardScaler, MinMaxScaler]]): scaler to scale
+            numerical features. Defaults to RobustScaler().
+        cat_features_imputer (str): strategy to impute missing values in categorical features. Defaults to "constant".
+        cat_features_ohe_handle_unknown (str): strategy to handle unknown categories in categorical features. Defaults
+            to "infrequent_if_exist".
+        cat_features_nans_replacement (str): value to replace NaNs in categorical features. Defaults to np.nan.
     """
 
     def __init__(
         self,
-        num_features_imputer: str = "median",
-        num_features_scaler: Optional[Union[Callable, None]] = None,
-        cat_features_imputer: str = "constant",
-        cat_features_ohe_handle_unknown: str = "infrequent_if_exist",
-        cat_features_nans_replacement: float = np.nan,
+        num_features_imputer: Literal[
+            "mean", "median", "most_frequent", "constant"
+        ] = "median",
+        num_features_scaler: Optional[
+            Union[RobustScaler, StandardScaler, MinMaxScaler]
+        ] = RobustScaler(),
+        cat_features_imputer: Literal["most_frequent", "constant"] = "constant",
+        cat_features_ohe_handle_unknown: Literal[
+            "error", "ignore", "infrequent_if_exist"
+        ] = "infrequent_if_exist",
+        cat_features_nans_replacement: str = np.nan,
     ):
+        """Initializes an instance for data preprocessing pipeline using sklearn."""
+
         self.num_features_imputer = num_features_imputer
         self.num_features_scaler = num_features_scaler
         self.cat_features_imputer = cat_features_imputer
         self.cat_features_ohe_handle_unknown = cat_features_ohe_handle_unknown
         self.cat_features_nans_replacement = cat_features_nans_replacement
 
-    def create_num_features_pipeline(
+    def create_num_features_transformer(
         self,
     ) -> Pipeline:
         """Creates sklearn pipeline for numerical features.
@@ -55,6 +67,7 @@ class DataPipelineCreator:
         Returns:
             num_transformer (Pipeline): sklearn pipeline for numerical features.
         """
+
         num_transformer = Pipeline(
             steps=[
                 ("imputer", SimpleImputer(strategy=self.num_features_imputer)),
@@ -95,6 +108,47 @@ class DataPipelineCreator:
 
         return cat_transformer
 
+    def extract_col_names_after_preprocessing(
+        self,
+        num_feat_col_names: list,
+        cat_feat_col_names: list,
+        selector: VarianceThreshold,
+        data_pipeline: Pipeline,
+    ) -> list:
+        """Extracts one-hot encoded feature names from the data transformation pipeline.
+        If no categorical features are provided, it returns numerical feature names.
+
+        Note: if categorical features are provided the data transformation pipeline must
+        have a 'preprocessor' step that includes a 'onehot_encoder' step.
+
+        Args:
+            num_feat_col_names (list): list of numerical feature names.
+            cat_feat_col_names (list): list of categorical feature names.
+            selector (VarianceThreshold): variance threshold selector.
+            data_pipeline (Pipeline): data transformation pipeline.
+
+        Returns:
+            col_names: list of one-hot encoded feature names.
+        """
+
+        # The transformers_ attribute is only available after fitting
+        # ColumnTransformer
+        col_names = []
+        if len(cat_feat_col_names) > 0:
+            col_names = num_feat_col_names + list(
+                data_pipeline.named_steps["preprocessor"]
+                .transformers_[1][1]
+                .named_steps["onehot_encoder"]
+                .get_feature_names_out(cat_feat_col_names)
+            )
+        else:
+            col_names = num_feat_col_names
+
+        # Get feature names that were selected by selector step
+        col_names = [i for (i, v) in zip(col_names, list(selector.get_support())) if v]
+
+        return col_names
+
     ###########################################################
     def create_data_pipeline(
         self,
@@ -116,7 +170,6 @@ class DataPipelineCreator:
             AssertionError: if no numerical or categorical features are specified.
         """
 
-        # Copy input data
         features_set = input_features.copy()
 
         # Set column names to [] if None was provided
@@ -127,14 +180,13 @@ class DataPipelineCreator:
             [] if cat_feature_col_names is None else cat_feature_col_names
         )
 
-        # Assert that at least one numerical or categorical feature is specified
         assert (
             len(num_feature_col_names + cat_feature_col_names) > 0
         ), "At least one numerical or categorical feature name must be specified!"
 
         # Create a numerical features transformer
         if len(num_feature_col_names) > 0:
-            numeric_transformer = self.create_num_features_pipeline()
+            numeric_transformer = self.create_num_features_transformer()
         else:
             numeric_transformer = Pipeline(
                 steps=[
@@ -172,22 +224,17 @@ class DataPipelineCreator:
         transformed_data = pd.DataFrame(transformed_data)
 
         # Extract numerical and one-hot encoded features names
-        col_names = []
-        if len(cat_feature_col_names) > 0:
-            col_names = num_feature_col_names + list(
-                data_pipeline.named_steps["preprocessor"]
-                .transformers_[1][1]
-                .named_steps["onehot_encoder"]
-                .get_feature_names_out(cat_feature_col_names)
+        try:
+            transformed_data.columns = self.extract_col_names_after_preprocessing(
+                num_feat_col_names=num_feature_col_names,
+                cat_feat_col_names=cat_feature_col_names,
+                selector=selector,
+                data_pipeline=data_pipeline,
             )
-        else:
-            col_names = num_feature_col_names
-
-        # Get feature names that were selected by selector step
-        col_names = [i for (i, v) in zip(col_names, list(selector.get_support())) if v]
-
-        # Rename transformed dataframe columns
-        transformed_data.columns = col_names
+        except ValueError as e:
+            raise ValueError(
+                f"An error occurred while extracting feature names after preprocessing: {e}"
+            ) from e
 
         return transformed_data, data_pipeline
 
@@ -312,6 +359,7 @@ class PrepTrainingData:
         train_set_processor.specify_data_types()
         self.train_set = train_set_processor.get_preprocessed_data()
 
+        # This allows this method to be independent of create_validation_set method
         if self.valid_set is not None:
             valid_set_processor = DataPreprocessor(
                 input_data=self.valid_set,
@@ -329,32 +377,6 @@ class PrepTrainingData:
         test_set_processor.specify_data_types()
         self.test_set = test_set_processor.get_preprocessed_data()
 
-    def replace_nans_in_cat_features(
-        self,
-        nan_replacement: str = "Unspecified",
-    ) -> None:
-        """Replaces missing values with NaNs to allow converting them from
-        float to integer.
-        Note: the error (AttributeError: 'bool' object has no attribute 'transpose')
-        is raised when transforming train set possibly because of pd.NA.
-
-        Args:
-            nan_replacement (str, optional): value to replace NaNs with. Defaults to "Unspecified".
-        """
-
-        self.train_set[self.categorical_feature_names] = self.train_set[
-            self.categorical_feature_names
-        ].replace({pd.NA: nan_replacement})
-
-        if self.valid_set is not None:
-            self.valid_set[self.categorical_feature_names] = self.valid_set[
-                self.categorical_feature_names
-            ].replace({pd.NA: nan_replacement})
-
-        self.test_set[self.categorical_feature_names] = self.test_set[
-            self.categorical_feature_names
-        ].replace({pd.NA: nan_replacement})
-
     def create_validation_set(
         self,
         split_type: Literal["time", "random"] = "random",
@@ -367,7 +389,9 @@ class PrepTrainingData:
         """Creates a validation set by splitting training set into training and
         validation sets randomly or based on time.
 
-        Note: validation set will be used to select the best model.
+        Note: validation set will be used to select the best model. An error should be
+        raised if this method is called when validation set is already provided to
+        prevent overwritting the provided validation set unintentionally.
 
         Args:
             split_type (Literal["time", "random"], optional): type of split. Defaults to "random".
@@ -401,7 +425,7 @@ class PrepTrainingData:
         )
 
     def extract_features(self, valid_set: Optional[pd.DataFrame] = None) -> None:
-        """Separate features and class column of testing set. The validation
+        """Separates features and class column of testing set. The validation
         set (valid_set) can be provided in this method if to wasn't provided
         already. If validation set is provided here, it will overwrite the
         validation set created by create_validation_set.
@@ -475,6 +499,15 @@ class PrepTrainingData:
 
     def create_data_transformation_pipeline(
         self,
+        num_features_imputer: Literal[
+            "mean", "median", "most_frequent", "constant"
+        ] = "median",
+        num_features_scaler: Optional[Union[Callable, None]] = RobustScaler(),
+        cat_features_imputer: Literal["most_frequent", "constant"] = "constant",
+        cat_features_ohe_handle_unknown: Literal[
+            "error", "ignore", "infrequent_if_exist"
+        ] = "infrequent_if_exist",
+        cat_features_nans_replacement: str = np.nan,
         var_thresh_val: float = 0.05,
     ) -> Pipeline:
         """Creates a data transformation pipeline and fit it on training set.
@@ -484,11 +517,11 @@ class PrepTrainingData:
         """
 
         train_set_transformer = DataPipelineCreator(
-            num_features_imputer="median",
-            num_features_scaler=MinMaxScaler(),
-            cat_features_imputer="constant",
-            cat_features_ohe_handle_unknown="infrequent_if_exist",
-            cat_features_nans_replacement=np.nan,
+            num_features_imputer=num_features_imputer,
+            num_features_scaler=num_features_scaler,
+            cat_features_imputer=cat_features_imputer,
+            cat_features_ohe_handle_unknown=cat_features_ohe_handle_unknown,
+            cat_features_nans_replacement=cat_features_nans_replacement,
         )
         (
             self.train_features_preprocessed,
@@ -546,70 +579,6 @@ class PrepTrainingData:
         self.valid_features_preprocessed = self.valid_features_preprocessed.rename(
             columns=lambda x: re.sub("[^A-Za-z0-9]+", "_", x), inplace=False
         )
-
-    def get_train_set(self):
-        """Returns the training set (features and class) when invoked.
-
-        Returns:
-            train_set (pd.DataFrame): training set.
-        """
-        return self.train_set.copy()
-
-    def get_validation_set(self):
-        """Returns the validation set (features and class) when invoked.
-
-        Returns:
-            valid_set (pd.DataFrame): validation set.
-        """
-        return self.valid_set.copy()
-
-    def get_test_set(self):
-        """Returns the testing set (features and class) when invoked.
-
-        Returns:
-            test_set (pd.DataFrame): testing set.
-        """
-        return self.test_set.copy()
-
-    def get_training_features(self):
-        """Returns the training features when invoked.
-
-        Returns:
-            training_features (pd.DataFrame): training set features.
-        """
-        return self.training_features.copy()
-
-    def get_validation_features(self):
-        """Returns the validation features when invoked.
-
-        Returns:
-            validation_features (pd.DataFrame): validation set features.
-        """
-        return self.validation_features.copy()
-
-    def get_testing_features(self):
-        """Returns the testing features when invoked.
-
-        Returns:
-            testing_features (pd.DataFrame): testing set features.
-        """
-        return self.testing_features.copy()
-
-    def get_train_features_preprocessed(self):
-        """Returns the transformed training set features when invoked.
-
-        Returns:
-            train_features_preprocessed (pd.DataFrame): transformed training set features.
-        """
-        return self.train_features_preprocessed.copy()
-
-    def get_valid_features_preprocessed(self):
-        """Returns the transformed validation set features when invoked.
-
-        Returns:
-            valid_features_preprocessed (pd.DataFrame): transformed validation set features.
-        """
-        return self.valid_features_preprocessed.copy()
 
     def get_feature_names(self) -> Union[list, list]:
         """Returns the numerical and categorical feature names of all data

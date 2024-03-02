@@ -69,9 +69,6 @@ def main(
     dataset_split_date_col_format = config.params["data"]["params"][
         "split_date_col_format"
     ]
-    cat_features_nan_replacement = config.params["data"]["params"][
-        "cat_features_nan_replacement"
-    ]
 
     # Extract cut-off date for splitting train and test sets
     input_split_cutoff_date = None
@@ -164,7 +161,6 @@ def main(
     # Preprocess train and test sets by enforcing data types of numerical and categorical features
     data_prep.select_relevant_columns()
     data_prep.enforce_data_types()
-    data_prep.replace_nans_in_cat_features(nan_replacement=cat_features_nan_replacement)
     data_prep.create_validation_set(
         split_type=dataset_split_type,
         train_set_size=train_set_ratio,
@@ -176,19 +172,19 @@ def main(
 
     # Store train, validation, and test sets locally
     # Note: should be registered and tagged for reproducibility.
-    train_set = data_prep.get_train_set()
+    train_set = data_prep.train_set
     train_set.to_parquet(
         data_dir / train_set_file_name,
         index=False,
     )
 
-    valid_set = data_prep.get_validation_set()
+    valid_set = data_prep.valid_set
     valid_set.to_parquet(
         data_dir / valid_set_file_name,
         index=False,
     )
 
-    test_set = data_prep.get_test_set()
+    test_set = data_prep.test_set
     test_set.to_parquet(
         data_dir / test_set_file_name,
         index=False,
