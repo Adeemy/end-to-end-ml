@@ -359,6 +359,7 @@ class PrepTrainingData:
         train_set_processor.specify_data_types()
         self.train_set = train_set_processor.get_preprocessed_data()
 
+        # This allows this method to be independent of create_validation_set method
         if self.valid_set is not None:
             valid_set_processor = DataPreprocessor(
                 input_data=self.valid_set,
@@ -388,7 +389,9 @@ class PrepTrainingData:
         """Creates a validation set by splitting training set into training and
         validation sets randomly or based on time.
 
-        Note: validation set will be used to select the best model.
+        Note: validation set will be used to select the best model. An error should be
+        raised if this method is called when validation set is already provided to
+        prevent overwritting the provided validation set unintentionally.
 
         Args:
             split_type (Literal["time", "random"], optional): type of split. Defaults to "random".
@@ -422,7 +425,7 @@ class PrepTrainingData:
         )
 
     def extract_features(self, valid_set: Optional[pd.DataFrame] = None) -> None:
-        """Separate features and class column of testing set. The validation
+        """Separates features and class column of testing set. The validation
         set (valid_set) can be provided in this method if to wasn't provided
         already. If validation set is provided here, it will overwrite the
         validation set created by create_validation_set.
