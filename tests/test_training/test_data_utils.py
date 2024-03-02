@@ -5,8 +5,9 @@ from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, RobustScaler
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, RobustScaler
 
+from src.feature_store.utils.prep import DataSplitter
 from src.training.utils.data import DataPipelineCreator, PrepTrainingData
 
 
@@ -137,15 +138,17 @@ def test_create_validation_set(training_data_prep):
     assert training_data_prep.valid_set is None
 
     # Call the create_validation_set method
-    training_data_prep.create_validation_set()
+    training_data_prep.create_validation_set(split_random_seed=100)
 
     # Check if the validation set is created
     assert training_data_prep.valid_set is not None
 
 
 def test_extract_features(training_data_prep):
-    # Create validation set
-    training_data_prep.create_validation_set()
+    # Apply all steps before extract_features to ensure this test is independent of other tests
+    training_data_prep.select_relevant_columns()
+    training_data_prep.enforce_data_types()
+    training_data_prep.create_validation_set(split_random_seed=100)
 
     # Call the extract_features method
     training_data_prep.extract_features()
@@ -157,8 +160,40 @@ def test_extract_features(training_data_prep):
     assert list(training_data_prep.testing_features.columns) == ["age", "gender"]
 
 
+def test_encode_class_labels(training_data_prep):
+    """Tests the encode_class_labels method of the PrepTrainingData class. The method
+    should encode the class labels in the train, validation, and test sets. The method
+    should also return the encoded class labels, the encoded positive class label, and
+    the fitted class encoder.
+    """
+
+    # Apply all steps before encoding class labels to ensure this test is independent of other tests
+    training_data_prep.select_relevant_columns()
+    training_data_prep.enforce_data_types()
+    training_data_prep.create_validation_set(split_random_seed=100)
+    training_data_prep.extract_features()
+
+    (
+        encoded_train_class,
+        encoded_valid_class,
+        encoded_test_class,
+        enc_pos_class_label,
+        fitted_class_encoder,
+    ) = training_data_prep.encode_class_labels(pos_class_label="B")
+
+    # Check if encoded classes are correct (A=1 and B=0)
+    assert np.array_equal(encoded_train_class, np.array([0, 0, 0, 0, 1, 1, 0, 1]))
+    assert np.array_equal(encoded_valid_class, np.array([0, 1]))
+    assert np.array_equal(encoded_test_class, np.array([1, 1, 0, 0, 0]))
+
+    assert (
+        enc_pos_class_label == 1
+    )  # positive class label is 'B' and should be encoded as 1
+    assert isinstance(fitted_class_encoder, LabelEncoder)
+
+
 @pytest.fixture
-def test_dataset():
+def test_df():
     """Creates a test dataset with numerical and categorical features. It also includes a near-zero variance feature
     to test selector step."""
 
@@ -184,6 +219,52 @@ def test_dataset():
     cat_feat_col_names = ["cat_feature1", "cat_feature2", "near_zero_var_cat_feature"]
 
     return df, num_feat_col_names, cat_feat_col_names
+
+
+def test_create_data_transformation_pipeline(test_df):
+    """Tests if create_data_transformation_pipeline method returns a data transformation
+    pipeline and creates preprocessed train and validation sets used for hyperparameter tuning.
+    """
+
+    df, num_feat_col_names, cat_feat_col_names = test_df
+
+    # Add primary key and class columns
+    df = df.reset_index(names="id")
+    df["class"] = np.random.choice(["A", "B"], 100)
+
+    # Split data into train and test sets
+    data_splitter = DataSplitter(
+        dataset=df,
+        primary_key_col_name="id",
+        class_col_name="class",
+    )
+    train_set, test_set = data_splitter.split_dataset()
+
+    # Apply all steps before encoding class labels to ensure this test is independent of other tests
+    data_prep = PrepTrainingData(
+        train_set=train_set,
+        test_set=test_set,
+        primary_key="id",
+        class_col_name="class",
+        numerical_feature_names=num_feat_col_names,
+        categorical_feature_names=cat_feat_col_names,
+    )
+
+    data_prep.select_relevant_columns()
+    data_prep.enforce_data_types()
+    data_prep.create_validation_set(split_random_seed=100)
+    data_prep.extract_features()
+
+    pipeline = data_prep.create_data_transformation_pipeline()
+
+    assert isinstance(pipeline, Pipeline)
+    assert isinstance(data_prep.train_features_preprocessed, pd.DataFrame)
+    assert isinstance(data_prep.valid_features_preprocessed, pd.DataFrame)
+
+    # Check if the preprocessed train and validation sets have the same columns
+    assert list(data_prep.train_features_preprocessed.columns) == list(
+        data_prep.valid_features_preprocessed.columns
+    )
 
 
 def test_create_num_features_transformer():
@@ -218,22 +299,24 @@ def test_create_cat_features_transformer():
     # Test output type (must be a pipeline)
     assert isinstance(transformer, Pipeline)
     assert len(transformer.steps) == 2
+
     # cat_features_transformer must have two steps: imputer and one-hot encoder
     assert transformer.steps[0][0] == "imputer"
     assert transformer.steps[1][0] == "onehot_encoder"
+
     # If this fails, it means that the default values have changed and the tests need to be updated.
     assert isinstance(transformer.steps[0][1], SimpleImputer)
     assert isinstance(transformer.steps[1][1], OneHotEncoder)
 
 
-def test_extract_col_names_after_preprocessing(test_dataset):
+def test_extract_col_names_after_preprocessing(test_df):
     """Tests the extraction of column names after preprocessing. The test dataset
     includes numerical and categorical features, and a near-zero variance feature
     to test the selector step. The expected output is a list with the names of the
     numerical and categorical features. The near-zero variance feature should be removed.
     """
 
-    df, num_feat_col_names, cat_feat_col_names = test_dataset
+    df, num_feat_col_names, cat_feat_col_names = test_df
 
     pipeline_creator = DataPipelineCreator()
 
@@ -299,14 +382,14 @@ def test_extract_col_names_after_preprocessing(test_dataset):
     assert col_names[5] == "cat_feature2_Z"
 
 
-def test_create_data_pipeline(test_dataset):
+def test_create_data_pipeline(test_df):
     """Tests the creation of a data pipeline. The test dataset includes numerical and
     categorical features, and a near-zero variance feature to test the selector step.
     The expected output is a dataframe with the preprocessed features and a pipeline
     with the preprocessing steps.
     """
 
-    df, num_feat_col_names, cat_feat_col_names = test_dataset
+    df, num_feat_col_names, cat_feat_col_names = test_df
 
     pipeline_creator = DataPipelineCreator(
         num_features_imputer="median",
