@@ -335,8 +335,8 @@ def test_create_validation_set(training_data_prep):
 def test_extract_features(training_data_prep):
     # Apply all steps before extract_features to ensure this test is independent of other tests
     training_data_prep.select_relevant_columns()
-    training_data_prep.enforce_data_types()
     training_data_prep.create_validation_set(split_random_seed=100)
+    training_data_prep.enforce_data_types()
 
     # Call the extract_features method
     training_data_prep.extract_features()
