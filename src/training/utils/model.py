@@ -1238,4 +1238,3 @@ class ModelChampionManager:
         )
         exp_obj.register_model(model_name=self.champ_model_name)
         exp_obj.end()
-        print(f"Champion model {self.champ_model_name} was registered in workspace.")
