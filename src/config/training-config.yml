@@ -42,6 +42,7 @@ data:
       - Sex
       - Education
       - Income
+      
     historical_features:  # Features of historical data pulled from feature store for training
       - features_view:BMI
       - features_view:PhysHlth
