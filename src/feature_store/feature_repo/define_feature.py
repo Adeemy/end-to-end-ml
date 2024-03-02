@@ -21,7 +21,7 @@ from src.utils.path import DATA_DIR
 # Specify required column names by data type
 config = Config(
     config_path=str(Path(__file__).parent.resolve().parent.parent)
-    + "/config/feature_store_config.yml"
+    + "/config/feature-store-config.yml"
 )
 PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
 CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]

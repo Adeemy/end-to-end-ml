@@ -8,7 +8,7 @@ def test_config_init():
     """Tests if Config class init method returns the correct
     config yaml file (config file exists)."""
 
-    config_path = f"{str(PARENT_DIR)}/config/training_config.yml"
+    config_path = f"{str(PARENT_DIR)}/config/training-config.yml"
     config = Config(config_path)
     assert config.config_path == config_path
 

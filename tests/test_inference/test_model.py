@@ -16,7 +16,7 @@ def model_loader():
 def test_get_config_params(model_loader):
     """Tests that get_config_params returns the correct configuration parameters."""
 
-    config_yaml_abs_path = f"{str(PARENT_DIR)}/config/training_config.yml"
+    config_yaml_abs_path = f"{str(PARENT_DIR)}/config/training-config.yml"
 
     config = Config(config_path=config_yaml_abs_path)
     comet_workspace_name = config.params["train"]["params"]["comet_workspace_name"]
