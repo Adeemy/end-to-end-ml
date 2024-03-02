@@ -96,7 +96,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load the configuration file
-    logging.config.fileConfig(args.logger_path)
+    try:
+        logging.config.fileConfig(args.logger_path)
+    except KeyError as e:
+        raise KeyError(
+            f"Failed to load logger configuration file: {args.logger_path}"
+        ) from e
 
     # Get the logger objects by name
     console_logger = logging.getLogger("console_logger")

@@ -3,6 +3,7 @@ from pathlib import Path
 
 # Specify paths to data and training artifacts directories
 PARENT_DIR = Path(__file__).parent.resolve().parent
+LOG_CONF_PATH = PARENT_DIR / "config/logging.conf"
 
 # Path to data directory
 FEATURE_REPO_DIR = PARENT_DIR / "feature_store/feature_repo"

@@ -74,7 +74,8 @@ def main(
     ]
 
     # Import train and test sets to evaluate best model on test set
-    # Note: it requires class labels to be encoded.
+    # Note: it requires class labels to be encoded. An integration
+    # test should be added to ensure the class labels are encoded.
     train_set = pd.read_parquet(
         data_dir / train_set_file_name,
     )
@@ -82,6 +83,8 @@ def main(
     test_set = pd.read_parquet(
         data_dir / test_set_file_name,
     )
+
+    logger.info("Imported train and test sets.")
 
     #############################################
     # Rename comparison metric if it's fbeta_score to include beta value
@@ -106,6 +109,8 @@ def main(
         comparison_metric=f"valid_{comparison_metric_name}",
         comet_exp_keys=successful_exp_keys,
     )
+
+    logger.info(f"Best candidate model is {best_model_name}.")
 
     # Create ExistingExperiment object to allow appending logging new metrics
     best_model_exp_key = successful_exp_keys.loc[
@@ -160,6 +165,8 @@ def main(
         cv_folds=calib_cv_folds,
     )
 
+    logger.info(f"Champion model {best_model_name} was calibrated.")
+
     # Log and register champion model (in Comet, model must be logged first)
     # Note: the best model should not be deployed in production if its score
     # on the test set is below minimum score. Otherwise, prevent deploying
@@ -179,7 +186,8 @@ def main(
 
     else:
         raise ValueError(
-            f"Best model score is {best_model_test_score}, which is lower than deployment threshold {deployment_score_thresh}."
+            f"""Best model score is {best_model_test_score}, which is lower than 
+                         deployment threshold {deployment_score_thresh}."""
         )
 
 
@@ -202,7 +210,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load the configuration file
-    logging.config.fileConfig(args.logger_path)
+    try:
+        logging.config.fileConfig(args.logger_path)
+    except KeyError as e:
+        raise KeyError(
+            f"Failed to load logger configuration file: {args.logger_path}"
+        ) from e
 
     # Get the logger objects by name
     console_logger = logging.getLogger("console_logger")
