@@ -162,9 +162,9 @@ def main(
     )
 
     # Return features
-    train_features = data_prep.get_training_features()
-    valid_features = data_prep.get_validation_features()
-    test_features = data_prep.get_testing_features()
+    train_features = data_prep.training_features
+    valid_features = data_prep.validation_features
+    test_features = data_prep.testing_features
 
     # Define the mapping from strings to scaler classes
     scaler_mapping = {
@@ -190,8 +190,8 @@ def main(
 
     # Preprocessed train and validation features are needed during hyperparams
     # optimization to avoid applying data transformation in each iteration.
-    train_features_preprocessed = data_prep.get_train_features_preprocessed()
-    valid_features_preprocessed = data_prep.get_valid_features_preprocessed()
+    train_features_preprocessed = data_prep.train_features_preprocessed
+    valid_features_preprocessed = data_prep.valid_features_preprocessed
 
     # Save data splits with encoded class to be used in models evaluation
     # TODO: an integration test should be added to check if the saved files.

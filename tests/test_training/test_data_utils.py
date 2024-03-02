@@ -7,12 +7,159 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, RobustScaler
 
-from src.training.utils.data import DataPipelineCreator
+from src.training.utils.data import DataPipelineCreator, PrepTrainingData
+
+
+@pytest.fixture
+def training_data_prep():
+    # Create a sample train set and test set
+    train_set = pd.DataFrame(
+        {
+            "id": list(range(1, 11)),
+            "age": [25, 30, np.nan, 35, 40, 45, 50, np.nan, 55, 60],
+            "gender": [
+                "Male",
+                "Female",
+                np.nan,
+                "",
+                pd.NA,
+                "Male",
+                "Female",
+                "Male",
+                "Male",
+                "Female",
+            ],
+            "zip_code": [
+                "29875",
+                "37540",
+                "37535",
+                "12345",
+                "67890",
+                "11111",
+                "22222",
+                "33333",
+                "44444",
+                "55555",
+            ],
+            "class": list("AABBBABAAA"),
+        }
+    )
+
+    test_set = pd.DataFrame(
+        {
+            "id": list(range(10, 15)),
+            "age": [20, 70, np.nan, 75, 31],
+            "gender": [
+                "Female",
+                "Male",
+                np.nan,
+                np.nan,
+                "Female",
+            ],
+            "zip_code": [
+                "66666",
+                "77777",
+                "11111",
+                "33333",
+                "44444",
+            ],
+            "class": list("BBAAA"),
+        }
+    )
+
+    # Create an instance of PrepTrainingData
+    training_data_prep = PrepTrainingData(
+        train_set=train_set,
+        test_set=test_set,
+        primary_key="id",
+        class_col_name="class",
+        numerical_feature_names=["age"],
+        categorical_feature_names=["gender"],
+    )
+
+    return training_data_prep
+
+
+def test_select_relevant_columns(training_data_prep):
+    """Tests the select_relevant_columns method of the PrepTrainingData class. The method
+    should select the relevant columns from the train and test sets. The relevant columns
+    are the primary key, numerical features, categorical features, and the target variable
+    specified in PrepTrainingData initialization. The method should remove any other
+    columns from the train and test sets. The expected output is the train and test sets
+    with only the relevant columns.
+    """
+
+    # Call the select_relevant_columns method
+    training_data_prep.select_relevant_columns()
+
+    # Check if the selected columns are correct in the train and test set
+    assert list(training_data_prep.train_set.columns) == [
+        "id",
+        "age",
+        "gender",
+        "class",
+    ]
+
+    # Check if the selected columns are correct in the test set
+    assert list(training_data_prep.test_set.columns) == ["id", "age", "gender", "class"]
+
+
+def test_enforce_data_types(training_data_prep):
+    """Tests the enforce_data_types method of the PrepTrainingData class. The method
+    should enforce the specified data types for the numerical and categorical features
+    in the train and test sets. The method should also replace common missing values in
+    categorical features np.nan because it calls replace_common_missing_values method
+    before specifying data types.
+    """
+
+    # Call the enforce_data_types method
+    training_data_prep.enforce_data_types()
+
+    # Check if the data types are enforced correctly in the train set
+    assert training_data_prep.train_set["age"].dtype == "float32"
+    assert training_data_prep.train_set["gender"].dtype == "string"
+
+    # Check if the data types are enforced correctly in the test set
+    assert training_data_prep.test_set["age"].dtype == "float32"
+    assert training_data_prep.test_set["gender"].dtype == "string"
+
+    # Check the number of NaNs are in train set
+    assert training_data_prep.train_set["age"].isna().sum() == 2
+    assert training_data_prep.train_set["gender"].isna().sum() == 3
+
+    # Check the number of NaNs are in test set
+    assert training_data_prep.test_set["age"].isna().sum() == 1
+    assert training_data_prep.test_set["gender"].isna().sum() == 2
+
+
+def test_create_validation_set(training_data_prep):
+    # Default validation set is None
+    assert training_data_prep.valid_set is None
+
+    # Call the create_validation_set method
+    training_data_prep.create_validation_set()
+
+    # Check if the validation set is created
+    assert training_data_prep.valid_set is not None
+
+
+def test_extract_features(training_data_prep):
+    # Create validation set
+    training_data_prep.create_validation_set()
+
+    # Call the extract_features method
+    training_data_prep.extract_features()
+
+    # Check if the training, testing, and validation features are extracted correctly,
+    # which should not include the primary key and target variable
+    assert list(training_data_prep.training_features.columns) == ["age", "gender"]
+    assert list(training_data_prep.validation_features.columns) == ["age", "gender"]
+    assert list(training_data_prep.testing_features.columns) == ["age", "gender"]
 
 
 @pytest.fixture
 def test_dataset():
-    """Create a test dataset with numerical and categorical features. It also includes a near-zero variance feature
+    """Creates a test dataset with numerical and categorical features. It also includes a near-zero variance feature
     to test selector step."""
 
     # Set seed for reproducibility

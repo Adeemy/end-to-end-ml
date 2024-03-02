@@ -376,32 +376,6 @@ class PrepTrainingData:
         test_set_processor.specify_data_types()
         self.test_set = test_set_processor.get_preprocessed_data()
 
-    def replace_nans_in_cat_features(
-        self,
-        nan_replacement: str = "Unspecified",
-    ) -> None:
-        """Replaces missing values with NaNs to allow converting them from
-        float to integer.
-        Note: the error (AttributeError: 'bool' object has no attribute 'transpose')
-        is raised when transforming train set possibly because of pd.NA.
-
-        Args:
-            nan_replacement (str, optional): value to replace NaNs with. Defaults to "Unspecified".
-        """
-
-        self.train_set[self.categorical_feature_names] = self.train_set[
-            self.categorical_feature_names
-        ].replace({pd.NA: nan_replacement})
-
-        if self.valid_set is not None:
-            self.valid_set[self.categorical_feature_names] = self.valid_set[
-                self.categorical_feature_names
-            ].replace({pd.NA: nan_replacement})
-
-        self.test_set[self.categorical_feature_names] = self.test_set[
-            self.categorical_feature_names
-        ].replace({pd.NA: nan_replacement})
-
     def create_validation_set(
         self,
         split_type: Literal["time", "random"] = "random",
@@ -602,70 +576,6 @@ class PrepTrainingData:
         self.valid_features_preprocessed = self.valid_features_preprocessed.rename(
             columns=lambda x: re.sub("[^A-Za-z0-9]+", "_", x), inplace=False
         )
-
-    def get_train_set(self):
-        """Returns the training set (features and class) when invoked.
-
-        Returns:
-            train_set (pd.DataFrame): training set.
-        """
-        return self.train_set.copy()
-
-    def get_validation_set(self):
-        """Returns the validation set (features and class) when invoked.
-
-        Returns:
-            valid_set (pd.DataFrame): validation set.
-        """
-        return self.valid_set.copy()
-
-    def get_test_set(self):
-        """Returns the testing set (features and class) when invoked.
-
-        Returns:
-            test_set (pd.DataFrame): testing set.
-        """
-        return self.test_set.copy()
-
-    def get_training_features(self):
-        """Returns the training features when invoked.
-
-        Returns:
-            training_features (pd.DataFrame): training set features.
-        """
-        return self.training_features.copy()
-
-    def get_validation_features(self):
-        """Returns the validation features when invoked.
-
-        Returns:
-            validation_features (pd.DataFrame): validation set features.
-        """
-        return self.validation_features.copy()
-
-    def get_testing_features(self):
-        """Returns the testing features when invoked.
-
-        Returns:
-            testing_features (pd.DataFrame): testing set features.
-        """
-        return self.testing_features.copy()
-
-    def get_train_features_preprocessed(self):
-        """Returns the transformed training set features when invoked.
-
-        Returns:
-            train_features_preprocessed (pd.DataFrame): transformed training set features.
-        """
-        return self.train_features_preprocessed.copy()
-
-    def get_valid_features_preprocessed(self):
-        """Returns the transformed validation set features when invoked.
-
-        Returns:
-            valid_features_preprocessed (pd.DataFrame): transformed validation set features.
-        """
-        return self.valid_features_preprocessed.copy()
 
     def get_feature_names(self) -> Union[list, list]:
         """Returns the numerical and categorical feature names of all data
