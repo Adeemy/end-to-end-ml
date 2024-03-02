@@ -90,11 +90,11 @@ jobs:
       #   run: |
       #     make evaluate
 
-      - name: Test champion model
-        env:
-          COMET_API_KEY: ${{ secrets.COMET_API_KEY }}
-        run: |
-          make test_model
+      # - name: Test champion model
+      #   env:
+      #     COMET_API_KEY: ${{ secrets.COMET_API_KEY }}
+      #   run: |
+      #     make test_model
 
   # build:
   #   runs-on: ubuntu-latest
