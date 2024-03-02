@@ -128,6 +128,7 @@ Below is the project structure.
         └── test_inference
                 └── test_model.py
         └── test_training
+                └── test_data_utils.py
                 └── test_training_config.py
         └── test_utils.py
 
