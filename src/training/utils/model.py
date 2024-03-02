@@ -129,7 +129,7 @@ class ModelOptimizer:
 
         return params
 
-    def calculate_performance_metrics(
+    def calc_perf_metrics(
         self,
         true_class: ArrayLike,
         pred_class: ArrayLike,
@@ -202,11 +202,11 @@ class ModelOptimizer:
         # other htreshold values can be used, which is problem-dependent.
         pred_train_preds = self.model.predict(self.train_features_preprocessed)
         pred_valid_preds = self.model.predict(self.valid_features_preprocessed)
-        train_scores = self.calculate_performance_metrics(
+        train_scores = self.calc_perf_metrics(
             true_class=self.train_class,
             pred_class=pred_train_preds,
         )
-        valid_scores = self.calculate_performance_metrics(
+        valid_scores = self.calc_perf_metrics(
             true_class=self.valid_class,
             pred_class=pred_valid_preds,
         )
@@ -778,11 +778,11 @@ class ModelEvaluator(ModelOptimizer):
         )
 
         # Calculate performance metrics on train and validation sets
-        train_scores = self.calculate_performance_metrics(
+        train_scores = self.calc_perf_metrics(
             true_class=self.train_class,
             pred_class=pred_train_class,
         )
-        valid_scores = self.calculate_performance_metrics(
+        valid_scores = self.calc_perf_metrics(
             true_class=self.valid_class,
             pred_class=pred_valid_class,
         )
