@@ -5,7 +5,7 @@
 
 # End-to-end ML Project
 
-This project is an end-to-end ML project on tabular data that incorporates software engineering principles in machine learning. It spans the whole lifecycle of a ML model, from data exploration, preprocessing, feature engineering, model selection, training, evaluation, to deployment.
+This is an end-to-end ML project for tabular data that incorporates software engineering principles in machine learning. It spans the whole lifecycle of a ML model, from data exploration, preprocessing, feature engineering, model selection, training, evaluation, to deployment.
 
 The project leverages the Diabetes Health Indicators public dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), which was originally sourced from CDC. The dataset comprises various information about patients, such as demographics, lab results, and self-reported health history. The goal is to develop a classifier that can discern whether a patient has diabetes, is pre-diabetic, or healthy.
 
@@ -47,6 +47,8 @@ Below is the project structure.
         ├── LICENSE
         ├── Makefile
         ├── README.md
+        ├── pytest.ini
+        ├── requirements.txt
         ├── __init__.py
         ├── img
         │   └── feast_workflow.png
@@ -54,15 +56,13 @@ Below is the project structure.
         │   ├── eda.ipynb
         │   ├── eda_requirements.txt
         │   └── utils.py
-        ├── pytest.ini
-        ├── requirements.txt
         ├── src
         │   ├── __init__.py
         │   ├── config
         │   │   ├── __init__.py
-        │   │   ├── feature_store_config.yml
+        │   │   ├── feature-store-config.yml
         │   │   ├── logging.conf
-        │   │   └── training_config.yml
+        │   │   └── training-config.yml
         │   ├── feature_store
         │   │   ├── README.md
         │   │   ├── feature_repo
@@ -125,11 +125,13 @@ Below is the project structure.
         │   ├── test_data_splitter.py
         │   ├── test_data_transformer.py
         │   └── test_feature_store_config.py
-        └── test_inference
-                └── test_model.py
-        └── test_training
-                └── test_data_utils.py
-                └── test_training_config.py
+        ├── test_inference
+        │   └── test_model.py
+        ├── test_training
+        │   ├── test_data_utils.py
+        │   ├── test_job.py
+        │   ├── test_model.py
+        │   └── test_training_config.py
         └── test_utils.py
 
 ### Setup environment & Usage

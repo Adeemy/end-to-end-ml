@@ -11,3 +11,7 @@ pre-commit install
 # To remove the deprecation warning from jupyter_client when running tests
 touch pytest.ini
 echo -e '[pytest]\nfilterwarnings =\n    ignore::DeprecationWarning:jupyter_client.*' > pytest.ini
+
+# Install auxiliar tools
+sudo apt-get update
+sudo apt-get install tree # To print project structure

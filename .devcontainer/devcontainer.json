@@ -37,8 +37,7 @@
         "GitHub.vscode-github-actions",
         "eamodio.gitlens",
         "timonwong.shellcheck",
-        "redhat.vscode-yaml",
-        "Codecov.codecov",
+        "redhat.vscode-yaml"
       ]
     }
   },
