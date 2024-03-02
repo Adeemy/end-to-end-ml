@@ -9,7 +9,7 @@ import pandas as pd
 import pandas.api.types as ptypes
 import pytest
 
-from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
+from src.feature_store.utils.prep import DataPreprocessor
 
 
 #################################
