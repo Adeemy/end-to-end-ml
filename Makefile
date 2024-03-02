@@ -7,10 +7,11 @@ update_reqs:
 	pipreqs --force --ignore bin,etc,include,lib,lib64 "./"
 
 # Install packages, format code, sort imports, and run unit tests
+PIP_CACHE_DIR ?= $(HOME)/.cache/pip
 install:
 	pip install --upgrade pip &&\
 		pip install black[jupyter] pytest pylint isort pytest-cov pytest-mock &&\
-		pip install -r requirements.txt
+		pip install --cache-dir $(PIP_CACHE_DIR) -r requirements.txt
 
 isort:
 	isort --profile black ./notebooks
