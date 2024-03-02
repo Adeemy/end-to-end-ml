@@ -16,7 +16,7 @@ from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 
 from src.feature_store.utils.prep import DataSplitter
 from src.training.utils.config import Config
-from src.training.utils.data import PrepTrainingData
+from src.training.utils.data import TrainingDataPrep
 from src.utils.logger import LoggerWriter
 from src.utils.path import DATA_DIR, FEATURE_REPO_DIR
 
@@ -127,7 +127,7 @@ def main(
     )
 
     # Prepare data for training
-    data_prep = PrepTrainingData(
+    data_prep = TrainingDataPrep(
         train_set=training_set,
         test_set=testing_set,
         primary_key=pk_col_name,

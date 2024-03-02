@@ -239,7 +239,7 @@ class DataPipelineCreator:
         return transformed_data, data_pipeline
 
 
-class PrepTrainingData:
+class TrainingDataPrep:
     """Prepares data for training during data split. It can be used to create the
     three data splits: training, validation, and testing, and apply minimal preprocessing
     steps that doesn't cause data leakage. It can also be used in training script to ensure
@@ -267,7 +267,7 @@ class PrepTrainingData:
         numerical_feature_names: Optional[list] = None,
         categorical_feature_names: Optional[list] = None,
     ) -> None:
-        """Creates a PrepTrainingData instance.
+        """Creates a TrainingDataPrep instance.
 
         Args:
             train_set (pd.DataFrame): training set.

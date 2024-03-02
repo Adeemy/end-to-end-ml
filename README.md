@@ -126,11 +126,11 @@ Below is the project structure.
         │   ├── test_data_transformer.py
         │   └── test_feature_store_config.py
         ├── test_inference
-        │   └── test_model.py
+        │   └── test_inference_model.py
         ├── test_training
         │   ├── test_data_utils.py
         │   ├── test_job.py
-        │   ├── test_model.py
+        │   ├── test_training_model.py
         │   └── test_training_config.py
         └── test_utils.py
 

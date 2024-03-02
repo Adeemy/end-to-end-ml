@@ -21,7 +21,7 @@ from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
 
 from src.training.utils.config import Config
-from src.training.utils.model import ModelEvaluator, PrepChampModel
+from src.training.utils.model import ModelChampionManager, ModelEvaluator
 from src.utils.logger import LoggerWriter
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
 
@@ -99,8 +99,8 @@ def main(
         )
 
     # Select the best performing model
-    prep_champ_model = PrepChampModel()
-    best_model_name = prep_champ_model.select_best_performer(
+    champ_model_manager = ModelChampionManager(champ_model_name=champ_model_name)
+    best_model_name = champ_model_manager.select_best_performer(
         comet_project_name=project_name,
         comet_workspace_name=workspace_name,
         comparison_metric=f"valid_{comparison_metric_name}",
@@ -151,7 +151,7 @@ def main(
     # Calibrate champ model before deployment
     training_features = train_set.drop(class_col_name, axis=1)
     training_class = np.array(train_set[class_col_name])
-    calib_pipeline = prep_champ_model.calibrate_pipeline(
+    calib_pipeline = champ_model_manager.calibrate_pipeline(
         train_features=training_features,
         train_class=training_class,
         preprocessor_step=best_model_pipeline.named_steps["preprocessor"],
@@ -166,9 +166,8 @@ def main(
     # the model by raising error preventing build job.
     best_model_test_score = test_scores.get(f"test_{comparison_metric_name}")
     if best_model_test_score >= deployment_score_thresh:
-        prep_champ_model.log_and_register_champ_model(
+        champ_model_manager.log_and_register_champ_model(
             local_path=artifacts_dir,
-            champ_model_name=champ_model_name,
             pipeline=calib_pipeline,
             exp_obj=best_model_exp_obj,
         )

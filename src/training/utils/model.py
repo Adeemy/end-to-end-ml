@@ -1114,9 +1114,17 @@ class ModelEvaluator(ModelOptimizer):
         return ece[0]
 
 
-class PrepChampModel:
-    """A class to select the best (champion) model, calibrates it, and
-    registers it in workspace."""
+class ModelChampionManager:
+    """Manages all champion model related activities, such as selecting the best
+    performer from candidate models, calibrating the best model, and registering
+    it in workspace.
+
+    Attributes:
+        champ_model_name (str): name of the champion model.
+    """
+
+    def __init__(self, champ_model_name: str) -> None:
+        self.champ_model_name = champ_model_name
 
     def select_best_performer(
         self,
@@ -1206,7 +1214,6 @@ class PrepChampModel:
     def log_and_register_champ_model(
         self,
         local_path: str,
-        champ_model_name: str,
         pipeline: Pipeline,
         exp_obj: ExistingExperiment,
     ) -> None:
@@ -1214,7 +1221,6 @@ class PrepChampModel:
 
         Args:
             local_path (str): local path to save champion model.
-            champ_model_name (str): champion model name.
             pipeline (Pipeline): fitted pipeline.
             exp_obj (ExistingExperiment): comet experiment object.
 
@@ -1224,12 +1230,12 @@ class PrepChampModel:
 
         if not os.path.exists(local_path):
             os.makedirs(local_path)
-        joblib.dump(pipeline, f"{local_path}/{champ_model_name}.pkl")
+        joblib.dump(pipeline, f"{local_path}/{self.champ_model_name}.pkl")
         exp_obj.log_model(
-            name=champ_model_name,
-            file_or_folder=f"{local_path}/{champ_model_name}.pkl",
+            name=self.champ_model_name,
+            file_or_folder=f"{local_path}/{self.champ_model_name}.pkl",
             overwrite=False,
         )
-        exp_obj.register_model(model_name=champ_model_name)
+        exp_obj.register_model(model_name=self.champ_model_name)
         exp_obj.end()
-        print(f"Champion model {champ_model_name} was registered in workspace.")
+        print(f"Champion model {self.champ_model_name} was registered in workspace.")
