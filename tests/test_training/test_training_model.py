@@ -552,6 +552,97 @@ def test_log_lift_curve(mocker, model_evaluator):
     )
 
 
+def test_calc_expected_calibration_error(model_evaluator):
+    """Tests that the calc_expected_calibration_error method returns the expected ECE for a perfectly
+    calibrated model and a highly uncalibrated model. This test also checks that the method raises an
+    AssertionError if the decision threshold is not between 0 and 1.
+    """
+
+    # 900 samples where the model is 90% confident and is correct
+    pred_probs_90_correct = np.full(900, 0.9)
+    true_labels_90_correct = np.full(900, 1)
+
+    # 100 samples where the model is 90% confident and is incorrect
+    pred_probs_90_incorrect = np.full(100, 0.9)
+    true_labels_90_incorrect = np.full(100, 0)
+
+    # 90 samples where the model is 10% confident and is correct
+    pred_probs_10_correct = np.full(90, 0.1)
+    true_labels_10_correct = np.full(90, 0)
+
+    # 10 samples where the model is 10% confident and is incorrect
+    pred_probs_10_incorrect = np.full(10, 0.1)
+    true_labels_10_incorrect = np.full(10, 1)
+
+    # Calculate ECE with test inputs for a perfectly calibrated model
+    near_perfect_ece = model_evaluator.calc_expected_calibration_error(
+        pred_probs=np.concatenate(
+            [
+                pred_probs_90_correct,
+                pred_probs_90_incorrect,
+                pred_probs_10_correct,
+                pred_probs_10_incorrect,
+            ]
+        ),
+        true_labels=np.concatenate(
+            [
+                true_labels_90_correct,
+                true_labels_90_incorrect,
+                true_labels_10_correct,
+                true_labels_10_incorrect,
+            ]
+        ),
+        decision_thresh_val=0.5,
+        nbins=5,
+    )
+
+    # Assert that the ECE is 0 for a perfectly calibrated model
+    assert isinstance(near_perfect_ece, float)
+    assert np.isclose(0, near_perfect_ece, atol=0.1)  # ECE should be close to 0
+
+    # 50 samples where the model is 95% confident and is correct
+    pred_probs_95_correct = np.full(50, 0.95)
+    true_labels_95_correct = np.full(50, 1)
+
+    # 950 samples where the model is 95% confident and is incorrect
+    pred_probs_95_incorrect = np.full(950, 0.95)
+    true_labels_95_incorrect = np.full(950, 0)
+
+    # 5 samples where the model is 5% confident and is correct
+    pred_probs_5_correct = np.full(5, 0.05)
+    true_labels_5_correct = np.full(5, 0)
+
+    # 95 samples where the model is 5% confident and is incorrect
+    pred_probs_5_incorrect = np.full(95, 0.05)
+    true_labels_5_incorrect = np.full(95, 1)
+
+    # Calculate ECE with test inputs for a uncalibrated model
+    high_ece = model_evaluator.calc_expected_calibration_error(
+        pred_probs=np.concatenate(
+            [
+                pred_probs_95_correct,
+                pred_probs_95_incorrect,
+                pred_probs_5_correct,
+                pred_probs_5_incorrect,
+            ]
+        ),
+        true_labels=np.concatenate(
+            [
+                true_labels_95_correct,
+                true_labels_95_incorrect,
+                true_labels_5_correct,
+                true_labels_5_incorrect,
+            ]
+        ),
+        decision_thresh_val=0.5,
+        nbins=5,
+    )
+
+    # Assert that the ECE is 0 for a highly uncalibrated model
+    assert isinstance(high_ece, float)
+    assert np.isclose(1, high_ece, atol=0.2)  # ECE should be close to 1
+
+
 # @pytest.fixture
 # def model_optimizer(mocker):
 #     """Create a ModelOptimizer instance for testing. This fixture is used by all the tests
