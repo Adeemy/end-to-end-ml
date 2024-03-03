@@ -1008,7 +1008,7 @@ class ModelEvaluator(ModelOptimizer):
         """Logs cumulative gains curve for the best model on the validation set.
 
         Args:
-            pred_probs (np.ndarray): predicted probabilities of the positive class.
+            pred_probs (1-D np.ndarray): predicted probabilities of the positive class.
             valid_class (np.ndarray): validation class labels.
 
         Returns:
@@ -1016,7 +1016,9 @@ class ModelEvaluator(ModelOptimizer):
         """
 
         cum_gain_fig = self.plot_cumulative_gains(
-            y_true=valid_class, y_pred=pred_probs, fig_size=(6, 6)
+            y_true=valid_class,
+            y_pred=pred_probs[:, self.encoded_pos_class_label],
+            fig_size=(6, 6),
         )
         self.comet_exp.log_figure(
             figure_name="Cumulative Gain", figure=cum_gain_fig, overwrite=True
@@ -1026,7 +1028,7 @@ class ModelEvaluator(ModelOptimizer):
         """Logs lift curve for the best model on the validation set.
 
         Args:
-            pred_probs (np.ndarray): predicted probabilities of the positive class.
+            pred_probs (1-D np.ndarray): predicted probabilities of the positive class.
             valid_class (np.ndarray): validation class labels.
 
         Returns:
@@ -1034,7 +1036,9 @@ class ModelEvaluator(ModelOptimizer):
         """
 
         lift_curve_fig = self.plot_lift_curve(
-            y_true=valid_class, y_pred=pred_probs, fig_size=(6, 6)
+            y_true=valid_class,
+            y_pred=pred_probs[:, self.encoded_pos_class_label],
+            fig_size=(6, 6),
         )
         self.comet_exp.log_figure(
             figure_name="Lift Curve", figure=lift_curve_fig, overwrite=True
