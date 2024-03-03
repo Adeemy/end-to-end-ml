@@ -3,7 +3,11 @@ import optuna
 import optuna_distributed
 import pandas as pd
 import pytest
+from sklearn.compose import ColumnTransformer
+from sklearn.feature_selection import VarianceThreshold
 from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import FunctionTransformer
 
 from src.training.utils.model import ModelOptimizer
 
@@ -180,3 +184,82 @@ def test_model_optimizer_tune_model_in_parallel(mocker, model_optimizer):
     # Check that the returned study object is not None
     assert study
     assert isinstance(study, optuna_distributed.study.DistributedStudy)
+
+
+def test_create_pipeline():
+    """Tests that the create_pipeline method returns a pipeline with the expected steps."""
+
+    # Create mock preprocessor, selector, and model
+    preprocessor_step = ColumnTransformer(transformers=[])
+    selector_step = VarianceThreshold()
+    model = LogisticRegression()
+
+    pipeline = ModelOptimizer.create_pipeline(preprocessor_step, selector_step, model)
+
+    assert isinstance(pipeline, Pipeline)
+    assert len(pipeline.steps) == 3
+    assert pipeline.steps[0][0] == "preprocessor"
+    assert isinstance(pipeline.steps[0][1], ColumnTransformer)
+    assert pipeline.steps[1][0] == "selector"
+    assert isinstance(pipeline.steps[1][1], VarianceThreshold)
+    assert pipeline.steps[2][0] == "classifier"
+    assert isinstance(pipeline.steps[2][1], LogisticRegression)
+
+
+def test_fit_pipeline(mocker, model_optimizer):
+    """Tests that the fit_pipeline method returns a pipeline with the expected steps.
+    This test also mocks the fit method of the pipeline to track its calls, i.e.,
+    interaction testing.
+    """
+
+    # Set the required attributes
+    model_optimizer.train_class = np.random.randint(0, 2, size=10)
+    model_optimizer.n_features = 5
+
+    # Create mock train_features, preprocessor, selector, and model
+    train_features = pd.DataFrame(
+        {
+            "feat1": np.random.rand(10),
+            "feat2": np.random.rand(10),
+            "feat3": np.random.rand(10),
+            "feat4": np.random.rand(10),
+            "feat5": np.random.rand(10),
+        }
+    )
+    preprocessor_step = ColumnTransformer(
+        transformers=[
+            (
+                "passthrough",
+                FunctionTransformer(),
+                ["feat1", "feat2", "feat3", "feat4", "feat5"],
+            )
+        ]
+    )
+    selector_step = VarianceThreshold(
+        threshold=0
+    )  # threshold=0 means no features will be removed
+    model = LogisticRegression()
+
+    # Create a spy on the fit_pipeline method to track its calls
+    spy = mocker.spy(model_optimizer, "fit_pipeline")
+
+    # Call the fit_pipeline method
+    pipeline = model_optimizer.fit_pipeline(
+        train_features, preprocessor_step, selector_step, model
+    )
+
+    # Check that the fit method of the pipeline was called with the correct arguments
+    called_args = spy.call_args
+
+    # Check that the returned pipeline is not None
+    assert isinstance(pipeline, Pipeline)
+
+    # Check if fit_pipeline was called with the expected arguments (interaction testing assertions)
+    assert isinstance(called_args[0][0], pd.DataFrame)
+    assert called_args[0][0].equals(train_features)
+    assert isinstance(called_args[0][1], ColumnTransformer)
+    assert isinstance(called_args[0][2], VarianceThreshold)
+    assert isinstance(called_args[0][3], LogisticRegression)
+
+    # Check if fit_pipeline fits the logistic regression model
+    assert pipeline.named_steps["classifier"].coef_ is not None
