@@ -5,6 +5,7 @@ import optuna_distributed
 import pandas as pd
 import pytest
 from comet_ml import Experiment
+from sklearn.calibration import CalibrationDisplay
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.linear_model import LogisticRegression
@@ -375,6 +376,180 @@ def test_get_original_class_labels(mocker, model_evaluator):
     assert (
         original_class_labels == expected_original_class_labels
     ), "The method did not return the expected original class labels"
+
+
+def test_log_confusion_matrix(mocker, model_evaluator):
+    """Tests that the _log_confusion_matrix method logs the confusion matrix. This test also
+    checks that the method logs the confusion matrix the correct number of times.
+    """
+
+    # Create a mock comet_exp to test number of calls by the method
+    mock_comet_exp = mocker.MagicMock(Experiment)
+    model_evaluator.comet_exp = mock_comet_exp
+
+    # Define test inputs
+    original_train_class = np.array(["class0", "class1", "class1"])
+    pred_original_train_class = np.array(["class1", "class0", "class1"])
+    original_valid_class = np.array(["class0", "class1", "class1"])
+    pred_original_valid_class = np.array(["class1", "class0", "class1"])
+    original_class_labels = ["class0", "class1"]
+
+    model_evaluator._log_confusion_matrix(
+        original_train_class,
+        pred_original_train_class,
+        original_valid_class,
+        pred_original_valid_class,
+        original_class_labels,
+    )
+
+    # Assert that the log_confusion_matrix method was called the correct number of times
+    assert (
+        mock_comet_exp.log_confusion_matrix.call_count == 4
+    ), f"""The log_confusion_matrix method was not called the correct number of times 
+    ({mock_comet_exp.log_confusion_matrix.call_count} calls)."""
+
+
+def test_log_calibration_curve(mocker, model_evaluator):
+    """Tests that the _log_calibration_curve method logs the calibration curve. This test also
+    checks that the method logs the calibration curve the correct number of times.
+    """
+
+    # Create a mock comet_exp to test number of calls by the method
+    mock_comet_exp = mocker.MagicMock(Experiment)
+    model_evaluator.comet_exp = mock_comet_exp
+
+    # Define test inputs
+    model_evaluator.valid_class = np.array([0, 1, 1])
+    model_evaluator.encoded_pos_class_label = (
+        1  # assuming positive class is encoded as 1
+    )
+    pred_probs = np.array([[0.1, 0.9], [0.8, 0.2], [0.4, 0.6]])
+
+    # Call the method with the test inputs
+    model_evaluator._log_calibration_curve(pred_probs)
+
+    # Assert that the log_figure method was called once
+    assert (
+        mock_comet_exp.log_figure.call_count == 1
+    ), f"""The log_figure method was not called the correct number of times 
+    ({mock_comet_exp.log_figure.call_count} calls)"""
+
+
+def test_log_roc_curve(mocker, model_evaluator):
+    """Tests that the _log_roc_curve method logs the ROC curve. This test also checks that the method
+    logs the ROC curve the correct number of times.
+    """
+
+    # Create a mock comet_exp to test number of calls by the method
+    mock_comet_exp = mocker.MagicMock(Experiment)
+    model_evaluator.comet_exp = mock_comet_exp
+
+    # Define test inputs
+    model_evaluator.valid_class = np.array([0, 1, 1])
+    encoded_pos_class_label = 1  # assuming positive class is encoded as 1
+    pred_probs = np.array([[0.1, 0.9], [0.8, 0.2], [0.4, 0.6]])
+
+    # Mock the plot_roc_curve method to return a MagicMock (which will stand in for the figure)
+    mock_figure = mocker.MagicMock(plt.Figure)
+    with mocker.patch.object(
+        ModelEvaluator, "plot_roc_curve", return_value=mock_figure
+    ):
+        # Call the method with the test inputs
+        model_evaluator._log_roc_curve(pred_probs, encoded_pos_class_label)
+
+    # Assert that the log_figure method was called once with the correct arguments
+    mock_comet_exp.log_figure.assert_called_once_with(
+        figure_name="ROC Curve", figure=mock_figure, overwrite=True
+    )
+
+
+def test_log_precision_recall_curve(monkeypatch, mocker, model_evaluator):
+    """Tests that the _log_precision_recall_curve method logs the precision-recall curve. This test also
+    checks that the method logs the precision-recall curve the correct number of times.
+    """
+
+    # Create a mock comet_exp to test number of calls by the method
+    mock_comet_exp = mocker.MagicMock(Experiment)
+    model_evaluator.comet_exp = mock_comet_exp
+
+    # Define test inputs
+    model_evaluator.valid_class = np.array([0, 1, 1])
+    encoded_pos_class_label = 1  # assuming positive class is encoded as 1
+    pred_probs = np.array([[0.1, 0.9], [0.8, 0.2], [0.4, 0.6]])
+
+    # Mock the plot_precision_recall_curve method to return a MagicMock (which will stand in for the figure)
+    mock_figure = mocker.MagicMock(plt.Figure)
+    monkeypatch.setattr(
+        model_evaluator,
+        "plot_precision_recall_curve",
+        lambda *args, **kwargs: mock_figure,
+    )
+
+    # Call the method with the test inputs
+    model_evaluator._log_precision_recall_curve(pred_probs, encoded_pos_class_label)
+
+    # Assert that the log_figure method was called once with the correct arguments
+    mock_comet_exp.log_figure.assert_called_once_with(
+        figure_name="Precision-Recall Curve", figure=mock_figure, overwrite=True
+    )
+
+
+def test_log_cumulative_gains(mocker, model_evaluator):
+    """Tests that the _log_cumulative_gains method logs the cumulative gains plot. This test also
+    checks that the method logs the cumulative gains plot the correct number of times.
+    """
+
+    # Create a mock comet_exp to test number of calls by the method
+    mock_comet_exp = mocker.MagicMock(Experiment)
+    model_evaluator.comet_exp = mock_comet_exp
+
+    # Define test inputs
+    valid_class = np.array([0, 1, 1])
+    pred_probs = np.array([[0.1, 0.9], [0.8, 0.2], [0.4, 0.6]])
+    model_evaluator.encoded_pos_class_label = (
+        1  # Assuming positive class is encoded as 1
+    )
+
+    # Mock the plot_cumulative_gains method to return a MagicMock (which will stand in for the figure)
+    mock_figure = mocker.MagicMock(plt.Figure)
+    mocker.patch.object(
+        model_evaluator, "plot_cumulative_gains", return_value=mock_figure
+    )
+
+    # Call the method with the test inputs
+    model_evaluator._log_cumulative_gains(pred_probs, valid_class)
+
+    # Assert that the log_figure method was called once with the correct arguments
+    mock_comet_exp.log_figure.assert_called_once_with(
+        figure_name="Cumulative Gain", figure=mock_figure, overwrite=True
+    )
+
+
+def test_log_lift_curve(mocker, model_evaluator):
+    """Tests that the _log_lift_curve method logs the lift curve. This test also checks that the method
+    logs the lift curve the correct number of times.
+    """
+
+    # Create a mock comet_exp to test number of calls by the method
+    mock_comet_exp = mocker.MagicMock(Experiment)
+    model_evaluator.comet_exp = mock_comet_exp
+
+    # Define test inputs
+    valid_class = np.array([0, 1, 1])
+    pred_probs = np.array([[0.1, 0.9], [0.8, 0.2], [0.4, 0.6]])
+    model_evaluator.encoded_pos_class_label = (
+        1  # Assuming positive class is encoded as 1
+    )
+
+    # Mock the plot_lift_curve method to return a MagicMock (which will stand in for the figure)
+    mock_figure = mocker.MagicMock(plt.Figure)
+    mocker.patch.object(model_evaluator, "plot_lift_curve", return_value=mock_figure)
+    model_evaluator._log_lift_curve(pred_probs, valid_class)
+
+    # Assert that the log_figure method was called once with the correct arguments
+    mock_comet_exp.log_figure.assert_called_once_with(
+        figure_name="Lift Curve", figure=mock_figure, overwrite=True
+    )
 
 
 # @pytest.fixture

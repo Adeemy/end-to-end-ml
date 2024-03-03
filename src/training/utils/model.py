@@ -454,7 +454,7 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns:
-            figure_obj (plt.figure.Figure): figure object that can be logged.
+            figure_obj (plt.Figure): figure object that can be logged.
 
         Raises:
             ValueError: if feature names and feature importance scores have different lengths.
@@ -616,7 +616,7 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns
-            fig (plt.figure.Figure): matplotlib figure object that can be logged and saved.
+            fig (plt.Figure): matplotlib figure object that can be logged and saved.
         """
 
         # Compute the FPR, TPR, and thresholds
@@ -651,7 +651,7 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns
-            fig (plt.figure.Figure): matplotlib figure object that can be logged and saved.
+            fig (plt.Figure): matplotlib figure object that can be logged and saved.
         """
 
         # Compute the precision, recall, and thresholds
@@ -679,7 +679,7 @@ class ModelEvaluator(ModelOptimizer):
         y_true: np.array,
         y_pred: np.array,
         fig_size: tuple = (6, 6),
-    ) -> None:
+    ) -> Figure:
         """Plots the cumulative gains curve for a binary classification model. It
         shows the percentage of positive cases captured by the model as a function
         of the percentage of the sample that is predicted as positive.
@@ -690,7 +690,7 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns:
-            fig (plt.figure.Figure): matplotlib figure object.
+            fig (plt.Figure): matplotlib figure object.
         """
 
         kds.metrics.plot_cumulative_gain(y_true, y_pred, figsize=fig_size)
@@ -701,7 +701,7 @@ class ModelEvaluator(ModelOptimizer):
     @staticmethod
     def plot_lift_curve(
         y_true: np.array, y_pred: np.array, fig_size: tuple = (6, 6)
-    ) -> None:
+    ) -> Figure:
         """Plots the lift curve for a binary classification model.
         It shows the ratio of the positive cases captured by the model to the
         baseline (random) model as a function of the percentage of the sample
@@ -713,7 +713,7 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns
-            fig (plt.figure.Figure): matplotlib figure object.
+            fig (plt.Figure): matplotlib figure object.
         """
 
         kds.metrics.plot_lift(y_true, y_pred, figsize=fig_size)
