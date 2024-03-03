@@ -2,12 +2,13 @@
 Tests helper functions of feature pipeline.
 """
 
+import re
 from datetime import date
 
 import pandas as pd
 import pytest
 
-from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
+from src.feature_store.utils.prep import DataSplitter
 
 
 @pytest.fixture
@@ -62,6 +63,17 @@ def test_split_dataset_random(split_dataset_data):
     train_set_random, test_set_random = data_splitter_class.split_dataset(
         split_type="random"
     )
+
+    # Assert that ValueError is raised when split_type is not 'random' or 'time'
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            f"split_type must be 'random' or 'time'. Got not_random instead!"
+        ),
+    ):
+        train_set_random, test_set_random = data_splitter_class.split_dataset(
+            split_type="not_random"
+        )
 
     # Assert that the train and test sets are dataframes
     assert isinstance(train_set_random, pd.DataFrame)

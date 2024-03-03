@@ -10,7 +10,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, RobustScaler
 
 from src.feature_store.utils.prep import DataSplitter
-from src.training.utils.data import DataPipelineCreator, PrepTrainingData
+from src.training.utils.data import DataPipelineCreator, TrainingDataPrep
 
 
 @pytest.fixture
@@ -256,8 +256,8 @@ def training_data_prep():
         }
     )
 
-    # Create an instance of PrepTrainingData
-    data_prep = PrepTrainingData(
+    # Create an instance of TrainingDataPrep
+    data_prep = TrainingDataPrep(
         train_set=train_set,
         test_set=test_set,
         primary_key="id",
@@ -270,10 +270,10 @@ def training_data_prep():
 
 
 def test_select_relevant_columns(training_data_prep):
-    """Tests the select_relevant_columns method of the PrepTrainingData class. The method
+    """Tests the select_relevant_columns method of the TrainingDataPrep class. The method
     should select the relevant columns from the train and test sets. The relevant columns
     are the primary key, numerical features, categorical features, and the target variable
-    specified in PrepTrainingData initialization. The method should remove any other
+    specified in TrainingDataPrep initialization. The method should remove any other
     columns from the train and test sets. The expected output is the train and test sets
     with only the relevant columns.
     """
@@ -294,7 +294,7 @@ def test_select_relevant_columns(training_data_prep):
 
 
 def test_enforce_data_types(training_data_prep):
-    """Tests the enforce_data_types method of the PrepTrainingData class. The method
+    """Tests the enforce_data_types method of the TrainingDataPrep class. The method
     should enforce the specified data types for the numerical and categorical features
     in the train and test sets. The method should also replace common missing values in
     categorical features np.nan because it calls replace_common_missing_values method
@@ -349,7 +349,7 @@ def test_extract_features(training_data_prep):
 
 
 def test_encode_class_labels(training_data_prep):
-    """Tests the encode_class_labels method of the PrepTrainingData class. The method
+    """Tests the encode_class_labels method of the TrainingDataPrep class. The method
     should encode the class labels in the train, validation, and test sets. The method
     should also return the encoded class labels, the encoded positive class label, and
     the fitted class encoder.
@@ -400,7 +400,7 @@ def test_create_data_transformation_pipeline(test_df):
     train_set, test_set = data_splitter.split_dataset()
 
     # Apply all steps before encoding class labels to ensure this test is independent of other tests
-    data_prep = PrepTrainingData(
+    data_prep = TrainingDataPrep(
         train_set=train_set,
         test_set=test_set,
         primary_key="id",
@@ -427,7 +427,7 @@ def test_create_data_transformation_pipeline(test_df):
 
 
 def test_clean_up_feature_names(training_data_prep):
-    """Tests the clean_up_feature_names method of the PrepTrainingData class. The method
+    """Tests the clean_up_feature_names method of the TrainingDataPrep class. The method
     should clean up the column names of the training, validation, and testing features
     by removing special characters and replacing them with underscores. The method should
     also clean up the column names of the preprocessed training and validation features.
@@ -465,7 +465,7 @@ def test_clean_up_feature_names(training_data_prep):
 
 
 def test_get_feature_names(training_data_prep):
-    """Tests the get_feature_names method of the PrepTrainingData class. The method
+    """Tests the get_feature_names method of the TrainingDataPrep class. The method
     should return the names of the numerical and categorical features in the training
     set.
     """

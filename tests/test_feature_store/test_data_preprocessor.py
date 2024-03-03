@@ -9,7 +9,7 @@ import pandas as pd
 import pandas.api.types as ptypes
 import pytest
 
-from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
+from src.feature_store.utils.prep import DataPreprocessor
 
 
 #################################
@@ -62,7 +62,7 @@ def test_check_duplicate_rows(remove_duplicates_by_unique_id_data, capsys):
     # Extract class column and test data
     (
         input_data_id,
-        test_data_with_unique_id,
+        _,
         test_data_with_non_unique_id,
     ) = remove_duplicates_by_unique_id_data
 
@@ -119,6 +119,20 @@ def test_remove_duplicates_by_primary_key(remove_duplicates_by_unique_id_data):
     output_data_with_non_unique_id = (
         test_data_with_non_unique_id_class.get_preprocessed_data()
     )
+
+    # Assert that the function raises an error if no primary key is provided
+    with pytest.raises(
+        ValueError, match=re.escape("No primary key column(s) provided!")
+    ):
+        test_data_without_unique_id_class = DataPreprocessor(
+            input_data=test_data_with_unique_id,
+            primary_key_names=[],
+            date_cols_names=None,
+            datetime_cols_names=None,
+            num_feature_names=None,
+            cat_feature_names=input_data_id,  # specified to pass assertion that at least one feature must be specified.
+        )
+        test_data_without_unique_id_class.remove_duplicates_by_primary_key()
 
     # Assert that the output data is a dataframe
     assert isinstance(output_data_with_unique_id, pd.DataFrame)

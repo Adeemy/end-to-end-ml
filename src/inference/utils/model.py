@@ -15,7 +15,8 @@ from src.training.utils.config import Config
 
 
 class ModelLoader:
-    """Loads scoring models for inference.
+    """Loads scoring models for inference. It creates Comet API instance
+    if comet_api is not provided and comet_api_key is provided.
 
     Attributes:
         comet_api (comet_ml.API): Comet API instance needed to download models.

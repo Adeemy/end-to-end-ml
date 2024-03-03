@@ -20,7 +20,7 @@ from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 from xgboost import XGBClassifier
 
 from src.training.utils.config import Config
-from src.training.utils.data import PrepTrainingData
+from src.training.utils.data import TrainingDataPrep
 from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
@@ -137,7 +137,7 @@ def main(
     cat_col_names = [col for col in cat_col_names if col in training_set.columns]
 
     # Prepare data for training
-    data_prep = PrepTrainingData(
+    data_prep = TrainingDataPrep(
         train_set=training_set,
         test_set=testing_set,
         primary_key=pk_col_name,
@@ -365,7 +365,7 @@ def main(
 
     if len(exp_objects) == 0:
         raise ValueError(
-            "No model was selected for training or all training experiments failed."
+            "No model was selected in config for training or all training experiments failed."
         )
 
     # Save names of successful experiments names so that logged training

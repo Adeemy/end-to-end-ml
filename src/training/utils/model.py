@@ -7,12 +7,12 @@ import os
 from typing import Callable, Optional, Union
 
 import joblib
+import kds
 import matplotlib.pyplot as plt
 import numpy as np
 import optuna
 import optuna_distributed
 import pandas as pd
-import scikitplot as skplt
 from comet_ml import API, ExistingExperiment, Experiment
 from dask.distributed import Client
 from matplotlib.figure import Figure
@@ -129,7 +129,7 @@ class ModelOptimizer:
 
         return params
 
-    def calculate_performance_metrics(
+    def calc_perf_metrics(
         self,
         true_class: ArrayLike,
         pred_class: ArrayLike,
@@ -202,11 +202,11 @@ class ModelOptimizer:
         # other htreshold values can be used, which is problem-dependent.
         pred_train_preds = self.model.predict(self.train_features_preprocessed)
         pred_valid_preds = self.model.predict(self.valid_features_preprocessed)
-        train_scores = self.calculate_performance_metrics(
+        train_scores = self.calc_perf_metrics(
             true_class=self.train_class,
             pred_class=pred_train_preds,
         )
-        valid_scores = self.calculate_performance_metrics(
+        valid_scores = self.calc_perf_metrics(
             true_class=self.valid_class,
             pred_class=pred_valid_preds,
         )
@@ -454,7 +454,7 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns:
-            figure_obj (plt.figure.Figure): figure object that can be logged.
+            figure_obj (plt.Figure): figure object that can be logged.
 
         Raises:
             ValueError: if feature names and feature importance scores have different lengths.
@@ -468,6 +468,8 @@ class ModelEvaluator(ModelOptimizer):
                 kind="barh", fontsize=font_size, legend=None, figsize=fig_size
             )
             plt.title(f"Top {n_top_features} important features")
+            plt.xlabel("Contribution")
+            plt.ylabel("Feature Name")
             plt.show()
 
         except ValueError as e:
@@ -614,7 +616,7 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns
-            fig (plt.figure.Figure): matplotlib figure object that can be logged and saved.
+            fig (plt.Figure): matplotlib figure object that can be logged and saved.
         """
 
         # Compute the FPR, TPR, and thresholds
@@ -649,7 +651,7 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns
-            fig (plt.figure.Figure): matplotlib figure object that can be logged and saved.
+            fig (plt.Figure): matplotlib figure object that can be logged and saved.
         """
 
         # Compute the precision, recall, and thresholds
@@ -677,7 +679,7 @@ class ModelEvaluator(ModelOptimizer):
         y_true: np.array,
         y_pred: np.array,
         fig_size: tuple = (6, 6),
-    ) -> None:
+    ) -> Figure:
         """Plots the cumulative gains curve for a binary classification model. It
         shows the percentage of positive cases captured by the model as a function
         of the percentage of the sample that is predicted as positive.
@@ -688,21 +690,18 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns:
-            ax.get_figure(): figure object that can be logged and saved.
+            fig (plt.Figure): matplotlib figure object.
         """
 
-        ax = skplt.metrics.plot_cumulative_gain(y_true, y_pred, figsize=fig_size)
-        plt.title("Cumulative Gains Curve")
-        plt.xlabel("Percentage of sample")
-        plt.ylabel("Percentage of positive outcomes")
-        plt.show()
+        kds.metrics.plot_cumulative_gain(y_true, y_pred, figsize=fig_size)
+        fig = plt.gcf()
 
-        return ax.get_figure()
+        return fig
 
     @staticmethod
     def plot_lift_curve(
         y_true: np.array, y_pred: np.array, fig_size: tuple = (6, 6)
-    ) -> None:
+    ) -> Figure:
         """Plots the lift curve for a binary classification model.
         It shows the ratio of the positive cases captured by the model to the
         baseline (random) model as a function of the percentage of the sample
@@ -714,16 +713,13 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns
-            ax.get_figure(): figure object that can be logged and saved.
+            fig (plt.Figure): matplotlib figure object.
         """
 
-        ax = skplt.metrics.plot_lift_curve(y_true, y_pred, figsize=fig_size)
-        plt.title("Lift Curve")
-        plt.xlabel("Percentage of samples")
-        plt.ylabel("Lift")
-        plt.show()
+        kds.metrics.plot_lift(y_true, y_pred, figsize=fig_size)
+        fig = plt.gcf()
 
-        return ax.get_figure()
+        return fig
 
     @staticmethod
     def convert_metrics_from_df_to_dict(
@@ -778,11 +774,11 @@ class ModelEvaluator(ModelOptimizer):
         )
 
         # Calculate performance metrics on train and validation sets
-        train_scores = self.calculate_performance_metrics(
+        train_scores = self.calc_perf_metrics(
             true_class=self.train_class,
             pred_class=pred_train_class,
         )
-        valid_scores = self.calculate_performance_metrics(
+        valid_scores = self.calc_perf_metrics(
             true_class=self.valid_class,
             pred_class=pred_valid_class,
         )
@@ -1012,7 +1008,7 @@ class ModelEvaluator(ModelOptimizer):
         """Logs cumulative gains curve for the best model on the validation set.
 
         Args:
-            pred_probs (np.ndarray): predicted probabilities of the positive class.
+            pred_probs (1-D np.ndarray): predicted probabilities of the positive class.
             valid_class (np.ndarray): validation class labels.
 
         Returns:
@@ -1020,7 +1016,9 @@ class ModelEvaluator(ModelOptimizer):
         """
 
         cum_gain_fig = self.plot_cumulative_gains(
-            y_true=valid_class, y_pred=pred_probs, fig_size=(6, 6)
+            y_true=valid_class,
+            y_pred=pred_probs[:, self.encoded_pos_class_label],
+            fig_size=(6, 6),
         )
         self.comet_exp.log_figure(
             figure_name="Cumulative Gain", figure=cum_gain_fig, overwrite=True
@@ -1030,7 +1028,7 @@ class ModelEvaluator(ModelOptimizer):
         """Logs lift curve for the best model on the validation set.
 
         Args:
-            pred_probs (np.ndarray): predicted probabilities of the positive class.
+            pred_probs (1-D np.ndarray): predicted probabilities of the positive class.
             valid_class (np.ndarray): validation class labels.
 
         Returns:
@@ -1038,7 +1036,9 @@ class ModelEvaluator(ModelOptimizer):
         """
 
         lift_curve_fig = self.plot_lift_curve(
-            y_true=valid_class, y_pred=pred_probs, fig_size=(6, 6)
+            y_true=valid_class,
+            y_pred=pred_probs[:, self.encoded_pos_class_label],
+            fig_size=(6, 6),
         )
         self.comet_exp.log_figure(
             figure_name="Lift Curve", figure=lift_curve_fig, overwrite=True
@@ -1114,9 +1114,17 @@ class ModelEvaluator(ModelOptimizer):
         return ece[0]
 
 
-class PrepChampModel:
-    """A class to select the best (champion) model, calibrates it, and
-    registers it in workspace."""
+class ModelChampionManager:
+    """Manages all champion model related activities, such as selecting the best
+    performer from candidate models, calibrating the best model, and registering
+    it in workspace.
+
+    Attributes:
+        champ_model_name (str): name of the champion model.
+    """
+
+    def __init__(self, champ_model_name: str) -> None:
+        self.champ_model_name = champ_model_name
 
     def select_best_performer(
         self,
@@ -1206,7 +1214,6 @@ class PrepChampModel:
     def log_and_register_champ_model(
         self,
         local_path: str,
-        champ_model_name: str,
         pipeline: Pipeline,
         exp_obj: ExistingExperiment,
     ) -> None:
@@ -1214,7 +1221,6 @@ class PrepChampModel:
 
         Args:
             local_path (str): local path to save champion model.
-            champ_model_name (str): champion model name.
             pipeline (Pipeline): fitted pipeline.
             exp_obj (ExistingExperiment): comet experiment object.
 
@@ -1224,12 +1230,11 @@ class PrepChampModel:
 
         if not os.path.exists(local_path):
             os.makedirs(local_path)
-        joblib.dump(pipeline, f"{local_path}/{champ_model_name}.pkl")
+        joblib.dump(pipeline, f"{local_path}/{self.champ_model_name}.pkl")
         exp_obj.log_model(
-            name=champ_model_name,
-            file_or_folder=f"{local_path}/{champ_model_name}.pkl",
+            name=self.champ_model_name,
+            file_or_folder=f"{local_path}/{self.champ_model_name}.pkl",
             overwrite=False,
         )
-        exp_obj.register_model(model_name=champ_model_name)
+        exp_obj.register_model(model_name=self.champ_model_name)
         exp_obj.end()
-        print(f"Champion model {champ_model_name} was registered in workspace.")

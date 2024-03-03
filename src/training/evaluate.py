@@ -21,7 +21,7 @@ from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
 
 from src.training.utils.config import Config
-from src.training.utils.model import ModelEvaluator, PrepChampModel
+from src.training.utils.model import ModelChampionManager, ModelEvaluator
 from src.utils.logger import LoggerWriter
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
 
@@ -74,7 +74,8 @@ def main(
     ]
 
     # Import train and test sets to evaluate best model on test set
-    # Note: it requires class labels to be encoded.
+    # Note: it requires class labels to be encoded. An integration
+    # test should be added to ensure the class labels are encoded.
     train_set = pd.read_parquet(
         data_dir / train_set_file_name,
     )
@@ -82,6 +83,8 @@ def main(
     test_set = pd.read_parquet(
         data_dir / test_set_file_name,
     )
+
+    logger.info("Imported train and test sets.")
 
     #############################################
     # Rename comparison metric if it's fbeta_score to include beta value
@@ -99,13 +102,15 @@ def main(
         )
 
     # Select the best performing model
-    prep_champ_model = PrepChampModel()
-    best_model_name = prep_champ_model.select_best_performer(
+    champ_model_manager = ModelChampionManager(champ_model_name=champ_model_name)
+    best_model_name = champ_model_manager.select_best_performer(
         comet_project_name=project_name,
         comet_workspace_name=workspace_name,
         comparison_metric=f"valid_{comparison_metric_name}",
         comet_exp_keys=successful_exp_keys,
     )
+
+    logger.info(f"Best candidate model is {best_model_name}.")
 
     # Create ExistingExperiment object to allow appending logging new metrics
     best_model_exp_key = successful_exp_keys.loc[
@@ -151,7 +156,7 @@ def main(
     # Calibrate champ model before deployment
     training_features = train_set.drop(class_col_name, axis=1)
     training_class = np.array(train_set[class_col_name])
-    calib_pipeline = prep_champ_model.calibrate_pipeline(
+    calib_pipeline = champ_model_manager.calibrate_pipeline(
         train_features=training_features,
         train_class=training_class,
         preprocessor_step=best_model_pipeline.named_steps["preprocessor"],
@@ -160,15 +165,16 @@ def main(
         cv_folds=calib_cv_folds,
     )
 
+    logger.info(f"Champion model {best_model_name} was calibrated.")
+
     # Log and register champion model (in Comet, model must be logged first)
     # Note: the best model should not be deployed in production if its score
     # on the test set is below minimum score. Otherwise, prevent deploying
     # the model by raising error preventing build job.
     best_model_test_score = test_scores.get(f"test_{comparison_metric_name}")
     if best_model_test_score >= deployment_score_thresh:
-        prep_champ_model.log_and_register_champ_model(
+        champ_model_manager.log_and_register_champ_model(
             local_path=artifacts_dir,
-            champ_model_name=champ_model_name,
             pipeline=calib_pipeline,
             exp_obj=best_model_exp_obj,
         )
@@ -180,7 +186,8 @@ def main(
 
     else:
         raise ValueError(
-            f"Best model score is {best_model_test_score}, which is lower than deployment threshold {deployment_score_thresh}."
+            f"""Best model score is {best_model_test_score}, which is lower than 
+                         deployment threshold {deployment_score_thresh}."""
         )
 
 
@@ -203,7 +210,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load the configuration file
-    logging.config.fileConfig(args.logger_path)
+    try:
+        logging.config.fileConfig(args.logger_path)
+    except KeyError as e:
+        raise KeyError(
+            f"Failed to load logger configuration file: {args.logger_path}"
+        ) from e
 
     # Get the logger objects by name
     console_logger = logging.getLogger("console_logger")
