@@ -365,7 +365,7 @@ def main(
 
     if len(exp_objects) == 0:
         raise ValueError(
-            "No model was selected for training or all training experiments failed."
+            "No model was selected in config for training or all training experiments failed."
         )
 
     # Save names of successful experiments names so that logged training
