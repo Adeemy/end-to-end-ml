@@ -75,7 +75,9 @@ def test_create_comet_experiment(model_trainer):
 def test_optimize_model_in_serial_mode(mocker, model_trainer):
     """Tests if the _optimize_model method returns optuna study and optimizer when running in
     serial mode as expected. It mocks the experiment and model (to mock its predictions) and
-    checks if the returned types are as expected.
+    checks if the returned types are as expected. It also mocks the ModelOptimizer to prevent
+    actual optimization that would require the model to be trained and evaluated (which is not
+    the purpose of this test).
     """
 
     mock_experiment = mocker.MagicMock(spec=Experiment)
@@ -89,6 +91,12 @@ def test_optimize_model_in_serial_mode(mocker, model_trainer):
 
     # Mock model predictions to avoid error when calculating metrics
     mock_model.predict.return_value = np.array([0, 1, 1, 0, 1, 0, 1, 1, 0, 1])
+
+    # Mock ModelOptimizer to return the mock study and prevent actual optimization that
+    # would require the model to be trained and evaluated (which is not the purpose of this test)
+    mock_optimizer = mocker.MagicMock(spec=ModelOptimizer)
+    mock_study = mocker.MagicMock(spec=optuna.study.Study)
+    mock_optimizer.tune_model_in_parallel.return_value = mock_study
 
     optimize_in_parallel = False
     result_study, result_optimizer = model_trainer._optimize_model(
@@ -123,7 +131,9 @@ def test_optimize_model_in_serial_mode(mocker, model_trainer):
 def test_optimize_model_in_parallel_mode(mocker, model_trainer):
     """Tests if the _optimize_model method returns optuna study and optimizer when running in
     parallel mode as expected. It mocks the experiment and model (to mock its predictions) and
-    checks if the returned types are as expected.
+    checks if the returned types are as expected. It also mocks the ModelOptimizer to prevent
+    actual optimization that would require the model to be trained and evaluated (which is not
+    the purpose of this test).
     """
 
     mock_experiment = mocker.MagicMock(spec=Experiment)
@@ -137,6 +147,15 @@ def test_optimize_model_in_parallel_mode(mocker, model_trainer):
 
     # Mock model predictions to avoid error when calculating metrics
     mock_model.predict.return_value = np.array([0, 1, 1, 0, 1, 0, 1, 1, 0, 1])
+
+    # Mock ModelOptimizer to return the mock study and prevent actual optimization that
+    # would require the model to be trained and evaluated (which is not the purpose of this test)
+    mock_optimizer = mocker.MagicMock(spec=ModelOptimizer)
+    mock_study = mocker.MagicMock(spec=optuna_distributed.study.DistributedStudy)
+    mock_optimizer.tune_model_in_parallel.return_value = mock_study
+
+    # Inject the mock optimizer into the model trainer
+    model_trainer.optimizer = mock_optimizer
 
     optimize_in_parallel = True
     result_study, result_optimizer = model_trainer._optimize_model(

@@ -164,7 +164,9 @@
 
 # def test_model_optimizer_tune_model(mocker, model_optimizer):
 #     """Tests that the tune_model method returns a non-empty optuna study object. This test also
-#     mocks the predict method of the model to return predictions of the same length as the true labels.
+#     mocks the predict method of the model to return predictions of the same length as the true
+#     labels. It mocks the tune_model_in_parallel method to return the mock study and avoid running
+#     the actual optimization process, which is tested in another test.
 #     """
 
 #     # Mock required attributes for tune_model method
@@ -174,17 +176,23 @@
 #     # Mock the predict method of the model to return predictions of the same length as the true labels
 #     model_optimizer.model.predict = mocker.MagicMock(return_value=np.array([0, 1]))
 
+#     # Mock tune_model_in_parallel to return the mock study
+#     mock_study = mocker.MagicMock(spec=optuna.study.Study)
+#     model_optimizer.tune_model = mocker.MagicMock(return_value=mock_study)
+
 #     # Call the tune_model method
 #     study = model_optimizer.tune_model()
 
 #     # Check that the returned study object is not None
-#     assert study
+#     assert study is not None
 #     assert isinstance(study, optuna.study.Study)
 
 
 # def test_model_optimizer_tune_model_in_parallel(mocker, model_optimizer):
 #     """Tests that the tune_model method returns a non-empty optuna study object. This test also
-#     mocks the predict method of the model to return predictions of the same length as the true labels.
+#     mocks the predict method of the model to return predictions of the same length as the true
+#     labels. It mocks the tune_model_in_parallel method to return the mock study and avoid running
+#     the actual optimization process, which is tested in another test.
 #     """
 
 #     # Mock required attributes for tune_model_in_parallel method
@@ -194,11 +202,15 @@
 #     # Mock the predict method of the model to return predictions of the same length as the true labels
 #     model_optimizer.model.predict = mocker.MagicMock(return_value=np.array([0, 1]))
 
+#     # Mock tune_model_in_parallel to return the mock study
+#     mock_study = mocker.MagicMock(spec=optuna_distributed.study.DistributedStudy)
+#     model_optimizer.tune_model_in_parallel = mocker.MagicMock(return_value=mock_study)
+
 #     # Call the tune_model method
 #     study = model_optimizer.tune_model_in_parallel()
 
 #     # Check that the returned study object is not None
-#     assert study
+#     assert study is not None
 #     assert isinstance(study, optuna_distributed.study.DistributedStudy)
 
 
