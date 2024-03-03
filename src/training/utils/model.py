@@ -7,12 +7,12 @@ import os
 from typing import Callable, Optional, Union
 
 import joblib
+import kds
 import matplotlib.pyplot as plt
 import numpy as np
 import optuna
 import optuna_distributed
 import pandas as pd
-import scikitplot as skplt
 from comet_ml import API, ExistingExperiment, Experiment
 from dask.distributed import Client
 from matplotlib.figure import Figure
@@ -468,6 +468,8 @@ class ModelEvaluator(ModelOptimizer):
                 kind="barh", fontsize=font_size, legend=None, figsize=fig_size
             )
             plt.title(f"Top {n_top_features} important features")
+            plt.xlabel("Contribution")
+            plt.ylabel("Feature Name")
             plt.show()
 
         except ValueError as e:
@@ -688,16 +690,13 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns:
-            ax.get_figure(): figure object that can be logged and saved.
+            fig (plt.figure.Figure): matplotlib figure object.
         """
 
-        ax = skplt.metrics.plot_cumulative_gain(y_true, y_pred, figsize=fig_size)
-        plt.title("Cumulative Gains Curve")
-        plt.xlabel("Percentage of sample")
-        plt.ylabel("Percentage of positive outcomes")
-        plt.show()
+        kds.metrics.plot_cumulative_gain(y_true, y_pred, figsize=fig_size)
+        fig = plt.gcf()
 
-        return ax.get_figure()
+        return fig
 
     @staticmethod
     def plot_lift_curve(
@@ -714,16 +713,13 @@ class ModelEvaluator(ModelOptimizer):
             fig_size (tuple): figure size.
 
         Returns
-            ax.get_figure(): figure object that can be logged and saved.
+            fig (plt.figure.Figure): matplotlib figure object.
         """
 
-        ax = skplt.metrics.plot_lift_curve(y_true, y_pred, figsize=fig_size)
-        plt.title("Lift Curve")
-        plt.xlabel("Percentage of samples")
-        plt.ylabel("Lift")
-        plt.show()
+        kds.metrics.plot_lift(y_true, y_pred, figsize=fig_size)
+        fig = plt.gcf()
 
-        return ax.get_figure()
+        return fig
 
     @staticmethod
     def convert_metrics_from_df_to_dict(
