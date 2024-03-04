@@ -466,3 +466,102 @@ def test_register_model(mocker, model_trainer):
         name=registered_model_name, file_or_folder=expected_file_path, overwrite=False
     )
     comet_exp.register_model.assert_called_once_with(model_name=registered_model_name)
+
+
+import pytest
+from unittest.mock import Mock
+from sklearn.pipeline import Pipeline
+from comet_ml import Experiment
+from typing import Callable, Optional, Union
+
+
+def test_submit_train_exp(mocker, model_trainer):
+    # Create required mock objects
+    mock_comet_exp = Mock(spec=Experiment)
+    mock_model = Mock(spec=Callable)
+
+    mock_model = mocker.MagicMock(spec=LogisticRegression)
+    mock_model.__class__.__name__ = "LogisticRegarssion"
+    mock_preprocessor = mocker.MagicMock(ColumnTransformer)
+    mock_selector = mocker.MagicMock(VarianceThreshold)
+    mock_evaluator = mocker.MagicMock(spec=ModelEvaluator)
+    mocker.patch("src.training.utils.model.ModelEvaluator", return_value=mock_evaluator)
+
+    # Mock the pipeline and its fit, predict_proba methods and named_steps attribute
+    mock_pipeline = mocker.MagicMock(spec=Pipeline)
+    mock_pipeline.fit.return_value = None
+    mock_pipeline.predict_proba.side_effect = lambda X: np.array(
+        [[1, 0], [0, 1]] * (len(X) // 2) + [[1, 0]] * (len(X) % 2)
+    )
+    mock_pipeline.named_steps = {
+        "preprocessor": mock_preprocessor,
+        "selector": mock_selector,
+        "classifier": mock_model,
+    }
+    mock_pipeline.classes_ = np.array([0, 1])
+    mock_model.coef_ = np.array([[0.5, 0.5]])
+
+    # Add transformers_ attribute as to the mock preprocessor must be fitted
+    mock_preprocessor.transformers_ = [
+        ("mock_transformer1", mocker.MagicMock(), [0]),
+        ("mock_transformer2", mocker.MagicMock(), [1]),
+    ]
+
+    mock_create_comet_experiment = mocker.patch(
+        "src.training.utils.job.ModelTrainer._create_comet_experiment",
+        return_value=mock_comet_exp,
+    )
+    mock_fit_best_model = mocker.patch(
+        "src.training.utils.job.ModelTrainer._fit_best_model",
+        return_value=mock_pipeline,
+    )
+    mock_optimize_model = mocker.patch(
+        "src.training.utils.job.ModelTrainer._optimize_model",
+        return_value=[Mock(), Mock()],
+    )
+    mock_log_study_trials = mocker.patch(
+        "src.training.utils.job.ModelTrainer._log_study_trials"
+    )
+    mock_evaluate_model = mocker.patch(
+        "src.training.utils.job.ModelTrainer._evaluate_model",
+        return_value=(Mock(), Mock(), Mock()),
+    )
+    mock_log_model_metrics = mocker.patch(
+        "src.training.utils.job.ModelTrainer._log_model_metrics"
+    )
+    mock_register_model = mocker.patch(
+        "src.training.utils.job.ModelTrainer._register_model"
+    )
+
+    comet_api_key = "comet_api_key"
+    comet_project_name = "comet_project_name"
+    comet_exp_name = "comet_exp_name"
+
+    fitted_pipeline, exp_obj = model_trainer.submit_train_exp(
+        comet_api_key,
+        comet_project_name,
+        comet_exp_name,
+        mock_model,
+        search_space_params={},
+        max_search_iters=100,
+        optimize_in_parallel=False,
+        n_parallel_jobs=4,
+        model_opt_timeout_secs=600,
+        registered_model_name=None,
+        is_voting_ensemble=False,
+        ece_nbins=5,
+    )
+
+    assert isinstance(fitted_pipeline, Pipeline)
+    assert isinstance(exp_obj, Experiment)
+    mock_create_comet_experiment.assert_called_once_with(
+        comet_api_key=comet_api_key,
+        comet_project_name=comet_project_name,
+        comet_exp_name=comet_exp_name,
+    )
+    mock_optimize_model.assert_called_once()
+    mock_log_study_trials.assert_called_once()
+    mock_fit_best_model.assert_called_once()
+    mock_evaluate_model.assert_called_once()
+    mock_log_model_metrics.assert_called_once()
+    mock_register_model.assert_called_once()
