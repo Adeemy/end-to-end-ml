@@ -970,7 +970,7 @@
 #         transformers=[("scaler", StandardScaler(), ["A", "B", "C", "D"])]
 #     )
 #     selector_step = VarianceThreshold()
-#     model = LogisticRegression()  # replace with the actual model you want to use
+#     model = LogisticRegression()
 #     cv_folds = 5
 
 #     calib_pipeline = mock_self.calibrate_pipeline(

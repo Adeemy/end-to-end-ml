@@ -322,32 +322,57 @@ def test_fit_best_model(mocker, model_trainer):
 
 
 def test_evaluate_model(mocker, model_trainer):
+    """Tests if the _evaluate_model method returns the expected values. It mocks the
+    Experiment, Pipeline, and ModelEvaluator objects and checks if the expected metrics
+    and ECE values are returned. It also checks if the internal methods were called as
+    expected.
+    """
+
     # Create required mock objects
     mock_comet_exp = mocker.MagicMock(spec=Experiment)
+    mock_model = mocker.MagicMock(spec=LogisticRegression)
+    mock_preprocessor = mocker.MagicMock(ColumnTransformer)
+    mock_selector = mocker.MagicMock(VarianceThreshold)
     mock_evaluator = mocker.MagicMock(spec=ModelEvaluator)
     mocker.patch("src.training.utils.model.ModelEvaluator", return_value=mock_evaluator)
 
-    # Mock the named_steps attribute to return a dictionary
-    pipeline = Pipeline(
-        [
-            (
-                "preprocessor",
-                ColumnTransformer(transformers=[("scaler", StandardScaler(), [0])]),
-            ),
-            ("selector", VarianceThreshold()),
-            ("classifier", LogisticRegression()),
-        ]
+    # Mock the pipeline and its fit, predict_proba methods and named_steps attribute
+    mock_pipeline = mocker.MagicMock(spec=Pipeline)
+    mock_pipeline.fit.return_value = None
+    mock_pipeline.predict_proba.side_effect = lambda X: np.array(
+        [[1, 0], [0, 1]] * (len(X) // 2) + [[1, 0]] * (len(X) % 2)
+    )
+    mock_pipeline.named_steps = {
+        "preprocessor": mock_preprocessor,
+        "selector": mock_selector,
+        "classifier": mock_model,
+    }
+    mock_pipeline.classes_ = np.array([0, 1])
+    mock_model.coef_ = np.array([[0.5, 0.5]])
+
+    # Add transformers_ attribute as to the mock preprocessor must be fitted
+    mock_preprocessor.transformers_ = [
+        ("mock_transformer1", mocker.MagicMock(), [0]),
+        ("mock_transformer2", mocker.MagicMock(), [1]),
+    ]
+
+    # Create spies for internal methods calls
+    spy_extract_feature_importance = mocker.spy(
+        ModelEvaluator, "extract_feature_importance"
+    )
+    spy_convert_metrics_from_df_to_dict = mocker.spy(
+        ModelEvaluator, "convert_metrics_from_df_to_dict"
+    )
+    spy_calc_expected_calibration_error = mocker.spy(
+        ModelEvaluator, "calc_expected_calibration_error"
     )
 
-    # Pipline must be fitted to evaluate it
-    pipeline.fit(model_trainer.train_features, model_trainer.train_class)
+    mocker.patch("src.training.utils.model.ModelEvaluator", return_value=mock_evaluator)
 
     # Call the _evaluate_model method
     train_metric_values, valid_metric_values, model_ece = model_trainer._evaluate_model(
-        comet_exp=mock_comet_exp, fitted_pipeline=pipeline
+        comet_exp=mock_comet_exp, fitted_pipeline=mock_pipeline
     )
-
-    print(train_metric_values, valid_metric_values, model_ece)
 
     # Check the structure and types of the output
     assert isinstance(train_metric_values, dict)
@@ -372,3 +397,9 @@ def test_evaluate_model(mocker, model_trainer):
     assert all(
         isinstance(value, (float, np.float64)) for value in valid_metric_values.values()
     )
+
+    # Check if internal methods were called
+    mock_pipeline.predict_proba.assert_called()
+    spy_extract_feature_importance.assert_called_once()
+    spy_convert_metrics_from_df_to_dict.call_count == 2
+    spy_calc_expected_calibration_error.assert_called_once()
