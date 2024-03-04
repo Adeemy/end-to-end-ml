@@ -18,6 +18,8 @@ from sklearn.preprocessing import (
     StandardScaler,
 )
 
+import joblib
+
 from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
 from src.training.utils.model import ModelEvaluator, ModelOptimizer
 
@@ -435,3 +437,32 @@ def test_log_model_metrics(mocker, model_trainer):
 
     # Check if the log_metrics method of the Experiment mock object was called with the correct parameters
     comet_exp.log_metrics.assert_called_once_with(expected_metrics)
+
+
+def test_register_model(mocker, model_trainer):
+    """Tests if the _register_model method registers the model to Comet as expected. It mocks
+    the Experiment and Pipeline objects and checks if the log_model and register_model methods
+    were called with the expected arguments.
+    """
+
+    # Create required mock objects
+    comet_exp = mocker.MagicMock(spec=Experiment)
+    fitted_pipeline = mocker.MagicMock(spec=Pipeline)
+
+    # Define the registered model name
+    registered_model_name = "test_model"
+
+    # Define the expected file path
+    expected_file_path = f"{model_trainer.artifacts_path}/{registered_model_name}.pkl"
+
+    # Mock joblib.dump to avoid creating an actual file
+    mocker.patch("joblib.dump")
+
+    model_trainer._register_model(comet_exp, fitted_pipeline, registered_model_name)
+
+    # Check if internal methods were called with the correct parameters
+    joblib.dump.assert_called_once_with(fitted_pipeline, expected_file_path)
+    comet_exp.log_model.assert_called_once_with(
+        name=registered_model_name, file_or_folder=expected_file_path, overwrite=False
+    )
+    comet_exp.register_model.assert_called_once_with(model_name=registered_model_name)
