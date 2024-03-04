@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+import joblib
 import numpy as np
 import optuna
 import optuna_distributed
@@ -17,8 +18,6 @@ from sklearn.preprocessing import (
     OneHotEncoder,
     StandardScaler,
 )
-
-import joblib
 
 from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
 from src.training.utils.model import ModelEvaluator, ModelOptimizer
@@ -468,11 +467,12 @@ def test_register_model(mocker, model_trainer):
     comet_exp.register_model.assert_called_once_with(model_name=registered_model_name)
 
 
-import pytest
-from unittest.mock import Mock
-from sklearn.pipeline import Pipeline
-from comet_ml import Experiment
 from typing import Callable, Optional, Union
+from unittest.mock import Mock
+
+import pytest
+from comet_ml import Experiment
+from sklearn.pipeline import Pipeline
 
 
 def test_submit_train_exp(mocker, model_trainer):
@@ -552,8 +552,11 @@ def test_submit_train_exp(mocker, model_trainer):
         ece_nbins=5,
     )
 
+    # Check if ouputs are as expected
     assert isinstance(fitted_pipeline, Pipeline)
     assert isinstance(exp_obj, Experiment)
+
+    # Check if internal methods were called with the correct parameters
     mock_create_comet_experiment.assert_called_once_with(
         comet_api_key=comet_api_key,
         comet_project_name=comet_project_name,
