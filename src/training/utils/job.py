@@ -686,7 +686,7 @@ class VotingEnsembleCreator(ModelTrainer):
 
     def create_voting_ensemble(
         self,
-    ) -> Pipeline:
+    ) -> Union[Pipeline, Experiment]:
         """Creates a voting ensemble classifier using the base models and evaluates the model
         using ModelEvaluator class. It logs the model metrics to Comet experiment.
 

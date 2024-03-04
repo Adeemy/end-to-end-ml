@@ -583,6 +583,22 @@ class ModelEvaluator(ModelOptimizer):
         font_size: float = 10.0,
         fig_name: str = "Feature Importance",
     ) -> None:
+        """Plots feature importance figure given feature importance scores and
+        column names and logs it to Comet workspace.
+
+        Args:
+            classifier_name (str): name of the classifier.
+            feature_importance_scores (np.ndarray): feature importance scores.
+            col_names (list): list of column names.
+            n_top_features (int): number of top features to plot.
+            figure_size (tuple): figure size.
+            font_size (float): font size.
+            fig_name (str): figure name.
+
+        Returns:
+            None
+        """
+
         # Log feature importance figure
         if classifier_name not in ["VotingClassifier"]:
             feature_importance_fig = plt.figure(figsize=figure_size)
@@ -827,9 +843,11 @@ class ModelEvaluator(ModelOptimizer):
 
     def _get_pred_class(self, pred_probs: np.ndarray, threshold: float) -> np.ndarray:
         """Returns predicted class labels based on decision threshold value.
+
         Args:
             pred_probs (np.ndarray): predicted probabilities of the positive class.
             threshold (float): decision threshold value for positive class.
+
         Returns:
             pred_class (np.ndarray): predicted class labels.
         """
