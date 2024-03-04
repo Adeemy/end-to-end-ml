@@ -226,3 +226,54 @@ def test_log_study_trials(mocker, model_trainer):
         file_data=f"{model_trainer.artifacts_path}/study_{classifier_name}.csv",
         file_name=f"study_{classifier_name}",
     )
+
+
+def test_fit_best_model(mocker, model_trainer):
+    """Tests if the _fit_best_model method fits the pipeline as expected. It mocks
+    the Study, ModelOptimizer, and Pipeline objects and checks if the fit_pipeline
+    method was called with the expected arguments.
+    """
+
+    # Create required mock objects
+    mock_optimizer = mocker.MagicMock(spec=ModelOptimizer)
+    mock_study = mocker.MagicMock(spec=optuna.study.Study)
+
+    # Set the train_features, preprocessor_step, and selector_step attributes of the instance
+    mock_study.best_params = {"C": 100, "l1_ratio": 0.08888}
+    model_trainer.train_features = pd.DataFrame(np.random.rand(10, 5))
+    model_trainer.preprocessor_step = ColumnTransformer(transformers=[])
+    model_trainer.selector_step = VarianceThreshold()
+
+    # Create a pipeline and set it as the return value of the fit_pipeline method
+    model = LogisticRegression()
+    pipeline = Pipeline(
+        steps=[
+            ("preprocessor", model_trainer.preprocessor_step),
+            ("selector", model_trainer.selector_step),
+            ("classifier", model),
+        ]
+    )
+    mock_optimizer.fit_pipeline.return_value = pipeline
+
+    # Create a spy on the fit_pipeline method to track its calls
+    spy = mocker.spy(mock_optimizer, "fit_pipeline")
+
+    fitted_pipeline = model_trainer._fit_best_model(
+        mock_study, mock_optimizer, model=model
+    )
+
+    assert isinstance(fitted_pipeline, Pipeline)
+
+    # Assert that fit_pipeline was called with the correct parameters
+    spy.assert_called_once_with(
+        train_features=model_trainer.train_features,
+        preprocessor_step=model_trainer.preprocessor_step,
+        selector_step=model_trainer.selector_step,
+        model=model,
+    )
+
+    # Assert that the last step is a model with the expected parameters
+    model_params = fitted_pipeline.named_steps["classifier"].get_params()
+    assert {
+        k: model_params[k] for k in mock_study.best_params
+    } == mock_study.best_params
