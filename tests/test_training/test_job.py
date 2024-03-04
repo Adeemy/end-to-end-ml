@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import Callable
 
 import joblib
 import numpy as np
@@ -12,12 +13,7 @@ from sklearn.ensemble import VotingClassifier
 from sklearn.feature_selection import SelectKBest, VarianceThreshold, chi2
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import (
-    FunctionTransformer,
-    LabelEncoder,
-    OneHotEncoder,
-    StandardScaler,
-)
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 
 from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
 from src.training.utils.model import ModelEvaluator, ModelOptimizer
@@ -258,7 +254,7 @@ def test_log_study_trials(mocker, model_trainer):
         }
     )
     mock_study.trials_dataframe.return_value = mock_trials_df
-    mock_trials_df.to_csv = mocker.MagicMock()  # Mock the to_csv method
+    mock_trials_df.to_csv = mocker.MagicMock()
     model_trainer.artifacts_path = "/path/to/artifacts"
 
     classifier_name = "classifier_name"
@@ -467,18 +463,15 @@ def test_register_model(mocker, model_trainer):
     comet_exp.register_model.assert_called_once_with(model_name=registered_model_name)
 
 
-from typing import Callable, Optional, Union
-from unittest.mock import Mock
-
-import pytest
-from comet_ml import Experiment
-from sklearn.pipeline import Pipeline
-
-
 def test_submit_train_exp(mocker, model_trainer):
+    """Tests if the submit_train_exp method returns the expected outputs. It mocks the
+    Experiment, Pipeline, and ModelEvaluator objects and checks if the expected outputs
+    are returned and if the internal methods were called with the expected parameters.
+    """
+
     # Create required mock objects
-    mock_comet_exp = Mock(spec=Experiment)
-    mock_model = Mock(spec=Callable)
+    mock_comet_exp = mocker.MagicMock(spec=Experiment)
+    mock_model = mocker.MagicMock(spec=Callable)
 
     mock_model = mocker.MagicMock(spec=LogisticRegression)
     mock_model.__class__.__name__ = "LogisticRegarssion"
@@ -517,14 +510,14 @@ def test_submit_train_exp(mocker, model_trainer):
     )
     mock_optimize_model = mocker.patch(
         "src.training.utils.job.ModelTrainer._optimize_model",
-        return_value=[Mock(), Mock()],
+        return_value=[mocker.MagicMock, mocker.MagicMock],
     )
     mock_log_study_trials = mocker.patch(
         "src.training.utils.job.ModelTrainer._log_study_trials"
     )
     mock_evaluate_model = mocker.patch(
         "src.training.utils.job.ModelTrainer._evaluate_model",
-        return_value=(Mock(), Mock(), Mock()),
+        return_value=(mocker.MagicMock(), mocker.MagicMock(), mocker.MagicMock()),
     )
     mock_log_model_metrics = mocker.patch(
         "src.training.utils.job.ModelTrainer._log_model_metrics"
@@ -568,3 +561,47 @@ def test_submit_train_exp(mocker, model_trainer):
     mock_evaluate_model.assert_called_once()
     mock_log_model_metrics.assert_called_once()
     mock_register_model.assert_called_once()
+
+
+def test_get_base_models(mocker):
+    """Tests if the _get_base_models method returns the expected outputs. It mocks the
+    pipelines and checks if the expected outputs are returned and if the internal methods
+    were called with the expected parameters.
+    """
+
+    # Create required mock objects
+    mock_pipeline = mocker.MagicMock()
+    mock_pipeline.named_steps = {"classifier": mocker.MagicMock()}
+
+    # Create a VotingEnsembleCreator instance with mock pipelines
+    creator = VotingEnsembleCreator(
+        comet_api_key="mock_key",
+        comet_project_name="mock_project",
+        comet_exp_name="mock_exp",
+        train_features=mocker.MagicMock(),
+        valid_features=mocker.MagicMock(),
+        train_class=mocker.MagicMock(),
+        valid_class=mocker.MagicMock(),
+        class_encoder=mocker.MagicMock(),
+        artifacts_path="mock_path",
+    )
+    creator.lr_calib_pipeline = mock_pipeline
+    creator.rf_calib_pipeline = mock_pipeline
+    creator.lgbm_calib_pipeline = mock_pipeline
+    creator.xgb_calib_pipeline = mock_pipeline
+
+    # Test that _get_base_models returns a list of base models
+    base_models = creator._get_base_models()
+    assert len(base_models) == 4
+    assert base_models[0][0] == "LR"
+    assert base_models[1][0] == "RF"
+    assert base_models[2][0] == "LightGBM"
+    assert base_models[3][0] == "XGBoost"
+
+    # Test that _get_base_models raises a ValueError if less than two base models are provided
+    creator.lr_calib_pipeline = None
+    creator.rf_calib_pipeline = None
+    creator.lgbm_calib_pipeline = None
+    creator.xgb_calib_pipeline = None
+    with pytest.raises(ValueError):
+        creator._get_base_models()
