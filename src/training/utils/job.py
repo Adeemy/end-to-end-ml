@@ -721,7 +721,6 @@ class VotingEnsembleCreator(ModelTrainer):
                 ece_nbins=self.ece_nbins,
             )
 
-            # Log model metrics
             super()._log_model_metrics(
                 comet_exp=comet_exp,
                 train_metric_values=train_metric_values,
@@ -729,8 +728,11 @@ class VotingEnsembleCreator(ModelTrainer):
                 model_ece=model_ece,
             )
 
-            # Register model in Comet workspace
-            super()._register_model(comet_exp=comet_exp, pipeline=ve_pipeline)
+            super()._register_model(
+                comet_exp=comet_exp,
+                pipeline=ve_pipeline,
+                registered_model_name=self.registered_model_name,
+            )
 
         except Exception as e:  # pylint: disable=W0718
             print(f"\nVoting ensemble error --> {e}\n\n")
