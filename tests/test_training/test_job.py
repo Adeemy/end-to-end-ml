@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import numpy as np
 import optuna
 import optuna_distributed
@@ -185,3 +187,42 @@ def test_optimize_model_in_parallel_mode(mocker, model_trainer):
     # Assert all trials has status COMPLETE and values are not NaN
     assert all(trials_df["state"] == "COMPLETE")
     assert not any(trials_df["value"].isna())
+
+
+def test_log_study_trials(mocker, model_trainer):
+    """Tests if the _log_study_trials method logs the study trials to Comet as expected.
+    It mocks the Experiment and Study objects and checks if the log_asset method was called
+    with the expected arguments.
+    """
+
+    # Create required mock objects
+    mock_comet_exp = mocker.MagicMock(spec=Experiment)
+    mock_study = mocker.MagicMock(spec=optuna.study.Study)
+
+    # Create a mock trials dataframe and save it in mock local path
+    mock_trials_df = pd.DataFrame(
+        {
+            "number": np.arange(2),
+            "value": np.random.rand(2),
+            "datetime_start": [datetime.now() - timedelta(days=i) for i in range(2)],
+            "datetime_complete": [
+                datetime.now() - timedelta(days=i, hours=2) for i in range(2)
+            ],
+            "duration": [timedelta(hours=i) for i in range(2)],
+            "params_C": np.random.rand(2),
+            "params_l1_ratio": np.random.rand(2),
+            "state": ["COMPLETE" if i % 2 == 0 else "INCOMPLETE" for i in range(2)],
+        }
+    )
+    mock_study.trials_dataframe.return_value = mock_trials_df
+    mock_trials_df.to_csv = mocker.MagicMock()  # Mock the to_csv method
+    model_trainer.artifacts_path = "/path/to/artifacts"
+
+    classifier_name = "classifier_name"
+    model_trainer._log_study_trials(mock_comet_exp, mock_study, classifier_name)
+
+    # Check that the log_asset method was called with the expected arguments
+    mock_comet_exp.log_asset.assert_called_once_with(
+        file_data=f"{model_trainer.artifacts_path}/study_{classifier_name}.csv",
+        file_name=f"study_{classifier_name}",
+    )
