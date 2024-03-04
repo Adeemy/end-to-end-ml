@@ -325,23 +325,21 @@ class ModelTrainer:
     def _register_model(
         self,
         comet_exp: Experiment,
-        fitted_pipeline: Pipeline,
+        pipeline: Pipeline,
         registered_model_name: str,
     ) -> None:
         """Saves and registers the model to Comet experiment.
 
         Args:
             comet_exp (Experiment): Comet experiment object,
-            fitted_pipeline (Pipeline): fitted pipeline object,
+            pipeline (Pipeline): fitted pipeline object,
             registered_model_name (str): name of the registered model.
 
         Returns:
             None
         """
 
-        joblib.dump(
-            fitted_pipeline, f"{self.artifacts_path}/{registered_model_name}.pkl"
-        )
+        joblib.dump(pipeline, f"{self.artifacts_path}/{registered_model_name}.pkl")
         comet_exp.log_model(
             name=registered_model_name,
             file_or_folder=f"{self.artifacts_path}/{registered_model_name}.pkl",
@@ -466,7 +464,7 @@ class ModelTrainer:
             # Save and register model
             self._register_model(
                 comet_exp=comet_exp,
-                fitted_pipeline=fitted_pipeline,
+                pipeline=fitted_pipeline,
                 registered_model_name=registered_model_name,
             )
 
@@ -479,9 +477,11 @@ class ModelTrainer:
         return fitted_pipeline, comet_exp
 
 
-class VotingEnsembleCreator:
+class VotingEnsembleCreator(ModelTrainer):
     """Creates a voting ensemble classifier. It uses ModelEvaluator class to
     evaluate the model and logs the model and its metrics to Comet experiment.
+    It is a subclass of ModelTrainer class and utilizes some of its methods like
+    create_comet_experiment, evaluate_model, log_model_metrics,
 
     Attributes:
         comet_api_key (str): Comet API key,
@@ -530,6 +530,24 @@ class VotingEnsembleCreator:
         registered_model_name: Optional[str] = None,
         ece_nbins: int = 5,
     ):
+        super().__init__(
+            train_features=None,
+            train_class=None,
+            valid_features=None,
+            valid_class=None,
+            train_features_preprocessed=None,
+            valid_features_preprocessed=None,
+            n_features=None,
+            class_encoder=None,
+            preprocessor_step=None,
+            selector_step=None,
+            artifacts_path=None,
+            num_feature_names=None,
+            cat_feature_names=None,
+            fbeta_score_beta=None,
+            encoded_pos_class_label=None,
+        )
+
         self.comet_api_key = comet_api_key
         self.comet_project_name = comet_project_name
         self.comet_exp_name = comet_exp_name
@@ -548,34 +566,6 @@ class VotingEnsembleCreator:
         self.fbeta_score_beta = fbeta_score_beta
         self.registered_model_name = registered_model_name or "VotingEnsemble"
         self.ece_nbins = ece_nbins
-
-    @staticmethod
-    def _create_comet_experiment(
-        comet_api_key: str, comet_project_name: str, comet_exp_name: str
-    ) -> Experiment:
-        """Creates a Comet experiment object.
-
-        Args:
-            comet_api_key (str): Comet API key,
-            comet_project_name (str): Comet project name,
-            comet_exp_name (str)L Comet experiment name,
-
-        Returns:
-            Experiment: Comet experiment object.
-
-        Raises:
-            ValueError: if Comet experiment creation fails.
-        """
-
-        try:
-            comet_exp = Experiment(
-                api_key=comet_api_key, project_name=comet_project_name
-            )
-            comet_exp.log_code(folder=".")
-            comet_exp.set_name(comet_exp_name)
-        except ValueError as e:
-            raise ValueError(f"Comet experiment creation error --> {e}") from e
-        return comet_exp
 
     def _get_base_models(
         self,
@@ -694,116 +684,6 @@ class VotingEnsembleCreator:
 
         return ve_pipeline
 
-    def _evaluate_model(
-        self,
-        comet_exp: Experiment,
-        fitted_pipeline: Pipeline,
-        is_voting_ensemble: bool = True,
-        ece_nbins: int = 5,
-    ) -> Union[dict, dict, float]:
-        """Evaluates the model using ModelEvaluator class.
-
-        Args:
-            comet_exp (Experiment): Comet experiment object,
-            fitted_pipeline (Pipeline): fitted pipeline object,
-            is_voting_ensemble (bool, optional): is it a voting ensemble classifier? Default to True,
-            ece_nbins (int, optional): number of bins for expected calibration error. Default to 5.
-
-        Returns:
-            train_metric_values (dict): training scores,
-            valid_metric_values (dict): validation scores,
-            model_ece (float): expected calibration error.
-        """
-
-        # Evaluate model performance on training and validation sets
-        evaluator = ModelEvaluator(
-            comet_exp=comet_exp,
-            pipeline=fitted_pipeline,
-            train_features=self.train_features,
-            train_class=self.train_class,
-            valid_features=self.valid_features,
-            valid_class=self.valid_class,
-            fbeta_score_beta=self.fbeta_score_beta,
-            is_voting_ensemble=is_voting_ensemble,
-        )
-
-        train_scores, valid_scores = evaluator.evaluate_model_perf(
-            class_encoder=self.class_encoder
-        )
-
-        # Convert metrics from dataframes to dictionaries
-        train_metric_values = evaluator.convert_metrics_from_df_to_dict(
-            scores=train_scores, prefix="train_"
-        )
-        valid_metric_values = evaluator.convert_metrics_from_df_to_dict(
-            scores=valid_scores, prefix="valid_"
-        )
-
-        # Add ECE to logged metrics
-        pred_probs = fitted_pipeline.predict_proba(self.valid_features)
-        pos_class_index = list(fitted_pipeline.classes_).index(
-            self.encoded_pos_class_label
-        )
-        model_ece = evaluator.calc_expected_calibration_error(
-            pred_probs=pred_probs[:, pos_class_index],
-            true_labels=self.valid_class,
-            nbins=ece_nbins,
-        )
-
-        return train_metric_values, valid_metric_values, model_ece
-
-    def _log_model_metrics(
-        self,
-        comet_exp: Experiment,
-        train_metric_values: dict,
-        valid_metric_values: pd.DataFrame,
-        model_ece: float,
-    ) -> None:
-        """Logs model metrics to Comet experiment.
-
-        Args:
-            comet_exp (Experiment): Comet experiment object,
-            evaluator (ModelEvaluator): ModelEvaluator object,
-            train_metric_values (dict): training scores,
-            valid_metric_values (dict): validation scores,
-            model_ece (float): expected calibration error.
-
-        Returns:
-            None
-        """
-
-        metrics_to_log = {}
-        metrics_to_log.update(train_metric_values)
-        metrics_to_log.update(valid_metric_values)
-        metrics_to_log.update({"model_ece": model_ece})
-
-        comet_exp.log_metrics(metrics_to_log)
-
-    def _register_model(self, comet_exp: Experiment, pipeline: Pipeline) -> None:
-        """Saves and registers the model to Comet experiment.
-
-        Args:
-            comet_exp (Experiment): Comet experiment object,
-            pipeline (Pipeline): voting ensemble pipeline object,
-
-        Returns:
-            None
-        """
-
-        joblib.dump(
-            pipeline,
-            f"{self.artifacts_path}/{self.registered_model_name}.pkl",
-        )
-        comet_exp.log_model(
-            name=self.registered_model_name,
-            file_or_folder=f"{self.artifacts_path}/{self.registered_model_name}.pkl",
-            overwrite=False,
-        )
-
-        comet_exp.register_model(
-            model_name=self.registered_model_name,
-        )
-
     def create_voting_ensemble(
         self,
     ) -> Pipeline:
@@ -822,7 +702,7 @@ class VotingEnsembleCreator:
         """
 
         # Create Comet experiment
-        comet_exp = self._create_comet_experiment(
+        comet_exp = super()._create_comet_experiment(
             comet_api_key=self.comet_api_key,
             comet_project_name=self.comet_project_name,
             comet_exp_name=self.comet_exp_name,
@@ -841,16 +721,18 @@ class VotingEnsembleCreator:
                 ece_nbins=self.ece_nbins,
             )
 
-            # Log model metrics
-            self._log_model_metrics(
+            super()._log_model_metrics(
                 comet_exp=comet_exp,
                 train_metric_values=train_metric_values,
                 valid_metric_values=valid_metric_values,
                 model_ece=model_ece,
             )
 
-            # Register model in Comet workspace
-            self._register_model(comet_exp=comet_exp, pipeline=ve_pipeline)
+            super()._register_model(
+                comet_exp=comet_exp,
+                pipeline=ve_pipeline,
+                registered_model_name=self.registered_model_name,
+            )
 
         except Exception as e:  # pylint: disable=W0718
             print(f"\nVoting ensemble error --> {e}\n\n")
