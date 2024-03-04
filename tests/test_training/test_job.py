@@ -8,10 +8,15 @@ import pytest
 from comet_ml import Experiment
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import VotingClassifier
-from sklearn.feature_selection import VarianceThreshold
+from sklearn.feature_selection import SelectKBest, VarianceThreshold, chi2
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import (
+    FunctionTransformer,
+    LabelEncoder,
+    OneHotEncoder,
+    StandardScaler,
+)
 
 from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
 from src.training.utils.model import ModelEvaluator, ModelOptimizer
@@ -32,7 +37,7 @@ def model_trainer():
     artifacts_path = "/path/to/artifacts"
     num_feature_names = ["f3", "f4", "f5"]
     cat_feature_names = ["f1", "f2"]
-    fbeta_score_beta = 1.0
+    fbeta_score_beta = 0.9888
     encoded_pos_class_label = 1
 
     return ModelTrainer(
@@ -51,6 +56,43 @@ def model_trainer():
         cat_feature_names=cat_feature_names,
         fbeta_score_beta=fbeta_score_beta,
         encoded_pos_class_label=encoded_pos_class_label,
+    )
+
+
+@pytest.fixture
+def model_evaluator():
+    """Create a ModelEvaluator instance for testing. This fixture is used by all the tests
+    related to ModelEvaluator in this module.
+    """
+
+    comet_exp = Experiment(
+        api_key="dummy_key", project_name="general", workspace="test"
+    )
+    pipeline = Pipeline(
+        steps=[
+            (
+                "preprocessor",
+                ColumnTransformer(
+                    transformers=[
+                        ("num", "passthrough", ["num_feature"]),
+                        ("cat", OneHotEncoder(), ["cat_feature"]),
+                    ]
+                ),
+            ),
+            ("selector", SelectKBest(chi2, k=2)),
+            ("classifier", LogisticRegression()),
+        ]
+    )
+    train_features = pd.DataFrame(
+        {"num_feature": [1, 2, 3], "cat_feature": ["a", "b", "a"]}
+    )
+    train_class = np.array([0, 1, 0])
+    valid_features = pd.DataFrame(
+        {"num_feature": [2, 3, 1], "cat_feature": ["b", "a", "b"]}
+    )
+    valid_class = np.array([1, 0, 1])
+    return ModelEvaluator(
+        comet_exp, pipeline, train_features, train_class, valid_features, valid_class
     )
 
 
@@ -277,3 +319,56 @@ def test_fit_best_model(mocker, model_trainer):
     assert {
         k: model_params[k] for k in mock_study.best_params
     } == mock_study.best_params
+
+
+def test_evaluate_model(mocker, model_trainer):
+    # Create required mock objects
+    mock_comet_exp = mocker.MagicMock(spec=Experiment)
+    mock_evaluator = mocker.MagicMock(spec=ModelEvaluator)
+    mocker.patch("src.training.utils.model.ModelEvaluator", return_value=mock_evaluator)
+
+    # Mock the named_steps attribute to return a dictionary
+    pipeline = Pipeline(
+        [
+            (
+                "preprocessor",
+                ColumnTransformer(transformers=[("scaler", StandardScaler(), [0])]),
+            ),
+            ("selector", VarianceThreshold()),
+            ("classifier", LogisticRegression()),
+        ]
+    )
+
+    # Pipline must be fitted to evaluate it
+    pipeline.fit(model_trainer.train_features, model_trainer.train_class)
+
+    # Call the _evaluate_model method
+    train_metric_values, valid_metric_values, model_ece = model_trainer._evaluate_model(
+        comet_exp=mock_comet_exp, fitted_pipeline=pipeline
+    )
+
+    print(train_metric_values, valid_metric_values, model_ece)
+
+    # Check the structure and types of the output
+    assert isinstance(train_metric_values, dict)
+    assert isinstance(valid_metric_values, dict)
+    assert isinstance(model_ece, (float, np.float64))
+
+    expected_keys = [
+        "accuracy",
+        "precision",
+        "recall",
+        "f1",
+        f"f_{model_trainer.fbeta_score_beta}_score",
+        "roc_auc",
+    ]
+
+    assert all("train_" + key in train_metric_values for key in expected_keys)
+    assert all(
+        isinstance(value, (float, np.float64)) for value in train_metric_values.values()
+    )
+
+    assert all("valid_" + key in valid_metric_values for key in expected_keys)
+    assert all(
+        isinstance(value, (float, np.float64)) for value in valid_metric_values.values()
+    )
