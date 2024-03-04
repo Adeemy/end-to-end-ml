@@ -403,3 +403,35 @@ def test_evaluate_model(mocker, model_trainer):
     spy_extract_feature_importance.assert_called_once()
     spy_convert_metrics_from_df_to_dict.call_count == 2
     spy_calc_expected_calibration_error.assert_called_once()
+
+
+def test_log_model_metrics(mocker, model_trainer):
+    """Tests if the _log_model_metrics method logs the model metrics to Comet as expected.
+    It mocks the Experiment object and checks if the log_metrics method was called with
+    the expected arguments.
+    """
+
+    # Create required mock objects
+    comet_exp = mocker.MagicMock(spec=Experiment)
+
+    # Define the metric values and expected output
+    train_metric_values = {"train_accuracy": 0.9, "train_loss": 0.1}
+    valid_metric_values = pd.DataFrame(
+        {"valid_accuracy": [0.8], "valid_loss": [0.2]}
+    ).to_dict("records")[0]
+    model_ece = 0.05
+
+    expected_metrics = {
+        "train_accuracy": 0.9,
+        "train_loss": 0.1,
+        "valid_accuracy": 0.8,
+        "valid_loss": 0.2,
+        "model_ece": 0.05,
+    }
+
+    model_trainer._log_model_metrics(
+        comet_exp, train_metric_values, valid_metric_values, model_ece
+    )
+
+    # Check if the log_metrics method of the Experiment mock object was called with the correct parameters
+    comet_exp.log_metrics.assert_called_once_with(expected_metrics)
