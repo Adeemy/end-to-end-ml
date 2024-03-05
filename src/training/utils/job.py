@@ -299,7 +299,7 @@ class ModelTrainer:
         self,
         comet_exp: Experiment,
         train_metric_values: dict,
-        valid_metric_values: pd.DataFrame,
+        valid_metric_values: dict,
         model_ece: float,
     ) -> None:
         """Logs model metrics to Comet experiment.
@@ -520,10 +520,10 @@ class VotingEnsembleCreator(ModelTrainer):
         valid_class: np.ndarray,
         class_encoder: LabelEncoder,
         artifacts_path: str,
-        lr_calib_pipeline: Pipeline = None,
-        rf_calib_pipeline: Pipeline = None,
-        lgbm_calib_pipeline: Pipeline = None,
-        xgb_calib_pipeline: Pipeline = None,
+        lr_calib_pipeline: Optional[Pipeline] = None,
+        rf_calib_pipeline: Optional[Pipeline] = None,
+        lgbm_calib_pipeline: Optional[Pipeline] = None,
+        xgb_calib_pipeline: Optional[Pipeline] = None,
         voting_rule: Literal["hard", "soft"] = "soft",
         encoded_pos_class_label: int = 1,
         fbeta_score_beta: float = 1.0,
@@ -531,21 +531,21 @@ class VotingEnsembleCreator(ModelTrainer):
         ece_nbins: int = 5,
     ):
         super().__init__(
-            train_features=None,
-            train_class=None,
-            valid_features=None,
-            valid_class=None,
+            train_features=train_features,
+            train_class=train_class,
+            valid_features=valid_features,
+            valid_class=valid_class,
             train_features_preprocessed=None,
             valid_features_preprocessed=None,
             n_features=None,
-            class_encoder=None,
+            class_encoder=class_encoder,
             preprocessor_step=None,
             selector_step=None,
-            artifacts_path=None,
+            artifacts_path=artifacts_path,
             num_feature_names=None,
             cat_feature_names=None,
-            fbeta_score_beta=None,
-            encoded_pos_class_label=None,
+            fbeta_score_beta=fbeta_score_beta,
+            encoded_pos_class_label=encoded_pos_class_label,
         )
 
         self.comet_api_key = comet_api_key
@@ -686,7 +686,7 @@ class VotingEnsembleCreator(ModelTrainer):
 
     def create_voting_ensemble(
         self,
-    ) -> Pipeline:
+    ) -> Union[Pipeline, Experiment]:
         """Creates a voting ensemble classifier using the base models and evaluates the model
         using ModelEvaluator class. It logs the model metrics to Comet experiment.
 
@@ -702,7 +702,7 @@ class VotingEnsembleCreator(ModelTrainer):
         """
 
         # Create Comet experiment
-        comet_exp = super()._create_comet_experiment(
+        comet_exp = self._create_comet_experiment(
             comet_api_key=self.comet_api_key,
             comet_project_name=self.comet_project_name,
             comet_exp_name=self.comet_exp_name,
@@ -721,14 +721,14 @@ class VotingEnsembleCreator(ModelTrainer):
                 ece_nbins=self.ece_nbins,
             )
 
-            super()._log_model_metrics(
+            self._log_model_metrics(
                 comet_exp=comet_exp,
                 train_metric_values=train_metric_values,
                 valid_metric_values=valid_metric_values,
                 model_ece=model_ece,
             )
 
-            super()._register_model(
+            self._register_model(
                 comet_exp=comet_exp,
                 pipeline=ve_pipeline,
                 registered_model_name=self.registered_model_name,

@@ -583,6 +583,22 @@ class ModelEvaluator(ModelOptimizer):
         font_size: float = 10.0,
         fig_name: str = "Feature Importance",
     ) -> None:
+        """Plots feature importance figure given feature importance scores and
+        column names and logs it to Comet workspace.
+
+        Args:
+            classifier_name (str): name of the classifier.
+            feature_importance_scores (np.ndarray): feature importance scores.
+            col_names (list): list of column names.
+            n_top_features (int): number of top features to plot.
+            figure_size (tuple): figure size.
+            font_size (float): font size.
+            fig_name (str): figure name.
+
+        Returns:
+            None
+        """
+
         # Log feature importance figure
         if classifier_name not in ["VotingClassifier"]:
             feature_importance_fig = plt.figure(figsize=figure_size)
@@ -827,9 +843,11 @@ class ModelEvaluator(ModelOptimizer):
 
     def _get_pred_class(self, pred_probs: np.ndarray, threshold: float) -> np.ndarray:
         """Returns predicted class labels based on decision threshold value.
+
         Args:
             pred_probs (np.ndarray): predicted probabilities of the positive class.
             threshold (float): decision threshold value for positive class.
+
         Returns:
             pred_class (np.ndarray): predicted class labels.
         """
@@ -1132,6 +1150,7 @@ class ModelChampionManager:
         comet_workspace_name: str,
         comparison_metric: str,
         comet_exp_keys: dict,
+        comet_api: API = API(),
     ) -> str:
         """Selects the best performer from all challenger models. The comet_exp_keys
         is a dictionary of model names as keys and their corresponding experiment
@@ -1143,12 +1162,12 @@ class ModelChampionManager:
             comparison_metric (str): metric name to compare models.
             comet_exp_keys (dict): dictionary of model names as keys and their
                                    corresponding experiment objects as values.
+            comet_api (API): comet API object.
 
         Returns:
             best_challenger_name (str): name of the best challenger model.
         """
 
-        comet_api = API()
         exp_scores = {}
         for i in range(comet_exp_keys.shape[0]):
             experiment = comet_api.get_experiment(
@@ -1159,6 +1178,8 @@ class ModelChampionManager:
             exp_metric_score = float(
                 experiment.get_metrics(comparison_metric)[0]["metricValue"]
             )
+
+            # Extract the model name from the experiment keys and attach its score from experiment
             exp_scores.update(**{f"{comet_exp_keys.iloc[i, 0]}": exp_metric_score})
 
         # Select the best performer

@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Callable
 
 import joblib
 import numpy as np
@@ -20,6 +19,10 @@ from src.training.utils.model import ModelEvaluator, ModelOptimizer
 
 @pytest.fixture
 def model_trainer():
+    """Create a ModelTrainer instance for testing. This fixture is used by all the tests
+    related to ModelTrainer in this module.
+    """
+
     train_features = pd.DataFrame(np.random.rand(10, 5))
     train_class = np.random.randint(2, size=10)
     valid_features = pd.DataFrame(np.random.rand(10, 5))
@@ -283,6 +286,8 @@ def test_fit_best_model(mocker, model_trainer):
     model_trainer.selector_step = VarianceThreshold()
 
     # Create a pipeline and set it as the return value of the fit_pipeline method
+    # Note: fit_pipeline is a method of ModelOptimizer, so we need to mock it and
+    # it's not being tested here.
     model = LogisticRegression()
     pipeline = Pipeline(
         steps=[
@@ -363,8 +368,6 @@ def test_evaluate_model(mocker, model_trainer):
         ModelEvaluator, "calc_expected_calibration_error"
     )
 
-    mocker.patch("src.training.utils.model.ModelEvaluator", return_value=mock_evaluator)
-
     # Call the _evaluate_model method
     train_metric_values, valid_metric_values, model_ece = model_trainer._evaluate_model(
         comet_exp=mock_comet_exp, fitted_pipeline=mock_pipeline
@@ -408,13 +411,11 @@ def test_log_model_metrics(mocker, model_trainer):
     """
 
     # Create required mock objects
-    comet_exp = mocker.MagicMock(spec=Experiment)
+    mock_comet_exp = mocker.MagicMock(spec=Experiment)
 
     # Define the metric values and expected output
     train_metric_values = {"train_accuracy": 0.9, "train_loss": 0.1}
-    valid_metric_values = pd.DataFrame(
-        {"valid_accuracy": [0.8], "valid_loss": [0.2]}
-    ).to_dict("records")[0]
+    valid_metric_values = {"valid_accuracy": 0.8, "valid_loss": 0.2}
     model_ece = 0.05
 
     expected_metrics = {
@@ -426,11 +427,11 @@ def test_log_model_metrics(mocker, model_trainer):
     }
 
     model_trainer._log_model_metrics(
-        comet_exp, train_metric_values, valid_metric_values, model_ece
+        mock_comet_exp, train_metric_values, valid_metric_values, model_ece
     )
 
     # Check if the log_metrics method of the Experiment mock object was called with the correct parameters
-    comet_exp.log_metrics.assert_called_once_with(expected_metrics)
+    mock_comet_exp.log_metrics.assert_called_once_with(expected_metrics)
 
 
 def test_register_model(mocker, model_trainer):
@@ -440,26 +441,28 @@ def test_register_model(mocker, model_trainer):
     """
 
     # Create required mock objects
-    comet_exp = mocker.MagicMock(spec=Experiment)
-    fitted_pipeline = mocker.MagicMock(spec=Pipeline)
+    mock_comet_exp = mocker.MagicMock(spec=Experiment)
+    mock_fitted_pipeline = mocker.MagicMock(spec=Pipeline)
 
-    # Define the registered model name
+    # Define the registered model name and expected file path
     registered_model_name = "test_model"
-
-    # Define the expected file path
     expected_file_path = f"{model_trainer.artifacts_path}/{registered_model_name}.pkl"
 
     # Mock joblib.dump to avoid creating an actual file
     mocker.patch("joblib.dump")
 
-    model_trainer._register_model(comet_exp, fitted_pipeline, registered_model_name)
+    model_trainer._register_model(
+        mock_comet_exp, mock_fitted_pipeline, registered_model_name
+    )
 
     # Check if internal methods were called with the correct parameters
-    joblib.dump.assert_called_once_with(fitted_pipeline, expected_file_path)
-    comet_exp.log_model.assert_called_once_with(
+    joblib.dump.assert_called_once_with(mock_fitted_pipeline, expected_file_path)
+    mock_comet_exp.log_model.assert_called_once_with(
         name=registered_model_name, file_or_folder=expected_file_path, overwrite=False
     )
-    comet_exp.register_model.assert_called_once_with(model_name=registered_model_name)
+    mock_comet_exp.register_model.assert_called_once_with(
+        model_name=registered_model_name
+    )
 
 
 def test_submit_train_exp(mocker, model_trainer):
@@ -474,8 +477,6 @@ def test_submit_train_exp(mocker, model_trainer):
     mock_selector = mocker.MagicMock(VarianceThreshold)
     mock_model = mocker.MagicMock(spec=LogisticRegression)
     mock_model.__class__.__name__ = "LogisticRegression"
-    mock_evaluator = mocker.MagicMock(spec=ModelEvaluator)
-    mocker.patch("src.training.utils.model.ModelEvaluator", return_value=mock_evaluator)
 
     # Mock the pipeline and its fit, predict_proba methods and named_steps attribute
     mock_pipeline = mocker.MagicMock(spec=Pipeline)
@@ -514,7 +515,7 @@ def test_submit_train_exp(mocker, model_trainer):
     )
     mock_evaluate_model = mocker.patch(
         "src.training.utils.job.ModelTrainer._evaluate_model",
-        return_value=(mocker.MagicMock(), mocker.MagicMock(), mocker.MagicMock()),
+        return_value=(dict, dict, float),
     )
     mock_log_model_metrics = mocker.patch(
         "src.training.utils.job.ModelTrainer._log_model_metrics"
@@ -567,6 +568,8 @@ def test_get_base_models(mocker):
     """
 
     # Create required mock objects
+    # Note: we only need to mock the 'classifier' attribute of the pipeline
+    # as it's the only attribute used in the _get_base_models method.
     mock_pipeline = mocker.MagicMock()
     mock_pipeline.named_steps = {"classifier": mocker.MagicMock()}
 
@@ -645,84 +648,64 @@ def test_copy_data_transform_pipeline(mocker):
         creator._copy_data_transform_pipeline()
 
 
-# TODO: fix this test
-# def test_create_voting_ensemble(mocker, model_trainer):
-#     """Tests if the create_voting_ensemble method returns the expected outputs. It mocks the
-#     internal methods and checks if the expected outputs are returned and if the internal methods
-#     were called with the expected parameters.
-#     """
+def test_create_voting_ensemble(mocker):
+    """Tests if the create_voting_ensemble method returns the expected outputs. It mocks the
+    internal methods and checks if the expected outputs are returned and if the internal methods
+    were called with the expected parameters.
+    """
 
-#     # Create a mock pipeline with a classifier
-#     mock_pipeline = mocker.MagicMock()
-#     mock_preprocessor = mocker.MagicMock(ColumnTransformer)
-#     mock_selector = mocker.MagicMock(VarianceThreshold)
-#     mock_model = mocker.MagicMock(spec=LogisticRegression)
-#     mock_pipeline.named_steps = {
-#         "preprocessor": mock_preprocessor,
-#         "selector": mock_selector,
-#         "classifier": mock_model,
-#     }
+    # Create a mock pipeline with a classifier
+    mock_pipeline = mocker.MagicMock()
+    mock_preprocessor = mocker.MagicMock(ColumnTransformer)
+    mock_selector = mocker.MagicMock(VarianceThreshold)
+    mock_model = mocker.MagicMock(spec=LogisticRegression)
+    mock_pipeline.named_steps = {
+        "preprocessor": mock_preprocessor,
+        "selector": mock_selector,
+        "classifier": mock_model,
+    }
 
-#     # Create a VotingEnsembleCreator instance with mock pipelines
-#     creator = VotingEnsembleCreator(
-#         comet_api_key="mock_key",
-#         comet_project_name="mock_project",
-#         comet_exp_name="mock_exp",
-#         train_features=mocker.MagicMock(pd.DataFrame),
-#         valid_features=mocker.MagicMock(pd.DataFrame),
-#         train_class=mocker.MagicMock(np.ndarray),
-#         valid_class=mocker.MagicMock(np.ndarray),
-#         class_encoder=mocker.MagicMock(LabelEncoder),
-#         artifacts_path="mock_path",
-#     )
-#     creator.lr_calib_pipeline = mock_pipeline
-#     creator.rf_calib_pipeline = mock_pipeline
-#     creator.lgbm_calib_pipeline = mock_pipeline
-#     creator.xgb_calib_pipeline = mock_pipeline
+    # Create a VotingEnsembleCreator instance with mock pipelines
+    creator = VotingEnsembleCreator(
+        comet_api_key="mock_key",
+        comet_project_name="mock_project",
+        comet_exp_name="mock_exp",
+        train_features=mocker.MagicMock(pd.DataFrame),
+        valid_features=mocker.MagicMock(pd.DataFrame),
+        train_class=mocker.MagicMock(np.ndarray),
+        valid_class=mocker.MagicMock(np.ndarray),
+        class_encoder=mocker.MagicMock(LabelEncoder),
+        artifacts_path="mock_path",
+    )
 
-#     # Patch the _create_comet_experiment method in the class
-#     with mocker.patch('src.training.utils.job.VotingEnsembleCreator._create_comet_experiment') as mock_create_comet_experiment:
-#         # Call create_voting_ensemble and check the output
-#         ve_pipeline, comet_exp = creator.create_voting_ensemble()
+    creator.lr_calib_pipeline = mock_pipeline
+    creator.rf_calib_pipeline = mock_pipeline
+    creator.lgbm_calib_pipeline = mock_pipeline
+    creator.xgb_calib_pipeline = mock_pipeline
 
-#         # Check that the internal methods were called
-#         assert mock_create_comet_experiment.called
+    # Mock the methods
+    mocker.patch.object(
+        creator, "_create_comet_experiment", return_value=mocker.MagicMock(Experiment)
+    )
+    mocker.patch.object(
+        creator,
+        "_get_base_models",
+        return_value=[("LR", mock_pipeline), ("RF", mock_pipeline)],
+    )
+    mocker.patch.object(
+        creator, "_create_fitted_ensemble_pipeline", return_value=mock_pipeline
+    )
+    mocker.patch.object(creator, "_evaluate_model", return_value=(dict, dict, float))
+    mocker.patch.object(creator, "_log_model_metrics", return_value=None)
+    mocker.patch.object(creator, "_register_model", return_value=None)
 
-#     # # Mock the internal methods
-#     # mock_create_comet_experiment = mocker.patch.object(creator, "_create_comet_experiment", autospec=True, return_value=mocker.MagicMock(Experiment))
-#     # mock_get_base_models = mocker.patch.object(creator, "_get_base_models", return_value=mocker.MagicMock(Pipeline))
-#     # mock_create_fitted_ensemble_pipeline = mocker.patch.object(creator, "_create_fitted_ensemble_pipeline", return_value=mocker.MagicMock(Pipeline))
-#     # mock_evaluate_model = mocker.patch.object(creator, "_evaluate_model", return_value=(dict, dict, float))
-#     # mock_log_model_metrics = mocker.patch.object(creator, "_log_model_metrics")
-#     # mock_register_model = mocker.patch.object(creator, "_register_model")
+    # Call create_voting_ensemble
+    _ = creator.create_voting_ensemble()
 
-#     # # Start the patches
-#     # mock_create_comet_experiment.start()
-#     # mock_get_base_models.start()
-#     # mock_create_fitted_ensemble_pipeline.start()
-#     # mock_evaluate_model.start()
-#     # mock_log_model_metrics.start()
-#     # mock_register_model.start()
-
-#     # # Call create_voting_ensemble and check the output
-#     # ve_pipeline, comet_exp = creator.create_voting_ensemble()
-
-#     # # Check that the internal methods were called
-#     # assert mock_create_comet_experiment.called
-#     # assert mock_get_base_models.called
-#     # assert mock_create_fitted_ensemble_pipeline.called
-#     # assert mock_evaluate_model.called
-#     # assert mock_log_model_metrics.called
-#     # assert mock_register_model.called
-
-#     # # Check the output
-#     # assert ve_pipeline is not None
-#     # assert comet_exp is not None
-
-#     # # Stop the patches
-#     # mock_create_comet_experiment.stop()
-#     # mock_get_base_models.stop()
-#     # mock_create_fitted_ensemble_pipeline.stop()
-#     # mock_evaluate_model.stop()
-#     # mock_log_model_metrics.stop()
-#     # mock_register_model.stop()
+    # Check that the internal methods were called
+    creator._create_comet_experiment.assert_called_once()
+    creator._get_base_models.assert_called_once()
+    creator._create_fitted_ensemble_pipeline.assert_called_once()
+    creator._evaluate_model.assert_called_once()
+    creator._log_model_metrics.assert_called_once()
+    creator._register_model.assert_called_once()
