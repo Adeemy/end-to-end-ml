@@ -531,21 +531,21 @@ class VotingEnsembleCreator(ModelTrainer):
         ece_nbins: int = 5,
     ):
         super().__init__(
-            train_features=None,
-            train_class=None,
-            valid_features=None,
-            valid_class=None,
+            train_features=train_features,
+            train_class=train_class,
+            valid_features=valid_features,
+            valid_class=valid_class,
             train_features_preprocessed=None,
             valid_features_preprocessed=None,
             n_features=None,
-            class_encoder=None,
+            class_encoder=class_encoder,
             preprocessor_step=None,
             selector_step=None,
-            artifacts_path=None,
+            artifacts_path=artifacts_path,
             num_feature_names=None,
             cat_feature_names=None,
-            fbeta_score_beta=None,
-            encoded_pos_class_label=None,
+            fbeta_score_beta=fbeta_score_beta,
+            encoded_pos_class_label=encoded_pos_class_label,
         )
 
         self.comet_api_key = comet_api_key
