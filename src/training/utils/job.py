@@ -702,7 +702,7 @@ class VotingEnsembleCreator(ModelTrainer):
         """
 
         # Create Comet experiment
-        comet_exp = super()._create_comet_experiment(
+        comet_exp = self._create_comet_experiment(
             comet_api_key=self.comet_api_key,
             comet_project_name=self.comet_project_name,
             comet_exp_name=self.comet_exp_name,
@@ -721,14 +721,14 @@ class VotingEnsembleCreator(ModelTrainer):
                 ece_nbins=self.ece_nbins,
             )
 
-            super()._log_model_metrics(
+            self._log_model_metrics(
                 comet_exp=comet_exp,
                 train_metric_values=train_metric_values,
                 valid_metric_values=valid_metric_values,
                 model_ece=model_ece,
             )
 
-            super()._register_model(
+            self._register_model(
                 comet_exp=comet_exp,
                 pipeline=ve_pipeline,
                 registered_model_name=self.registered_model_name,
