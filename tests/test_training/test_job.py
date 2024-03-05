@@ -286,6 +286,8 @@ def test_fit_best_model(mocker, model_trainer):
     model_trainer.selector_step = VarianceThreshold()
 
     # Create a pipeline and set it as the return value of the fit_pipeline method
+    # Note: fit_pipeline is a method of ModelOptimizer, so we need to mock it and
+    # it's not being tested here.
     model = LogisticRegression()
     pipeline = Pipeline(
         steps=[
@@ -366,8 +368,6 @@ def test_evaluate_model(mocker, model_trainer):
         ModelEvaluator, "calc_expected_calibration_error"
     )
 
-    mocker.patch("src.training.utils.model.ModelEvaluator", return_value=mock_evaluator)
-
     # Call the _evaluate_model method
     train_metric_values, valid_metric_values, model_ece = model_trainer._evaluate_model(
         comet_exp=mock_comet_exp, fitted_pipeline=mock_pipeline
@@ -411,7 +411,7 @@ def test_log_model_metrics(mocker, model_trainer):
     """
 
     # Create required mock objects
-    comet_exp = mocker.MagicMock(spec=Experiment)
+    mock_comet_exp = mocker.MagicMock(spec=Experiment)
 
     # Define the metric values and expected output
     train_metric_values = {"train_accuracy": 0.9, "train_loss": 0.1}
@@ -427,11 +427,11 @@ def test_log_model_metrics(mocker, model_trainer):
     }
 
     model_trainer._log_model_metrics(
-        comet_exp, train_metric_values, valid_metric_values, model_ece
+        mock_comet_exp, train_metric_values, valid_metric_values, model_ece
     )
 
     # Check if the log_metrics method of the Experiment mock object was called with the correct parameters
-    comet_exp.log_metrics.assert_called_once_with(expected_metrics)
+    mock_comet_exp.log_metrics.assert_called_once_with(expected_metrics)
 
 
 def test_register_model(mocker, model_trainer):
@@ -441,26 +441,28 @@ def test_register_model(mocker, model_trainer):
     """
 
     # Create required mock objects
-    comet_exp = mocker.MagicMock(spec=Experiment)
-    fitted_pipeline = mocker.MagicMock(spec=Pipeline)
+    mock_comet_exp = mocker.MagicMock(spec=Experiment)
+    mock_fitted_pipeline = mocker.MagicMock(spec=Pipeline)
 
-    # Define the registered model name
+    # Define the registered model name and expected file path
     registered_model_name = "test_model"
-
-    # Define the expected file path
     expected_file_path = f"{model_trainer.artifacts_path}/{registered_model_name}.pkl"
 
     # Mock joblib.dump to avoid creating an actual file
     mocker.patch("joblib.dump")
 
-    model_trainer._register_model(comet_exp, fitted_pipeline, registered_model_name)
+    model_trainer._register_model(
+        mock_comet_exp, mock_fitted_pipeline, registered_model_name
+    )
 
     # Check if internal methods were called with the correct parameters
-    joblib.dump.assert_called_once_with(fitted_pipeline, expected_file_path)
-    comet_exp.log_model.assert_called_once_with(
+    joblib.dump.assert_called_once_with(mock_fitted_pipeline, expected_file_path)
+    mock_comet_exp.log_model.assert_called_once_with(
         name=registered_model_name, file_or_folder=expected_file_path, overwrite=False
     )
-    comet_exp.register_model.assert_called_once_with(model_name=registered_model_name)
+    mock_comet_exp.register_model.assert_called_once_with(
+        model_name=registered_model_name
+    )
 
 
 def test_submit_train_exp(mocker, model_trainer):
@@ -475,8 +477,6 @@ def test_submit_train_exp(mocker, model_trainer):
     mock_selector = mocker.MagicMock(VarianceThreshold)
     mock_model = mocker.MagicMock(spec=LogisticRegression)
     mock_model.__class__.__name__ = "LogisticRegression"
-    mock_evaluator = mocker.MagicMock(spec=ModelEvaluator)
-    mocker.patch("src.training.utils.model.ModelEvaluator", return_value=mock_evaluator)
 
     # Mock the pipeline and its fit, predict_proba methods and named_steps attribute
     mock_pipeline = mocker.MagicMock(spec=Pipeline)
@@ -515,7 +515,7 @@ def test_submit_train_exp(mocker, model_trainer):
     )
     mock_evaluate_model = mocker.patch(
         "src.training.utils.job.ModelTrainer._evaluate_model",
-        return_value=(mocker.MagicMock(), mocker.MagicMock(), mocker.MagicMock()),
+        return_value=(dict, dict, float),
     )
     mock_log_model_metrics = mocker.patch(
         "src.training.utils.job.ModelTrainer._log_model_metrics"
@@ -568,6 +568,8 @@ def test_get_base_models(mocker):
     """
 
     # Create required mock objects
+    # Note: we only need to mock the 'classifier' attribute of the pipeline
+    # as it's the only attribute used in the _get_base_models method.
     mock_pipeline = mocker.MagicMock()
     mock_pipeline.named_steps = {"classifier": mocker.MagicMock()}
 

@@ -7,7 +7,7 @@ import optuna
 import optuna_distributed
 import pandas as pd
 import pytest
-from comet_ml import Experiment
+from comet_ml import API, Experiment
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import SelectKBest, VarianceThreshold, chi2
@@ -30,7 +30,7 @@ from src.training.utils.model import (
 
 @pytest.fixture
 def model_optimizer(mocker):
-    """Create a ModelOptimizer instance for testing. This fixture is used by all the tests
+    """Creates a ModelOptimizer instance for testing. This fixture is used by all the tests
     related to ModelOptimizer in this module.
     """
 
@@ -91,16 +91,16 @@ def test_model_optimizer_generate_trial_params(mocker, model_optimizer):
     # Create a mock optuna trial object
     trial = mocker.create_autospec(optuna.trial.Trial)
 
-    # Call the generate_trial_params method
     params = model_optimizer.generate_trial_params(trial)
 
-    # Check that the returned params dictionary is not empty
     assert params
     assert isinstance(params, dict)
 
 
 def test_model_optimizer_calc_perf_metrics(model_optimizer):
-    """Tests that the calc_perf_metrics method returns a non-empty dataframe."""
+    """Tests that the calc_perf_metrics method returns a non-empty dataframe.
+    It also checks that the returned dataframe has the expected metrics.
+    """
 
     # Create mock arrays for true_class and pred_class
     true_class = [0, 1, 0, 1, 0]
@@ -124,14 +124,10 @@ def test_model_optimizer_calc_perf_metrics(model_optimizer):
 
 
 def test_model_optimizer_objective_function(mocker, model_optimizer):
-    """Tests that the objective_function method returns a float value.
-    This test also mocks the suggest_float method of the optuna trial object.
-    """
+    """Tests that the objective_function method returns a float value."""
 
     # Create a mock optuna trial object
     trial = mocker.create_autospec(optuna.trial.Trial)
-
-    # Configure the suggest_float method of the trial mock object
     trial.suggest_float.return_value = 0.5
 
     # Mock the generate_trial_params method
@@ -139,7 +135,7 @@ def test_model_optimizer_objective_function(mocker, model_optimizer):
     model_optimizer.generate_trial_params.return_value = {
         "C": 1,
         "l1_ratio": 2,
-    }  # replace with actual params
+    }
 
     # Set train_features_preprocessed and train_class attributes
     model_optimizer.train_features_preprocessed = pd.DataFrame(
@@ -155,18 +151,19 @@ def test_model_optimizer_objective_function(mocker, model_optimizer):
     # Mock the predict method of the model to return predictions of the same length as the true labels
     model_optimizer.model.predict = mocker.MagicMock(return_value=np.array([0, 1]))
 
-    # Call the objective_function method
     valid_score = float(model_optimizer.objective_function(trial))
 
-    # Check that the returned valid_score is a float
     assert isinstance(valid_score, float)
+    assert (
+        valid_score >= 0.0 and valid_score <= 1.0
+    ), "The valid_score is not between 0 and 1"
 
 
 def test_model_optimizer_tune_model(mocker, model_optimizer):
-    """Tests that the tune_model method returns a non-empty optuna study object. This test also
-    mocks the predict method of the model to return predictions of the same length as the true
-    labels. It mocks the tune_model_in_parallel method to return the mock study and avoid running
-    the actual optimization process, which is tested in another test.
+    """Tests that the tune_model method returns a non-empty optuna study object. The test
+    mocks the predict method of the model to return predictions of the same length as the
+    true labels. It mocks the tune_model_in_parallel method to return the mock study and
+    avoid running the actual optimization process, which is tested in another test.
     """
 
     # Mock required attributes for tune_model method
@@ -176,23 +173,21 @@ def test_model_optimizer_tune_model(mocker, model_optimizer):
     # Mock the predict method of the model to return predictions of the same length as the true labels
     model_optimizer.model.predict = mocker.MagicMock(return_value=np.array([0, 1]))
 
-    # Mock tune_model_in_parallel to return the mock study
+    # Mock tune_model to return the mock study
     mock_study = mocker.MagicMock(spec=optuna.study.Study)
     model_optimizer.tune_model = mocker.MagicMock(return_value=mock_study)
 
-    # Call the tune_model method
     study = model_optimizer.tune_model()
 
-    # Check that the returned study object is not None
     assert study is not None
     assert isinstance(study, optuna.study.Study)
 
 
 def test_model_optimizer_tune_model_in_parallel(mocker, model_optimizer):
-    """Tests that the tune_model method returns a non-empty optuna study object. This test also
-    mocks the predict method of the model to return predictions of the same length as the true
-    labels. It mocks the tune_model_in_parallel method to return the mock study and avoid running
-    the actual optimization process, which is tested in another test.
+    """Tests that the tune_model method returns a non-empty optuna study object. The test
+    mocks the predict method of the model to return predictions of the same length as the
+    true labels. It mocks the tune_model_in_parallel method to return the mock study and
+    avoid running the actual optimization process, which is tested in another test.
     """
 
     # Mock required attributes for tune_model_in_parallel method
@@ -236,7 +231,7 @@ def test_create_pipeline():
 
 def test_fit_pipeline(mocker, model_optimizer):
     """Tests that the fit_pipeline method returns a pipeline with the expected steps.
-    This test also mocks the fit method of the pipeline to track its calls, i.e.,
+    The test also mocks the fit method of the pipeline to track its calls, i.e.,
     interaction testing.
     """
 
@@ -271,7 +266,6 @@ def test_fit_pipeline(mocker, model_optimizer):
     # Create a spy on the fit_pipeline method to track its calls
     spy = mocker.spy(model_optimizer, "fit_pipeline")
 
-    # Call the fit_pipeline method
     pipeline = model_optimizer.fit_pipeline(
         train_features, preprocessor_step, selector_step, model
     )
@@ -295,7 +289,7 @@ def test_fit_pipeline(mocker, model_optimizer):
 
 @pytest.fixture
 def model_evaluator():
-    """Create a ModelEvaluator instance for testing. This fixture is used by all the tests
+    """Creates a ModelEvaluator instance for testing. This fixture is used by all the tests
     related to ModelEvaluator in this module.
     """
 
@@ -386,9 +380,8 @@ def test_extract_feature_importance(model_evaluator):
 
 
 def test_log_feature_importance_fig(mocker, model_evaluator):
-    """Tests that the _log_feature_importance_fig method logs the
-    feature importance figure. It should not log the figure if the classifier
-    name is 'VotingClassifier' but it should log the figure otherwise.
+    """Tests that the _log_feature_importance_fig method logs the feature importance
+    figure if the classifier name is not 'VotingClassifier'
     """
 
     model_evaluator.comet_exp = mocker.MagicMock()
@@ -397,7 +390,7 @@ def test_log_feature_importance_fig(mocker, model_evaluator):
     model_evaluator._log_feature_importance_fig(
         "VotingClassifier", np.array([0.1, 0.2]), ["num_feature", "cat_feature"]
     )
-    model_evaluator.comet_exp.log_figure.assert_not_called()  # no figure logged
+    model_evaluator.comet_exp.log_figure.assert_not_called()
 
     # Check if the feature importance fig is logged
     model_evaluator._log_feature_importance_fig(
@@ -411,11 +404,23 @@ def test_log_feature_importance_fig(mocker, model_evaluator):
     )
     model_evaluator.comet_exp.log_figure.assert_called_once()
 
+    model_evaluator._log_feature_importance_fig(
+        "LightGBM",
+        np.array([0.1, 0.2]),
+        ["num_feature", "cat_feature"],
+        2,
+        (24, 36),
+        10.0,
+        "Feature Importance",
+    )
+    model_evaluator.comet_exp.log_figure.call_count == 2
+
 
 def test_plot_roc_curve():
-    """Tests that the plot_roc_curve method returns a matplotlib figure object. This test also
+    """Tests that the plot_roc_curve method returns a matplotlib figure object. The test
     checks that the AUC is correctly calculated and displayed in the plot.
     """
+
     y_true = np.array([0, 1, 0, 1, 0])
     y_pred = np.array([0.1, 0.9, 0.2, 0.2, 0.1])
     expected_auc = roc_auc_score(y_true, y_pred)
@@ -434,8 +439,8 @@ def test_plot_roc_curve():
 
 
 def test_plot_precision_recall_curve():
-    """Tests that the plot_precision_recall_curve method returns a matplotlib figure object. This test also
-    checks that the average precision is correctly calculated and displayed in the plot.
+    """Tests that the plot_precision_recall_curve method returns a matplotlib figure object.
+    The test checks that the average precision is correctly calculated and displayed in the plot.
     """
 
     y_true = np.array([0, 1, 0, 1, 0])
@@ -460,9 +465,9 @@ def test_plot_precision_recall_curve():
 
 
 def test_plot_cumulative_gains():
-    """Tests that the plot_cumulative_gains method returns a matplotlib figure object. This test also
-    checks that the plot has the expected title, x-axis label, and y-axis label. The plot should also
-    contain four lines: the precision-recall curve, the model, the wizard, and the random line.
+    """Tests that the plot_cumulative_gains method returns a matplotlib figure object. The test
+    checks that the plot has the expected title, x-axis label, and y-axis label. The plot should
+    also contain four lines: the precision-recall curve, the model, the wizard, and the random line.
     """
 
     y_true = np.array([0, 1, 0, 1, 0])
@@ -488,10 +493,10 @@ def test_plot_cumulative_gains():
 
 
 def test_plot_lift_curve():
-    """Tests that the plot_cumulative_gains method returns a matplotlib figure object. This test also
-    checks that the plot has the expected title, x-axis label, and y-axis label. The plot should also
-    contain six lines: the precision-recall curve, the model, the wizard, the random line, the model,
-    and the random line.
+    """Tests that the plot_lift_curve method returns a matplotlib figure object. The test checks
+    that the plot has the expected title, x-axis label, and y-axis label. The plot should also
+    contain six lines: the precision-recall curve, the model, the wizard, the random line, the
+    model, and the random line.
     """
 
     y_true = np.array([0, 1, 0, 1, 0])
@@ -517,8 +522,9 @@ def test_plot_lift_curve():
 
 
 def test_convert_metrics_from_df_to_dict():
-    """Tests that the convert_metrics_from_df_to_dict method returns a dictionary with the expected keys and values.
-    This test also checks that the returned dictionary has the expected keys and values when a prefix is provided.
+    """Tests that the convert_metrics_from_df_to_dict method returns a dictionary with
+    the expected keys and values. The test also checks that the returned dictionary has
+    the expected keys and values when a prefix is provided.
     """
 
     scores = pd.DataFrame(
@@ -542,10 +548,10 @@ def test_convert_metrics_from_df_to_dict():
 
 def test_evaluate_model_perf(mocker, model_evaluator):
     """Tests that the evaluate_model_perf method returns the expected performance metrics dataframes.
-    This test also mocks the methods that evaluate_model_perf calls internally. The pipeline is also
-    mocked because it must be fitted before calling evaluate_model_perf. The LabelEncoder is also mocked
-    because it's required to call _log_confusion_matrix. The function calc_perf_metrics is also mocked
-    to return a dataframe with the expected metrics. To ensure the test is isolated, functions called by
+    The test mocks the methods that evaluate_model_perf calls internally. The pipeline is also mocked
+    because it must be fitted before calling evaluate_model_perf. The LabelEncoder is also mocked because
+    it's required to call _log_confusion_matrix. The function calc_perf_metrics is also mocked to return
+    a dataframe with the expected metrics. To ensure the test is isolated, functions called by
     evaluate_model_perf are mocked to return the expected results and not tested in this test.
     """
 
@@ -584,9 +590,7 @@ def test_evaluate_model_perf(mocker, model_evaluator):
 
 
 def test_get_pred_class(model_evaluator):
-    """Tests that the _get_pred_class method returns the expected class labels. This test also
-    checks that the method raises an AssertionError if the threshold is not between 0 and 1.
-    """
+    """Tests that the _get_pred_class method returns the expected class labels."""
 
     # Define test inputs and expected output
     model_evaluator.encoded_pos_class_label = (
@@ -610,7 +614,7 @@ def test_get_pred_class(model_evaluator):
 
 def test_get_original_class_labels(mocker, model_evaluator):
     """Tests that the _get_original_class_labels method returns the expected original class
-    labels and class labels. This test also mocks the pipeline attribute of the ModelEvaluator
+    labels and class labels. The test mocks the pipeline attribute of the ModelEvaluator
     instance because it's required to call the method.
     """
 
@@ -651,7 +655,7 @@ def test_get_original_class_labels(mocker, model_evaluator):
 
 
 def test_log_confusion_matrix(mocker, model_evaluator):
-    """Tests that the _log_confusion_matrix method logs the confusion matrix. This test also
+    """Tests that the _log_confusion_matrix method logs the confusion matrix. The test
     checks that the method logs the confusion matrix the correct number of times.
     """
 
@@ -674,7 +678,9 @@ def test_log_confusion_matrix(mocker, model_evaluator):
         original_class_labels,
     )
 
-    # Assert that the log_confusion_matrix method was called the correct number of times
+    # Assert that the log_confusion_matrix method was called four times
+    # Note log_confusion_matrix logs normalized and non-normalized confusion matrices
+    # for both the training and validation sets
     assert (
         mock_comet_exp.log_confusion_matrix.call_count == 4
     ), f"""The log_confusion_matrix method was not called the correct number of times
@@ -682,7 +688,7 @@ def test_log_confusion_matrix(mocker, model_evaluator):
 
 
 def test_log_calibration_curve(mocker, model_evaluator):
-    """Tests that the _log_calibration_curve method logs the calibration curve. This test also
+    """Tests that the _log_calibration_curve method logs the calibration curve. The test
     checks that the method logs the calibration curve the correct number of times.
     """
 
@@ -697,7 +703,6 @@ def test_log_calibration_curve(mocker, model_evaluator):
     )
     pred_probs = np.array([[0.1, 0.9], [0.8, 0.2], [0.4, 0.6]])
 
-    # Call the method with the test inputs
     model_evaluator._log_calibration_curve(pred_probs)
 
     # Assert that the log_figure method was called once
@@ -708,8 +713,8 @@ def test_log_calibration_curve(mocker, model_evaluator):
 
 
 def test_log_roc_curve(mocker, model_evaluator):
-    """Tests that the _log_roc_curve method logs the ROC curve. This test also checks that the method
-    logs the ROC curve the correct number of times.
+    """Tests that the _log_roc_curve method logs the ROC curve. The test checks
+    that the method logs the ROC curve the correct number of times.
     """
 
     # Create a mock comet_exp to test number of calls by the method
@@ -733,8 +738,8 @@ def test_log_roc_curve(mocker, model_evaluator):
 
 
 def test_log_precision_recall_curve(monkeypatch, mocker, model_evaluator):
-    """Tests that the _log_precision_recall_curve method logs the precision-recall curve. This test also
-    checks that the method logs the precision-recall curve the correct number of times.
+    """Tests that the _log_precision_recall_curve method logs the precision-recall curve. The
+    test checks that the method logs the precision-recall curve the correct number of times.
     """
 
     # Create a mock comet_exp to test number of calls by the method
@@ -764,7 +769,7 @@ def test_log_precision_recall_curve(monkeypatch, mocker, model_evaluator):
 
 
 def test_log_cumulative_gains(mocker, model_evaluator):
-    """Tests that the _log_cumulative_gains method logs the cumulative gains plot. This test also
+    """Tests that the _log_cumulative_gains method logs the cumulative gains plot. The test
     checks that the method logs the cumulative gains plot the correct number of times.
     """
 
@@ -795,8 +800,8 @@ def test_log_cumulative_gains(mocker, model_evaluator):
 
 
 def test_log_lift_curve(mocker, model_evaluator):
-    """Tests that the _log_lift_curve method logs the lift curve. This test also checks that the method
-    logs the lift curve the correct number of times.
+    """Tests that the _log_lift_curve method logs the lift curve. The test checks that
+    the method logs the lift curve the correct number of times.
     """
 
     # Create a mock comet_exp to test number of calls by the method
@@ -823,7 +828,7 @@ def test_log_lift_curve(mocker, model_evaluator):
 
 def test_calc_expected_calibration_error(model_evaluator):
     """Tests that the calc_expected_calibration_error method returns the expected ECE for a perfectly
-    calibrated model and a highly uncalibrated model. This test also checks that the method raises an
+    calibrated model and a highly uncalibrated model. The test checks that the method raises an
     AssertionError if the decision threshold is not between 0 and 1.
     """
 
@@ -912,53 +917,78 @@ def test_calc_expected_calibration_error(model_evaluator):
     assert np.isclose(1, high_ece, atol=0.2)  # ECE should be close to 1
 
 
-# # TODO: fix this test
-# def test_select_best_performer(mocker):
-#     """Tests that the select_best_performer method returns the expected best model
-#     name. This test also checks that the method calls the Comet API to get the
-#     experiment metrics and that it selects the best model based on the comparison metric.
-#     """
-
-#     manager = ModelChampionManager(champ_model_name="champion_model")
-
-#     comet_project_name = "project"
-#     comet_workspace_name = "workspace"
-#     comparison_metric = "f_0.7_score"
-
-#     comet_exp_keys = pd.DataFrame(
-#         {"Model": ["model1", "model2"], "Experiment": ["exp1", "exp2"]}
-#     )
-
-#     mock_experiment = mocker.MagicMock(Experiment)
-#     mock_experiment.get_metrics.return_value = [
-#         {"metricValue": "0.5"},
-#         {"metricValue": "0.6"},
-#     ]
-
-#     # Mock the API class and the get_experiment method
-#     mock_api = mocker.patch("comet_ml.API")
-#     mock_api.return_value.get_experiment.return_value = mock_experiment
-
-#     # Act
-#     best_model = manager.select_best_performer(
-#         comet_project_name, comet_workspace_name, comparison_metric, comet_exp_keys
-#     )
-
-#     # Assert
-#     assert best_model == "model2"
-#     mock_api.return_value.get_experiment.assert_called_once_with(
-#         comet_project_name, comet_workspace_name, "exp2"
-#     )
-#     mock_experiment.get_metrics.assert_called_once_with(comparison_metric)
-
-
-def test_calibrate_pipeline(mocker):
-    """Tests that the calibrate_pipeline method returns a calibrated pipeline. This
-    test also checks that the method calls the fit method of the pipeline and the
-    calibration display object.
+def test_select_best_performer(mocker):
+    """Tests that the select_best_performer method returns the expected best model
+    name. The test checks that the method calls the Comet API to get the experiment
+    metrics and that it selects the best model based on the comparison metric. The
+    test also checks that the method raises an AssertionError if the wrong model is
+    selected.
     """
 
+    # Create a ModelChampionManager instance that includes the select_best_performer method
+    manager = ModelChampionManager(champ_model_name="champion_model")
+
+    # Set up the test data
+    comet_project_name = "project"
+    comet_workspace_name = "workspace"
+    comparison_metric = "accuracy"
+    comet_exp_keys = pd.DataFrame(
+        [
+            {"0": "model1", "1": "mock_exp1"},
+            {"0": "model2", "1": "mock_exp2"},
+            {"0": "model3", "1": "mock_exp3"},
+        ]
+    )
+
+    mock_api = mocker.Mock(API)
+    mock_exp1 = mocker.MagicMock()
+    mock_exp2 = mocker.MagicMock()
+    mock_exp3 = mocker.MagicMock()
+
+    # Set up the mock experiment metrics, where exp2 has the highest metric value
+    mock_exp1.get_metrics.return_value = [
+        {"metricName": comparison_metric, "metricValue": 0.3}
+    ]
+    mock_exp2.get_metrics.return_value = [
+        {"metricName": comparison_metric, "metricValue": 0.9}
+    ]
+    mock_exp3.get_metrics.return_value = [
+        {"metricName": comparison_metric, "metricValue": 0.7}
+    ]
+
+    # Set the side effect of `get_experiment` method on the `mock_api` object to return different
+    # mock experiment objects for each call, each with different model name and metric value
+    mock_api.get_experiment.side_effect = [mock_exp1, mock_exp2, mock_exp3]
+
+    best_model_name = manager.select_best_performer(
+        comet_project_name=comet_project_name,
+        comet_workspace_name=comet_workspace_name,
+        comparison_metric=comparison_metric,
+        comet_exp_keys=comet_exp_keys,
+        comet_api=mock_api,
+    )
+
+    # Assert that get_experiment was called the correct number of times
+    assert mock_api.get_experiment.call_count == comet_exp_keys.shape[0]
+
+    # Assert that the best model was selected correctly, i.e., the model with highest score
+    assert best_model_name == "model2"
+
+    # Test that the function raises a AssertionError if the comparison metric is not found
+    with pytest.raises(AssertionError):
+        assert best_model_name == "model1" or best_model_name == "model3"
+
+
+def test_calibrate_pipeline():
+    """Tests that the calibrate_pipeline method returns a calibrated pipeline. Thie test
+    checks that the method calls the fit method of the pipeline and the calibration
+    display object.
+    """
+
+    # Create a ModelChampionManager instance that includes the calibrate_pipeline method
     mock_self = ModelChampionManager(champ_model_name="champion_model")
+
+    # Set up the test data
     train_features = pd.DataFrame(
         np.random.randint(0, 100, size=(100, 4)), columns=list("ABCD")
     )
@@ -979,7 +1009,6 @@ def test_calibrate_pipeline(mocker):
         cv_folds=cv_folds,
     )
 
-    # Assert
     assert isinstance(calib_pipeline, Pipeline)
     assert isinstance(calib_pipeline.named_steps["classifier"], CalibratedClassifierCV)
     assert type(model).__name__ in str(calib_pipeline.named_steps["classifier"])
@@ -987,11 +1016,14 @@ def test_calibrate_pipeline(mocker):
 
 def test_log_and_register_champ_model(mocker, monkeypatch):
     """Tests that the log_and_register_champ_model method logs and registers the champion model.
-    This test also checks that the method calls the log_model and register_model methods of the
-    experiment object and the end method of the experiment object.
+    The test checks that the method calls the log_model and register_model methods of the experiment
+    object and the end method of the experiment object.
     """
 
+    # Create a ModelChampionManager instance that includes the log_and_register_champ_model method
     instance = ModelChampionManager(champ_model_name="champion_model")
+
+    # Set up the test data
     local_path = "/path/to/model"
     pipeline = mocker.MagicMock(Pipeline)
     exp_obj = mocker.MagicMock(Experiment)
