@@ -1150,7 +1150,7 @@ class ModelChampionManager:
         comet_workspace_name: str,
         comparison_metric: str,
         comet_exp_keys: dict,
-        comet_api: API = API(),
+        comet_api: API = None,
     ) -> str:
         """Selects the best performer from all challenger models. The comet_exp_keys
         is a dictionary of model names as keys and their corresponding experiment
@@ -1167,6 +1167,9 @@ class ModelChampionManager:
         Returns:
             best_challenger_name (str): name of the best challenger model.
         """
+
+        if comet_api is None:
+            comet_api = API()
 
         exp_scores = {}
         for i in range(comet_exp_keys.shape[0]):
