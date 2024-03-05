@@ -1,9 +1,9 @@
 [![CI/CD](https://github.com/Adeemy/end-to-end-tabular-ml/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/Adeemy/end-to-end-tabular-ml/actions/workflows/main.yml)[![python](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.99.1-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
-[![codecov](https://codecov.io/gh/Adeemy/end-to-end-tabular-ml/graph/badge.svg?token=LO67YZIGXR)](https://codecov.io/gh/Adeemy/end-to-end-tabular-ml)
+[![codecov](https://codecov.io/gh/Adeemy/end-to-end-ml/graph/badge.svg?token=LO67YZIGXR)](https://codecov.io/gh/Adeemy/end-to-end-ml)
 
-# End-to-end ML Project
+# End-to-end ML
 
 This is an end-to-end ML project for tabular data that incorporates software engineering principles in machine learning. It spans the whole lifecycle of a ML model, from data exploration, preprocessing, feature engineering, model selection, training, evaluation, to deployment.
 
@@ -43,7 +43,7 @@ The project consists of the following folders and files:
 
 Below is the project structure.
 
-        end-to-end-tabular-ml
+        end-to-end-ml
         ├── LICENSE
         ├── Makefile
         ├── README.md
