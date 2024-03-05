@@ -61,7 +61,7 @@ jobs:
         uses: codecov/codecov-action@v4.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: Adeemy/end-to-end-tabular-ml
+          slug: Adeemy/end-to-end-ml
 
       - name: Lint with pylint
         run: |
