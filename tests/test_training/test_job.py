@@ -412,9 +412,7 @@ def test_log_model_metrics(mocker, model_trainer):
 
     # Define the metric values and expected output
     train_metric_values = {"train_accuracy": 0.9, "train_loss": 0.1}
-    valid_metric_values = pd.DataFrame(
-        {"valid_accuracy": [0.8], "valid_loss": [0.2]}
-    ).to_dict("records")[0]
+    valid_metric_values = {"valid_accuracy": 0.8, "valid_loss": 0.2}
     model_ece = 0.05
 
     expected_metrics = {

@@ -299,7 +299,7 @@ class ModelTrainer:
         self,
         comet_exp: Experiment,
         train_metric_values: dict,
-        valid_metric_values: pd.DataFrame,
+        valid_metric_values: dict,
         model_ece: float,
     ) -> None:
         """Logs model metrics to Comet experiment.
