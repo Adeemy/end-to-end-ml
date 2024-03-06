@@ -96,6 +96,7 @@ jobs:
 
   evaluate:
     runs-on: ubuntu-latest
+    needs: train
 
     steps:
       - uses: actions/checkout@v3
