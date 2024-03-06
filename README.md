@@ -43,7 +43,7 @@ The project consists of the following folders and files:
 
 - `tests`: contains test scripts to validate the functionality of the ML components in the project. By having a dedicated tests folder, it promotes code quality, reliability, and helps in identifying and fixing issues early in the development process.
 
-Below is the project structure.
+Below is the repo structure.
 
         end-to-end-ml
         ├── LICENSE
@@ -129,7 +129,7 @@ Below is the project structure.
         │   └── test_training_config.py
         └── test_utils.py
 
-### Setup environment & Usage
+### Environment setup & usage
 
 This project uses a devcontainer to set up a full-featured development environment and install required dependencies in addition to some useful VS Code extensions. It allows isolating the tools, libraries, and runtimes needed for working with this project codebase, and to use VS Code’s full feature set inside the container. A devcontainer requires [Docker](https://docs.docker.com/engine/install/) to be up and running. It's recommended to use the devcontainer for this project to ensure consistency and reproducibility across different machines and platforms, but if you prefer not to, for whatever reason, you can create a virtual environment and install the python dependencies by running the following commands from the project root:
 
