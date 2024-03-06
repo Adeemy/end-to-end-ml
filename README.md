@@ -1,4 +1,4 @@
-[![CI/CD](https://github.com/Adeemy/end-to-end-tabular-ml/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/Adeemy/end-to-end-tabular-ml/actions/workflows/main.yml)[![python](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org)
+[![CI/CD](https://github.com/Adeemy/end-to-end-ml/actions/workflows/main.yml/badge.svg)](https://github.com/Adeemy/end-to-end-ml/actions/workflows/main.yml)[![python](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.99.1-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
 [![codecov](https://codecov.io/gh/Adeemy/end-to-end-ml/graph/badge.svg?token=LO67YZIGXR)](https://codecov.io/gh/Adeemy/end-to-end-ml)
@@ -38,6 +38,8 @@ The project consists of the following folders and files:
 - `src/training`: contains the scripts for data splitting, model training, evaluation, and selection. The script (split_data.py) splits the train set into a training set, to train models, and a validation set for model selection. The test set is used to assess the generalization capability of the best model (used only once). The script (train.py) applies data preprocessing on the training set using a sklearn pipeline, such as handling missing values, feature scaling, feature engineering, feature selection, and categorical features encoding. It also implements hyperparameter optimization, using optuna, for the following models: Logistic Regression, Random Forest, LightGBM, and XGBoost, with the ability to exclude models. The training pipeline is tracked and managed by [Comet](https://www.comet.com/site/), which records model parameters, metrics, and artifacts. Once the best model is selected and calibrated in evaluate.py, it is registered in Comet workspace as champion model if its score on the test set is better than a required threshold value. Otherwise, an error is raise that cancels build job.
 
 - `src/inference`: contains the script for scoring new data via REST API using containerized model, which is deployed using GitHub Actions CI/CD pipeline.
+
+- `src/utils`: contains utility modules used throughout the project, including logger class that redirects printed messages in addition to some select events that need to be logged to logger objects and constans that defines paths to to data and training artifacts directories.
 
 - `tests`: contains test scripts to validate the functionality of the ML components in the project. By having a dedicated tests folder, it promotes code quality, reliability, and helps in identifying and fixing issues early in the development process.
 
@@ -97,14 +99,7 @@ Below is the project structure.
         │   │   │   ├── champion_model.pkl
         │   │   │   ├── experiment_keys.csv
         │   │   │   ├── lightgbm.pkl
-        │   │   │   ├── logistic-regression.pkl
-        │   │   │   ├── random-forest.pkl
         │   │   │   ├── study_LGBMClassifier.csv
-        │   │   │   ├── study_LogisticRegression.csv
-        │   │   │   ├── study_RandomForestClassifier.csv
-        │   │   │   ├── study_XGBClassifier.csv
-        │   │   │   ├── voting-ensemble.pkl
-        │   │   │   └── xgboost.pkl
         │   │   ├── evaluate.py
         │   │   ├── split_data.py
         │   │   ├── train.py
@@ -174,4 +169,4 @@ The training and deployment pipelines can be run in GitHub Actions. You can also
 
 - Pull containerized model
 
-        docker pull ghcr.io/adeemy/end-to-end-tabular-ml:9c670633e181da234e0c57639d72a4b2834c7809
+        docker pull ghcr.io/adeemy/end-to-end-ml:9c670633e181da234e0c57639d72a4b2834c7809
