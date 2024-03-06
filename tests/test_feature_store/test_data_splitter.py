@@ -1,5 +1,6 @@
 """
-Tests helper functions of feature pipeline.
+Test functions for the DataSplitter class in the feature store
+module src/feature_store/utils/prep.py. 
 """
 
 import re

@@ -1,7 +1,6 @@
 """
-This script extracts preprocessed data from feature store,
-i.e., features and class labels, and creates data splits
-for model training. 
+Extracts preprocessed data from feature store,i.e., features and
+class labels, and creates data splits for model training. 
 """
 import argparse
 import logging

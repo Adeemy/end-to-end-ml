@@ -1,10 +1,9 @@
 """
-This script evaluates trained models and selects 
-the best model based on performance on validation 
-set. The best model is then evaluated on testing 
-set to assess its generalization capability and it
-will be registered as champion model only if its score
-on the test set is better than a required threshold value.
+Evaluates trained models and selects the best model based on
+performance on validation set. The best model is then evaluated
+on testing set to assess its generalization capability and it
+will be registered as champion model only if its score on the 
+test set is better than a required threshold value.
 """
 
 import argparse

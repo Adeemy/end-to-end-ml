@@ -1,6 +1,5 @@
 """
-This script prepares data retrieved from feature store
-for training. 
+Preprocesses and transforms raw data before saving it in the feature store.
 """
 
 import argparse
@@ -20,7 +19,7 @@ from src.utils.path import DATA_DIR
 
 #################################
 def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> None:
-    """Imports data from feature store to be preprocessed and transformed.
+    """Imports raw data to be preprocessed and transformed.
 
     Args:
         config_yaml_path (str): path to the config yaml file.

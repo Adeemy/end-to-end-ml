@@ -1,4 +1,5 @@
 """Defines a class that loads parameters from config.yml file."""
+
 import yaml
 
 

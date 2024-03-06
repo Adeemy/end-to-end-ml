@@ -1,6 +1,6 @@
 """
-This module contains helper functions used within the main 
-function in train.py
+Contains helper functions for data preprocessing and data split used
+in the training script (train.py)
 """
 
 import re
@@ -25,7 +25,7 @@ from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
 
 
 class DataPipelineCreator:
-    """Create a data preprocessing pipeline using sklearn.
+    """Creates a data preprocessing pipeline using sklearn.
 
     Attributes:
         num_features_imputer (str): strategy to impute missing values in numerical features. Defaults to "median".

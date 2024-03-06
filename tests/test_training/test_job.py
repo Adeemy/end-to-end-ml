@@ -1,3 +1,8 @@
+"""
+Test functions for the ModelTrainer and VotingEnsembleCreator classes 
+in the training module src/training/utils/job.py.
+"""
+
 from datetime import datetime, timedelta
 
 import joblib

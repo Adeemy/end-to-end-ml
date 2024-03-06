@@ -1,3 +1,8 @@
+"""
+Test functions for the Config class in the feature store
+module src/feature_store/utils/config.py.
+"""
+
 import pytest
 
 from src.feature_store.utils.config import Config

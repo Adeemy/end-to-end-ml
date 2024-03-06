@@ -1,6 +1,8 @@
 """
-This utility module includes functions to submit
-training job.
+Includes functions to submit training job, where the model is trained and evaluated
+using ModelOptimizer and ModelEvaluator classes. It also includes a class to create
+a voting ensemble classifier using the base models and evaluate the model using 
+ModelEvaluator.
 """
 
 import re

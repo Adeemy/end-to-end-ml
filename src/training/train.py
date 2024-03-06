@@ -1,6 +1,6 @@
 """
-This script submits experiments to perform 
-hyperparameters optimization for multiple models.
+Runs training experiments to perform hyperparameters optimization 
+for multiple models. It tracks the experiments using Comet.ml.
 """
 
 import argparse

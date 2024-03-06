@@ -1,3 +1,8 @@
+"""
+Test functions for the ModelLoader class and predict function 
+in the inference module src/inference/utils/model.py.
+"""
+
 from pathlib import Path
 
 import pandas as pd

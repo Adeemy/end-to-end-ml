@@ -1,14 +1,13 @@
 """
-This code imports original dataset from UCI data repository and stores it
-local path. Also, 5% of the original dataset is reserved as inference set, 
-which simulates production data that will be scored by the deployed model 
-in inference pipeline.
+Imports original dataset from UCI data repository and stores it local path.
+Also, 5% of the original dataset is reserved as inference set, which simulates 
+production data that will be scored by the deployed model in inference pipeline.
 
 The raw dataset was released by the CDC and it was imported from the following 
 UCI repo: https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators.
 
-Note that this script is only used in the beginning of this project just to
-generate data for the project and it isn't part of feature or inference pipelines.
+Note: this script is only used in the beginning of this project just to generate
+data for the project and it isn't part of feature or inference pipelines.
 """
 
 import argparse

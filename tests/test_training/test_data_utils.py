@@ -1,3 +1,8 @@
+"""
+Test functions for data preprocessing and splitting in the 
+training module src/training/utils/data.py.
+"""
+
 import re
 
 import numpy as np
@@ -15,8 +20,8 @@ from src.training.utils.data import DataPipelineCreator, TrainingDataPrep
 
 @pytest.fixture
 def test_df():
-    """Creates a test dataset with numerical and categorical features. It also includes a near-zero variance feature
-    to test selector step."""
+    """Creates a test dataset with numerical and categorical features. It also
+    includes a near-zero variance feature to test selector step."""
 
     # Set seed for reproducibility
     np.random.seed(0)

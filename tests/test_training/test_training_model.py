@@ -1,3 +1,8 @@
+"""
+Test functions for the ModelOptimizer and ModelEvaluator classes in 
+the model module src/training/utils/model.py.
+"""
+
 import os
 
 import joblib

@@ -1,6 +1,5 @@
 """
-This utility module includes functions for 
-model optimization and evaluation.
+Includes functions for model optimization and evaluation.
 """
 
 import os

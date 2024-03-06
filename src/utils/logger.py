@@ -1,3 +1,9 @@
+"""
+Defines a class that redirects printed messages in addition to some select events that
+need to be logged to logger objects.
+"""
+
+
 import io
 import logging
 

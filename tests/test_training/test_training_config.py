@@ -1,3 +1,7 @@
+"""
+Test functions for training configuration class in src/training/utils/config.py
+"""
+
 import pytest
 
 from src.training.utils.config import Config

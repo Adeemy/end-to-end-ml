@@ -1,5 +1,6 @@
 """
-Tests helper functions of feature pipeline.
+Test functions for the DataPreprocessor class in the
+src/feature_store/utils/prep.py file.
 """
 
 import re
