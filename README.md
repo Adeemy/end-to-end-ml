@@ -169,4 +169,4 @@ The training and deployment pipelines can be run in GitHub Actions. You can also
 
 - Pull containerized model
 
-        docker pull ghcr.io/adeemy/end-to-end-ml:9c670633e181da234e0c57639d72a4b2834c7809
+        docker pull ghcr.io/adeemy/end-to-end-ml:c35fb9610651e155d7a3799644e6ff64c1a5a2db
