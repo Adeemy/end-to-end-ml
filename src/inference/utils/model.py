@@ -81,16 +81,19 @@ class ModelLoader:
             model (sklearn.pipeline.Pipeline): trained model.
         """
 
-        # Download a registered model from Comet workspace
-        model = self.comet_api.get_model(
-            workspace=comet_workspace,
-            model_name=model_name,
-        )
+        # Get the latest version of the model
         model_versions = self.comet_api.get_registry_model_versions(
             workspace=comet_workspace,
             registry_name=model_name,
         )
-        model.download(model_versions[-1], artifacts_path, expand=True)
+        latest_version = model_versions[-1]
+
+        # Download the latest version of the model
+        model = self.comet_api.get_model(
+            workspace=comet_workspace,
+            model_name=model_name,
+        )
+        model.download(latest_version, artifacts_path, expand=True)
 
         return joblib.load(f"{str(artifacts_path)}/{model_name}.pkl")
 
