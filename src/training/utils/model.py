@@ -221,7 +221,7 @@ class ModelOptimizer:
         self.comet_exp.log_metric(name="validation_score", value=valid_score)
 
         # Return the validation score to ensure it's used for model selsection
-        return valid_score
+        return -valid_score
 
     def tune_model(
         self,
@@ -310,7 +310,7 @@ class ModelOptimizer:
         )
 
         study.optimize(
-            direction="maximize",
+            direction="minimize",
             func=self.objective_function,
             n_trials=max_search_iters,
             n_jobs=n_parallel_jobs,
