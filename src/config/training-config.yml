@@ -4,92 +4,90 @@ logger:
   project: diabetes-prediction
 
 data:
-  params:
-    raw_dataset_source: "Bena345/cdc-diabetes-health-indicators"
-    split_type: "random" # Can be either "random" or "time"
-    split_rand_seed: 100 # Seed for random number generator for random split
-    split_date_col_name: null # Name of date column to split dataset based on time (e.g., datetime.strptime("2023-15-11", "%Y-%d-%m").date())
-    train_test_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is test set)
-    train_valid_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is validation set)
-    split_date_col_format: "%Y-%m-%d %H:%M:%S"
-    cat_features_nan_replacement: "Unspecified"
-    train_set_size: 0.8 # % of train set when splitting data imported from feature store
-    pk_col_name: "ID" # Primary key that uniquely identifies every row in dataset
-    class_col_name: "Diabetes_binary"
-    pos_class: "Diabetic"
-    date_col_names: []
-    datetime_col_names: []
-    num_col_names:
-      - BMI
-      - PhysHlth
-    cat_col_names:
-      - Age
-      - HighBP
-      - HighChol
-      - CholCheck # Near-zero variance
-      - Smoker
-      - Stroke # Near-zero variance
-      - HeartDiseaseorAttack
-      - PhysActivity
-      - Fruits
-      - Veggies
-      - HvyAlcoholConsump # Near-zero variance
-      - AnyHealthcare # Near-zero variance
-      - NoDocbcCost
-      - GenHlth
-      - MentHlth
-      - DiffWalk
-      - Sex
-      - Education
-      - Income
-      
-    historical_features:  # Features of historical data pulled from feature store for training
-      - features_view:BMI
-      - features_view:PhysHlth
-      - features_view:Age
-      - features_view:HighBP
-      - features_view:HighChol
-      - features_view:CholCheck
-      - features_view:Smoker
-      - features_view:Stroke
-      - features_view:HeartDiseaseorAttack
-      - features_view:PhysActivity
-      - features_view:Fruits
-      - features_view:Veggies
-      - features_view:HvyAlcoholConsump
-      - features_view:AnyHealthcare
-      - features_view:NoDocbcCost
-      - features_view:GenHlth
-      - features_view:MentHlth
-      - features_view:DiffWalk
-      - features_view:Sex
-      - features_view:Education
-      - features_view:Income
+  raw_dataset_source: "Bena345/cdc-diabetes-health-indicators"
+  split_type: "random" # Can be either "random" or "time"
+  split_rand_seed: 100 # Seed for random number generator for random split
+  split_date_col_name: null # Name of date column to split dataset based on time (e.g., datetime.strptime("2023-15-11", "%Y-%d-%m").date())
+  train_test_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is test set)
+  train_valid_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is validation set)
+  split_date_col_format: "%Y-%m-%d %H:%M:%S"
+  cat_features_nan_replacement: "Unspecified"
+  train_set_size: 0.8 # % of train set when splitting data imported from feature store
+  pk_col_name: "ID" # Primary key that uniquely identifies every row in dataset
+  class_col_name: "Diabetes_binary"
+  pos_class: "Diabetic"
+  date_col_names: []
+  datetime_col_names: []
+  num_col_names:
+    - BMI
+    - PhysHlth
+  cat_col_names:
+    - Age
+    - HighBP
+    - HighChol
+    - CholCheck # Near-zero variance
+    - Smoker
+    - Stroke # Near-zero variance
+    - HeartDiseaseorAttack
+    - PhysActivity
+    - Fruits
+    - Veggies
+    - HvyAlcoholConsump # Near-zero variance
+    - AnyHealthcare # Near-zero variance
+    - NoDocbcCost
+    - GenHlth
+    - MentHlth
+    - DiffWalk
+    - Sex
+    - Education
+    - Income
 
-  preprocessing:
-    num_features_imputer: "median" # Can be "mean", "median", "most_frequent", or "constant"
-    num_features_scaler: "robust" # Can be "standard", "minmax", "robust", or "none"
-    scaler_params:
-      - with_centering: true
-      - with_scaling: true
-    cat_features_imputer: "constant" # Can be "most_frequent", "constant"
-    cat_features_ohe_handle_unknown: "infrequent_if_exist" # Can be "error", "ignore", "infrequent_if_exist"
-    cat_features_nans_replacement: np.nan # Value to replace NaNs in categorical features
-    var_thresh_val: 0.05 # Thresh. value to remove low variance features in VarianceThreshold
+  historical_features: # Features of historical data pulled from feature store for training
+    - features_view:BMI
+    - features_view:PhysHlth
+    - features_view:Age
+    - features_view:HighBP
+    - features_view:HighChol
+    - features_view:CholCheck
+    - features_view:Smoker
+    - features_view:Stroke
+    - features_view:HeartDiseaseorAttack
+    - features_view:PhysActivity
+    - features_view:Fruits
+    - features_view:Veggies
+    - features_view:HvyAlcoholConsump
+    - features_view:AnyHealthcare
+    - features_view:NoDocbcCost
+    - features_view:GenHlth
+    - features_view:MentHlth
+    - features_view:DiffWalk
+    - features_view:Sex
+    - features_view:Education
+    - features_view:Income
+
+preprocessing:
+  num_features_imputer: "median" # Can be "mean", "median", "most_frequent", or "constant"
+  num_features_scaler: "robust" # Can be "standard", "minmax", "robust", or "none"
+  scaler_params:
+    - with_centering: true
+    - with_scaling: true
+  cat_features_imputer: "constant" # Can be "most_frequent", "constant"
+  cat_features_ohe_handle_unknown: "infrequent_if_exist" # Can be "error", "ignore", "infrequent_if_exist"
+  cat_features_nans_replacement: np.nan # Value to replace NaNs in categorical features
+  var_thresh_val: 0.05 # Thresh. value to remove low variance features in VarianceThreshold
 
 train:
-  params:
-    initiate_comet_project: False # Should be True if new Comet project should be created
-    comet_project_name: "end-to-end-ml"
-    comet_workspace_name: "6bmod5d8"
-    search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization
-    parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
-    exp_timout_secs: 3600 # Experiment timeout
-    cross_val_folds: 5 # No. of folds used for cross-validation for model calibration
-    fbeta_score_beta_val: 0.5 # Value of beta in f_beta_score, which is a metric used for hyperparams optimization
-    comparison_metric: "fbeta_score" # Metric name to compare models. Must be: recall, precision, roc_auc, f1, or fbeta_score
-    voting_rule: "soft" # Voting strategy in voting ensemble
-    deployment_score_thresh: 0.8 # Min. score for the best model acheive to be deployed in production
+  initiate_comet_project: False # Should be True if new Comet project should be created
+  comet_project_name: "end-to-end-ml"
+  comet_workspace_name: "6bmod5d8"
+  search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization
+  parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
+  exp_timout_secs: 3600 # Experiment timeout
+  cross_val_folds: 5 # No. of folds used for cross-validation for model calibration
+  fbeta_score_beta_val: 0.5 # Value of beta in f_beta_score, which is a metric used for hyperparams optimization
+  comparison_metric: "fbeta_score" # Metric name to compare models. Must be: recall, precision, roc_auc, f1, or fbeta_score
+  voting_rule: "soft" # Voting strategy in voting ensemble
+  deployment_score_thresh: 0.8 # Min. score for the best model acheive to be deployed in production
 
 logisticregression:
   params: # Fixed params for logistic regression
@@ -152,28 +150,25 @@ xgboost:
     n_estimators: [20, 100, false]
 
 files:
-  params:
-    historical_data_file_name: "historical_data.parquet"
-    preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
-    preprocessed_dataset_features_file_name: "preprocessed_dataset_features.parquet"
-    train_set_file_name: "train.parquet"
-    valid_set_file_name: "validation.parquet"
-    test_set_file_name: "test.parquet"
-    experiments_keys_file_name: "experiment_keys" # Name of the csv file storing keys of experiments that ran successfully (needed for evaluate.py)
+  historical_data_file_name: "historical_data.parquet"
+  preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
+  preprocessed_dataset_features_file_name: "preprocessed_dataset_features.parquet"
+  train_set_file_name: "train.parquet"
+  valid_set_file_name: "validation.parquet"
+  test_set_file_name: "test.parquet"
+  experiments_keys_file_name: "experiment_keys" # Name of the csv file storing keys of experiments that ran successfully (needed for evaluate.py)
 
 modelregistry:
-  params:
-    lr_registered_model_name: "logistic-regression" # Name used to register logistic regression model
-    rf_registered_model_name: "random-forest" # Name used to register random forest model
-    lgbm_registered_model_name: "lightgbm" # Name used to register lightgbm model
-    xgb_registered_model_name: "xgboost" # Name used to register xgboost model
-    voting_ensemble_registered_model_name: "voting-ensemble" # Name used to register voting ensemble model
-    champion_model_name: "champion_model" # Name used to register champion model
+  lr_registered_model_name: "logistic-regression" # Name used to register logistic regression model
+  rf_registered_model_name: "random-forest" # Name used to register random forest model
+  lgbm_registered_model_name: "lightgbm" # Name used to register lightgbm model
+  xgb_registered_model_name: "xgboost" # Name used to register xgboost model
+  voting_ensemble_registered_model_name: "voting-ensemble" # Name used to register voting ensemble model
+  champion_model_name: "champion_model" # Name used to register champion model
 
 includedmodels:
-  params:
-    include_logistic_regression: true # Should Logisitic Regression be included in training
-    include_random_forest: true # Should Random Forest model be included in training
-    include_lightgbm: false # Should LightGBM model be included in training
-    include_xgboost: false # Should XGBoost model be included in training
-    include_voting_ensemble: true # Should Voting Ensemble model be included in training
+  include_logistic_regression: true # Should Logisitic Regression be included in training
+  include_random_forest: true # Should Random Forest model be included in training
+  include_lightgbm: false # Should LightGBM model be included in training
+  include_xgboost: false # Should XGBoost model be included in training
+  include_voting_ensemble: true # Should Voting Ensemble model be included in training

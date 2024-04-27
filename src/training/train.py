@@ -57,15 +57,13 @@ def main(
 
     # Experiment settings
     config = Config(config_path=config_yaml_path)
-    initiate_comet_project = bool(
-        config.params["train"]["params"]["initiate_comet_project"]
-    )
-    project_name = config.params["train"]["params"]["comet_project_name"]
-    workspace_name = config.params["train"]["params"]["comet_workspace_name"]
-    pk_col_name = config.params["data"]["params"]["pk_col_name"]
-    class_column_name = config.params["data"]["params"]["class_col_name"]
-    num_col_names = config.params["data"]["params"]["num_col_names"]
-    cat_col_names = config.params["data"]["params"]["cat_col_names"]
+    initiate_comet_project = bool(config.params["train"]["initiate_comet_project"])
+    project_name = config.params["train"]["comet_project_name"]
+    workspace_name = config.params["train"]["comet_workspace_name"]
+    pk_col_name = config.params["data"]["pk_col_name"]
+    class_column_name = config.params["data"]["class_col_name"]
+    num_col_names = config.params["data"]["num_col_names"]
+    cat_col_names = config.params["data"]["cat_col_names"]
 
     num_features_imputer = config.params["data"]["preprocessing"][
         "num_features_imputer"
@@ -83,31 +81,31 @@ def main(
     ]
     var_thresh_val = config.params["data"]["preprocessing"]["var_thresh_val"]
 
-    search_max_iters = config.params["train"]["params"]["search_max_iters"]
-    parallel_jobs_count = config.params["train"]["params"]["parallel_jobs_count"]
-    exp_timeout_in_secs = config.params["train"]["params"]["exp_timout_secs"]
-    f_beta_score_beta_val = config.params["train"]["params"]["fbeta_score_beta_val"]
-    ve_voting_rule = config.params["train"]["params"]["voting_rule"]
-    train_file_name = config.params["files"]["params"]["train_set_file_name"]
-    valid_set_file_name = config.params["files"]["params"]["valid_set_file_name"]
-    test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
-    exp_key_file_name = config.params["files"]["params"]["experiments_keys_file_name"]
-    lr_registered_model_name = config.params["modelregistry"]["params"][
+    search_max_iters = config.params["train"]["search_max_iters"]
+    parallel_jobs_count = config.params["train"]["parallel_jobs_count"]
+    exp_timeout_in_secs = config.params["train"]["exp_timout_secs"]
+    f_beta_score_beta_val = config.params["train"]["fbeta_score_beta_val"]
+    ve_voting_rule = config.params["train"]["voting_rule"]
+    train_file_name = config.params["files"]["train_set_file_name"]
+    valid_set_file_name = config.params["files"]["valid_set_file_name"]
+    test_set_file_name = config.params["files"]["test_set_file_name"]
+    exp_key_file_name = config.params["files"]["experiments_keys_file_name"]
+    lr_registered_model_name = config.params["modelregistry"][
         "lr_registered_model_name"
     ]
-    rf_registered_model_name = config.params["modelregistry"]["params"][
+    rf_registered_model_name = config.params["modelregistry"][
         "rf_registered_model_name"
     ]
-    lgbm_registered_model_name = config.params["modelregistry"]["params"][
+    lgbm_registered_model_name = config.params["modelregistry"][
         "lgbm_registered_model_name"
     ]
-    xgb_registered_model_name = config.params["modelregistry"]["params"][
+    xgb_registered_model_name = config.params["modelregistry"][
         "xgb_registered_model_name"
     ]
-    ve_registered_model_name = config.params["modelregistry"]["params"][
+    ve_registered_model_name = config.params["modelregistry"][
         "voting_ensemble_registered_model_name"
     ]
-    pos_class = config.params["data"]["params"]["pos_class"]
+    pos_class = config.params["data"]["pos_class"]
 
     lr_params = config.params["logisticregression"]["params"]
     rf_params = config.params["randomforest"]["params"]
@@ -245,7 +243,7 @@ def main(
 
     #############################################
     # Train Logistic Regression model
-    if config.params["includedmodels"]["params"]["include_logistic_regression"]:
+    if config.params["includedmodels"]["include_logistic_regression"]:
         lr_calibrated_pipeline, lr_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
             comet_project_name=project_name,
@@ -264,7 +262,7 @@ def main(
 
     #############################################
     # Train Random Forest model
-    if config.params["includedmodels"]["params"]["include_random_forest"]:
+    if config.params["includedmodels"]["include_random_forest"]:
         rf_calibrated_pipeline, rf_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
             comet_project_name=project_name,
@@ -283,7 +281,7 @@ def main(
 
     #############################################
     # Train LightGBM model
-    if config.params["includedmodels"]["params"]["include_lightgbm"]:
+    if config.params["includedmodels"]["include_lightgbm"]:
         lgbm_calibrated_pipeline, lgbm_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
             comet_project_name=project_name,
@@ -302,7 +300,7 @@ def main(
 
     #############################################
     # Train XGBoost model
-    if config.params["includedmodels"]["params"]["include_xgboost"]:
+    if config.params["includedmodels"]["include_xgboost"]:
         xgb_calibrated_pipeline, xgb_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
             comet_project_name=project_name,
@@ -324,7 +322,7 @@ def main(
 
     #############################################
     # Create a voting ensmble model with LR, RF, LightGBM, and XGBoost as base estimators
-    if config.params["includedmodels"]["params"]["include_voting_ensemble"]:
+    if config.params["includedmodels"]["include_voting_ensemble"]:
         ve_creator = VotingEnsembleCreator(
             comet_api_key=api_key,
             comet_project_name=project_name,

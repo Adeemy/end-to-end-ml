@@ -49,12 +49,12 @@ class ModelLoader:
 
         # Get config params
         config = Config(config_path=config_yaml_abs_path)
-        comet_workspace_name = config.params["train"]["params"]["comet_workspace_name"]
-        model_name = config.params["modelregistry"]["params"]["champion_model_name"]
-        hf_data_source = config.params["data"]["params"]["raw_dataset_source"]
+        comet_workspace_name = config.params["train"]["comet_workspace_name"]
+        model_name = config.params["modelregistry"]["champion_model_name"]
+        hf_data_source = config.params["data"]["raw_dataset_source"]
 
-        num_col_names = config.params["data"]["params"]["num_col_names"]
-        cat_col_names = config.params["data"]["params"]["cat_col_names"]
+        num_col_names = config.params["data"]["num_col_names"]
+        cat_col_names = config.params["data"]["cat_col_names"]
 
         return (
             comet_workspace_name,

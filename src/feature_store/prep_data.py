@@ -35,23 +35,21 @@ def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> 
     # Get initiated FeatureStore
     # Note: repo_path is the relative path to where this script is located.
     config = Config(config_path=config_yaml_path)
-    pk_col_name = config.params["data"]["params"]["pk_col_name"]
-    class_column_name = config.params["data"]["params"]["class_col_name"]
-    date_col_names = config.params["data"]["params"]["date_col_names"]
-    datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
-    num_col_names = config.params["data"]["params"]["num_col_names"]
-    cat_col_names = config.params["data"]["params"]["cat_col_names"]
+    pk_col_name = config.params["data"]["pk_col_name"]
+    class_column_name = config.params["data"]["class_col_name"]
+    date_col_names = config.params["data"]["date_col_names"]
+    datetime_col_names = config.params["data"]["datetime_col_names"]
+    num_col_names = config.params["data"]["num_col_names"]
+    cat_col_names = config.params["data"]["cat_col_names"]
     feature_mappings = config.params["feature_mappings"]
     class_mappings = config.params["class_mappings"]
 
-    event_timestamp_col_name = config.params["data"]["params"][
-        "event_timestamp_col_name"
-    ]
-    raw_dataset_file_name = config.params["files"]["params"]["raw_dataset_file_name"]
-    preprocessed_dataset_features_file_name = config.params["files"]["params"][
+    event_timestamp_col_name = config.params["data"]["event_timestamp_col_name"]
+    raw_dataset_file_name = config.params["files"]["raw_dataset_file_name"]
+    preprocessed_dataset_features_file_name = config.params["files"][
         "preprocessed_data_features_file_name"
     ]
-    preprocessed_dataset_target_file_name = config.params["files"]["params"][
+    preprocessed_dataset_target_file_name = config.params["files"][
         "preprocessed_data_target_file_name"
     ]
 

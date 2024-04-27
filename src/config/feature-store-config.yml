@@ -4,50 +4,49 @@ logger:
   project: diabetes-prediction
 
 data:
-  params:
-    uci_raw_data_num: 891
-    raw_dataset_source: "Bena345/cdc-diabetes-health-indicators"
-    pk_col_name: "ID"
-    class_col_name: "Diabetes_binary"
-    pos_class: "Diabetic"
-    date_col_names: []
-    datetime_col_names: []
-    inference_set_ratio: 0.05 # Percentage of data to be used for inference
-    original_split_type: "random" # Type of split to create inference set. Can be either "random" or "date"
-    random_seed: 123 # Random seed to select inference data from raw dataset
-    event_timestamp_col_name: "event_timestamp"
-    num_col_names:
-      - BMI
-      - PhysHlth
-    cat_col_names:
-      - Age
-      - HighBP
-      - HighChol
-      - CholCheck
-      - Smoker
-      - Stroke
-      - HeartDiseaseorAttack
-      - PhysActivity
-      - Fruits
-      - Veggies
-      - HvyAlcoholConsump
-      - AnyHealthcare
-      - NoDocbcCost
-      - GenHlth
-      - MentHlth
-      - DiffWalk
-      - Sex
-      - Education
-      - Income
-    entity_name: "patient" # For feature store
-    entity_description: "Patient ID" # For feature store
-    feature_view_name: "features_view" # For feature store
-    feature_view_description: "Patient level features." # For feature store
-    target_view_name: "target_view" # For feature store
-    target_view_description: "Patient level target value." # For feature store
-    view_tags_name_1: "patient" # For feature store
-    view_tags_value_1: "population_health" # For feature store
-    ttl_duration_in_days: 30
+  uci_raw_data_num: 891
+  raw_dataset_source: "Bena345/cdc-diabetes-health-indicators"
+  pk_col_name: "ID"
+  class_col_name: "Diabetes_binary"
+  pos_class: "Diabetic"
+  date_col_names: []
+  datetime_col_names: []
+  inference_set_ratio: 0.05 # Percentage of data to be used for inference
+  original_split_type: "random" # Type of split to create inference set. Can be either "random" or "date"
+  random_seed: 123 # Random seed to select inference data from raw dataset
+  event_timestamp_col_name: "event_timestamp"
+  num_col_names:
+    - BMI
+    - PhysHlth
+  cat_col_names:
+    - Age
+    - HighBP
+    - HighChol
+    - CholCheck
+    - Smoker
+    - Stroke
+    - HeartDiseaseorAttack
+    - PhysActivity
+    - Fruits
+    - Veggies
+    - HvyAlcoholConsump
+    - AnyHealthcare
+    - NoDocbcCost
+    - GenHlth
+    - MentHlth
+    - DiffWalk
+    - Sex
+    - Education
+    - Income
+  entity_name: "patient" # For feature store
+  entity_description: "Patient ID" # For feature store
+  feature_view_name: "features_view" # For feature store
+  feature_view_description: "Patient level features." # For feature store
+  target_view_name: "target_view" # For feature store
+  target_view_description: "Patient level target value." # For feature store
+  view_tags_name_1: "patient" # For feature store
+  view_tags_value_1: "population_health" # For feature store
+  ttl_duration_in_days: 30
 
 # Provide categorical feature mappings here. Must use actual column name as a prefix
 # for "_column" and "_values" keys. For example, for "GenHlth" column, use "GenHlth_column"
@@ -93,8 +92,7 @@ class_mappings:
     "1": "Diabetic"
 
 files:
-  params:
-    raw_dataset_file_name: "raw_dataset.parquet"
-    inference_set_file_name: "inference.parquet"
-    preprocessed_data_features_file_name: "preprocessed_dataset_features.parquet" # For feature store
-    preprocessed_data_target_file_name: "preprocessed_dataset_target.parquet" # For feature store
+  raw_dataset_file_name: "raw_dataset.parquet"
+  inference_set_file_name: "inference.parquet"
+  preprocessed_data_features_file_name: "preprocessed_dataset_features.parquet" # For feature store
+  preprocessed_data_target_file_name: "preprocessed_dataset_target.parquet" # For feature store

@@ -43,33 +43,29 @@ def main(
 
     feat_store = FeatureStore(repo_path=str(feast_repo_dir))
     config = Config(config_path=config_yaml_path)
-    pk_col_name = config.params["data"]["params"]["pk_col_name"]
-    class_column_name = config.params["data"]["params"]["class_col_name"]
-    date_col_names = config.params["data"]["params"]["date_col_names"]
-    datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
-    num_col_names = config.params["data"]["params"]["num_col_names"]
-    cat_col_names = config.params["data"]["params"]["cat_col_names"]
-    historical_features = config.params["data"]["params"]["historical_features"]
+    pk_col_name = config.params["data"]["pk_col_name"]
+    class_column_name = config.params["data"]["class_col_name"]
+    date_col_names = config.params["data"]["date_col_names"]
+    datetime_col_names = config.params["data"]["datetime_col_names"]
+    num_col_names = config.params["data"]["num_col_names"]
+    cat_col_names = config.params["data"]["cat_col_names"]
+    historical_features = config.params["data"]["historical_features"]
 
-    preprocessed_dataset_target_file_name = config.params["files"]["params"][
+    preprocessed_dataset_target_file_name = config.params["files"][
         "preprocessed_dataset_target_file_name"
     ]
-    historical_data_file_name = config.params["files"]["params"][
-        "historical_data_file_name"
-    ]
-    train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
-    valid_set_file_name = config.params["files"]["params"]["valid_set_file_name"]
-    test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
-    dataset_split_type = config.params["data"]["params"]["split_type"]
-    split_rand_seed = int(config.params["data"]["params"]["split_rand_seed"])
-    train_set_ratio = config.params["data"]["params"]["train_set_size"]
-    dataset_split_date_col_name = config.params["data"]["params"]["split_date_col_name"]
-    train_valid_split_curoff_date = config.params["data"]["params"][
+    historical_data_file_name = config.params["files"]["historical_data_file_name"]
+    train_set_file_name = config.params["files"]["train_set_file_name"]
+    valid_set_file_name = config.params["files"]["valid_set_file_name"]
+    test_set_file_name = config.params["files"]["test_set_file_name"]
+    dataset_split_type = config.params["data"]["split_type"]
+    split_rand_seed = int(config.params["data"]["split_rand_seed"])
+    train_set_ratio = config.params["data"]["train_set_size"]
+    dataset_split_date_col_name = config.params["data"]["split_date_col_name"]
+    train_valid_split_curoff_date = config.params["data"][
         "train_valid_split_curoff_date"
     ]
-    dataset_split_date_col_format = config.params["data"]["params"][
-        "split_date_col_format"
-    ]
+    dataset_split_date_col_format = config.params["data"]["split_date_col_format"]
 
     # Extract cut-off date for splitting train and test sets
     input_split_cutoff_date = None

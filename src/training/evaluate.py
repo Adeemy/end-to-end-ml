@@ -54,22 +54,20 @@ def main(
 
     # Experiment settings
     config = Config(config_path=config_yaml_path)
-    project_name = config.params["train"]["params"]["comet_project_name"]
-    workspace_name = config.params["train"]["params"]["comet_workspace_name"]
-    class_col_name = config.params["data"]["params"]["class_col_name"]
-    fbeta_score_beta_val = config.params["train"]["params"]["fbeta_score_beta_val"]
-    calib_cv_folds = config.params["train"]["params"]["cross_val_folds"]
-    comparison_metric_name = config.params["train"]["params"]["comparison_metric"]
-    exp_keys_file_name = config.params["files"]["params"]["experiments_keys_file_name"]
-    train_set_file_name = config.params["files"]["params"]["train_set_file_name"]
-    test_set_file_name = config.params["files"]["params"]["test_set_file_name"]
-    ve_registered_model_name = config.params["modelregistry"]["params"][
+    project_name = config.params["train"]["comet_project_name"]
+    workspace_name = config.params["train"]["comet_workspace_name"]
+    class_col_name = config.params["data"]["class_col_name"]
+    fbeta_score_beta_val = config.params["train"]["fbeta_score_beta_val"]
+    calib_cv_folds = config.params["train"]["cross_val_folds"]
+    comparison_metric_name = config.params["train"]["comparison_metric"]
+    exp_keys_file_name = config.params["files"]["experiments_keys_file_name"]
+    train_set_file_name = config.params["files"]["train_set_file_name"]
+    test_set_file_name = config.params["files"]["test_set_file_name"]
+    ve_registered_model_name = config.params["modelregistry"][
         "voting_ensemble_registered_model_name"
     ]
-    champ_model_name = config.params["modelregistry"]["params"]["champion_model_name"]
-    deployment_score_thresh = config.params["train"]["params"][
-        "deployment_score_thresh"
-    ]
+    champ_model_name = config.params["modelregistry"]["champion_model_name"]
+    deployment_score_thresh = config.params["train"]["deployment_score_thresh"]
 
     # Import train and test sets to evaluate best model on test set
     # Note: it requires class labels to be encoded. An integration

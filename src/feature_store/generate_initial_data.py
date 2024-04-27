@@ -48,20 +48,18 @@ def main(
     config = Config(config_path=config_yaml_path)
 
     # Specify variable types and data source from config file
-    uci_dataset_id = config.params["data"]["params"]["uci_raw_data_num"]
-    inference_set_ratio = float(config.params["data"]["params"]["inference_set_ratio"])
-    random_seed = int(config.params["data"]["params"]["random_seed"])
-    original_split_type = config.params["data"]["params"]["original_split_type"]
-    pk_col_name = config.params["data"]["params"]["pk_col_name"]
-    class_column_name = config.params["data"]["params"]["class_col_name"]
-    date_col_names = config.params["data"]["params"]["date_col_names"]
-    datetime_col_names = config.params["data"]["params"]["datetime_col_names"]
-    num_col_names = config.params["data"]["params"]["num_col_names"]
-    cat_col_names = config.params["data"]["params"]["cat_col_names"]
-    raw_dataset_file_name = config.params["files"]["params"]["raw_dataset_file_name"]
-    inference_set_file_name = config.params["files"]["params"][
-        "inference_set_file_name"
-    ]
+    uci_dataset_id = config.params["data"]["uci_raw_data_num"]
+    inference_set_ratio = float(config.params["data"]["inference_set_ratio"])
+    random_seed = int(config.params["data"]["random_seed"])
+    original_split_type = config.params["data"]["original_split_type"]
+    pk_col_name = config.params["data"]["pk_col_name"]
+    class_column_name = config.params["data"]["class_col_name"]
+    date_col_names = config.params["data"]["date_col_names"]
+    datetime_col_names = config.params["data"]["datetime_col_names"]
+    num_col_names = config.params["data"]["num_col_names"]
+    cat_col_names = config.params["data"]["cat_col_names"]
+    raw_dataset_file_name = config.params["files"]["raw_dataset_file_name"]
+    inference_set_file_name = config.params["files"]["inference_set_file_name"]
 
     #################################
     # Import raw data
