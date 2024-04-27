@@ -23,22 +23,22 @@ config = Config(
     config_path=str(Path(__file__).parent.resolve().parent.parent)
     + "/config/feature-store-config.yml"
 )
-PRIMARY_KEY = config.params["data"]["params"]["pk_col_name"]
-CLASS_COL_NAME = config.params["data"]["params"]["class_col_name"]
-EVENT_TIMESTAMP_COL_NAME = config.params["data"]["params"]["event_timestamp_col_name"]
-ENTITY_NAME = config.params["data"]["params"]["entity_name"]
-ENTITY_DESC = config.params["data"]["params"]["entity_description"]
-FEATURE_VIEW_NAME = config.params["data"]["params"]["feature_view_name"]
-TARGET_VIEW_NAME = config.params["data"]["params"]["target_view_name"]
-TTL_DURATION_IN_DAYS = config.params["data"]["params"]["ttl_duration_in_days"]
-VIEW_TAGS_NAME_1 = config.params["data"]["params"]["view_tags_name_1"]
-VIEW_TAGS_VAL_1 = config.params["data"]["params"]["view_tags_value_1"]
-TARGET_VIEW_DESC = config.params["data"]["params"]["target_view_description"]
+PRIMARY_KEY = config.params["data"]["pk_col_name"]
+CLASS_COL_NAME = config.params["data"]["class_col_name"]
+EVENT_TIMESTAMP_COL_NAME = config.params["data"]["event_timestamp_col_name"]
+ENTITY_NAME = config.params["data"]["entity_name"]
+ENTITY_DESC = config.params["data"]["entity_description"]
+FEATURE_VIEW_NAME = config.params["data"]["feature_view_name"]
+TARGET_VIEW_NAME = config.params["data"]["target_view_name"]
+TTL_DURATION_IN_DAYS = config.params["data"]["ttl_duration_in_days"]
+VIEW_TAGS_NAME_1 = config.params["data"]["view_tags_name_1"]
+VIEW_TAGS_VAL_1 = config.params["data"]["view_tags_value_1"]
+TARGET_VIEW_DESC = config.params["data"]["target_view_description"]
 
-PREPROCESS_FEAT_FILE_NAME = config.params["files"]["params"][
+PREPROCESS_FEAT_FILE_NAME = config.params["files"][
     "preprocessed_data_features_file_name"
 ]
-PREPROCESS_TARGET_FILE_NAME = config.params["files"]["params"][
+PREPROCESS_TARGET_FILE_NAME = config.params["files"][
     "preprocessed_data_target_file_name"
 ]
 
@@ -166,11 +166,11 @@ _feat_view = FeatureView(
         ),
     ],
     tags={
-        config.params["data"]["params"]["view_tags_name_1"]: config.params["data"][
-            "params"
-        ]["view_tags_value_1"]
+        config.params["data"]["view_tags_name_1"]: config.params["data"]["params"][
+            "view_tags_value_1"
+        ]
     },
-    description=config.params["data"]["params"]["feature_view_description"],
+    description=config.params["data"]["feature_view_description"],
 )
 
 #################################
