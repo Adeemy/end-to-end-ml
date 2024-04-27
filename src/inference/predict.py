@@ -49,7 +49,7 @@ def main(
     )
 
     prediction = predict(model, input_data)
-    logger.info("\n\n\n%s\n\n\n", prediction=prediction)
+    logger.info("\n\n\n%s\n\n\n", prediction)
 
 
 if __name__ == "__main__":
