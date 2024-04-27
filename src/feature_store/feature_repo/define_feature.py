@@ -166,7 +166,7 @@ _feat_view = FeatureView(
         ),
     ],
     tags={
-        config.params["data"]["view_tags_name_1"]: config.params["data"]["params"][
+        config.params["data"]["view_tags_name_1"]: config.params["data"][
             "view_tags_value_1"
         ]
     },
