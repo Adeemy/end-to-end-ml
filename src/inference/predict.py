@@ -7,12 +7,11 @@ import argparse
 import logging
 import logging.config
 import os
-import sys
 
 from dotenv import load_dotenv
 
 from src.inference.utils.model import ModelLoader, predict
-from src.utils.logger import LoggerWriter
+from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR
 
 load_dotenv()
@@ -95,23 +94,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Load the configuration file
-    try:
-        logging.config.fileConfig(args.logger_path)
-    except KeyError as e:
-        raise KeyError(
-            f"Failed to load logger configuration file: {args.logger_path}"
-        ) from e
-
     # Get the logger objects by name
-    console_logger = logging.getLogger("console_logger")
-    print_logger = logging.getLogger("print_logger")
-
-    # Create a LoggerWriter object using the console logger and the print logger
-    writer = LoggerWriter(console_logger, print_logger)
-
-    # Redirect sys.stdout to the LoggerWriter object
-    sys.stdout = writer
+    console_logger = get_console_logger("data_logger")
 
     main(
         config_yaml_path=args.config_yaml_path,

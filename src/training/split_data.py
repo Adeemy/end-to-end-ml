@@ -2,10 +2,10 @@
 Extracts preprocessed data from feature store,i.e., features and
 class labels, and creates data splits for model training. 
 """
+
 import argparse
 import logging
 import logging.config
-import sys
 from datetime import datetime
 from pathlib import PosixPath
 
@@ -16,7 +16,7 @@ from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 from src.feature_store.utils.prep import DataSplitter
 from src.training.utils.config import Config
 from src.training.utils.data import TrainingDataPrep
-from src.utils.logger import LoggerWriter
+from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR, FEATURE_REPO_DIR
 
 #################################
@@ -167,7 +167,7 @@ def main(
         index=False,
     )
 
-    logger.info("Train and test sets were created.")
+    logger.info("Train and test sets created.")
 
 
 ###########################################################
@@ -188,23 +188,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Load the configuration file
-    try:
-        logging.config.fileConfig(args.logger_path)
-    except KeyError as e:
-        raise KeyError(
-            f"Failed to load logger configuration file: {args.logger_path}"
-        ) from e
-
     # Get the logger objects by name
-    console_logger = logging.getLogger("console_logger")
-    print_logger = logging.getLogger("print_logger")
-
-    # Create a LoggerWriter object using the console logger and the print logger
-    writer = LoggerWriter(console_logger, print_logger)
-
-    # Redirect sys.stdout to the LoggerWriter object
-    sys.stdout = writer
+    console_logger = get_console_logger("split_data_logger")
 
     console_logger.info(
         "Splitting Preprocessed Data into Train and Test Sets Starts ..."

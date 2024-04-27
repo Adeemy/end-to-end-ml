@@ -22,6 +22,11 @@ from sklearn.preprocessing import (
 )
 
 from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
+from src.utils.logger import get_console_logger
+
+##########################################################
+# Get the logger objects by name
+logger = get_console_logger("data_logger")
 
 
 class DataPipelineCreator:
@@ -235,6 +240,8 @@ class DataPipelineCreator:
             raise ValueError(
                 f"An error occurred while extracting feature names after preprocessing: {e}"
             ) from e
+
+        logger.info("Data transformation pipeline created successfully.")
 
         return transformed_data, data_pipeline
 

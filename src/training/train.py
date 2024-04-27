@@ -401,7 +401,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Get the logger objects by name
-    console_logger = get_console_logger("training_logger")
+    console_logger = get_console_logger("train_logger")
 
     console_logger.info("Hyperparameters Optimization Experiments Starts ...")
 

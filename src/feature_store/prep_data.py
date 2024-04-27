@@ -5,7 +5,6 @@ Preprocesses and transforms raw data before saving it in the feature store.
 import argparse
 import logging
 import logging.config
-import sys
 from datetime import datetime
 from pathlib import PosixPath
 
@@ -13,7 +12,7 @@ import pandas as pd
 
 from src.feature_store.utils.config import Config
 from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
-from src.utils.logger import LoggerWriter
+from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR
 
 
@@ -159,23 +158,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Load the configuration file
-    try:
-        logging.config.fileConfig(args.logger_path)
-    except KeyError as e:
-        raise KeyError(
-            f"Failed to load logger configuration file: {args.logger_path}"
-        ) from e
-
     # Get the logger objects by name
-    console_logger = logging.getLogger("console_logger")
-    print_logger = logging.getLogger("print_logger")
-
-    # Create a LoggerWriter object using the console logger and the print logger
-    writer = LoggerWriter(console_logger, print_logger)
-
-    # Redirect sys.stdout to the LoggerWriter object
-    sys.stdout = writer
+    console_logger = get_console_logger("prep_data_logger")
 
     console_logger.info("Transforming for Feature Store Starts ...")
 

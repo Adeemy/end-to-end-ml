@@ -10,6 +10,12 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from src.utils.logger import get_console_logger
+
+##########################################################
+# Get the logger objects by name
+logger = get_console_logger("data_logger")
+
 
 class DataSplitter:
     """Splits dataset into two disjoint sets, train and test sets, either randomly
@@ -76,8 +82,8 @@ class DataSplitter:
             train_set = pd.concat([training_features, training_class], axis=1)
             test_set = pd.concat([testing_features, testing_class], axis=1)
 
-            print(
-                f"Dataset was split randomly using {train_set_size} as train set size."
+            logger.info(
+                "Dataset was split randomly using %s as train set size.", train_set_size
             )
 
         elif split_type == "time":
@@ -98,9 +104,9 @@ class DataSplitter:
                 >= pd.to_datetime(split_cutoff_date, format=split_date_col_format)
             ]
 
-            print(
-                f"""Dataset was split based on time using {split_cutoff_date} 
-                as cut-off date."""
+            logger.info(
+                "Dataset was split based on time using %s as cut-off date.",
+                split_cutoff_date,
             )
 
         else:
@@ -145,7 +151,7 @@ class DataSplitter:
                 f"\n{len(overlap_samples)} overlapping samples in both sets.\n"
             )
         else:
-            print("\nThe provided datasets are disjoint.\n")
+            logger.info("\nThe provided datasets are disjoint.\n")
 
     def print_class_dist(
         self,
@@ -167,8 +173,8 @@ class DataSplitter:
         n_classes = n_class_labels.to_dict()
         class_proportions = class_labels_proportions.to_dict()
 
-        print(f"Class label counts: {n_classes}\n")
-        print(f"Class label proportions (%): {class_proportions}\n")
+        logger.info("Class label counts: %s \n", n_classes)
+        logger.info("Class label proportions (%%): %s \n", class_proportions)
 
         return n_class_labels, class_labels_proportions
 
@@ -267,15 +273,18 @@ class DataPreprocessor:
                 subset=self.primary_key_names
             ).sum()
             if duplicates_by_id_count > 0:
-                print(
-                    f"""\n{duplicates_by_id_count} rows with the non-unique 
-                    {self.primary_key_names} in input data."""
+                logger.info(
+                    """\n{duplicates_by_id_count} rows with the non-unique 
+                    %s in input data.""",
+                    self.primary_key_names,
                 )
                 self._data.drop_duplicates(
                     subset=self.primary_key_names, keep="last", inplace=True
                 )
             else:
-                print(f"\nNo duplicate rows by {self.primary_key_names} in input data.")
+                logger.info(
+                    "\nNo duplicate rows by %s in input data.", self.primary_key_names
+                )
 
     def replace_common_missing_values(self) -> None:
         """Replaces common missing values with np.nan. It is useful when reading data
@@ -354,9 +363,10 @@ class DataPreprocessor:
             ].astype("float32")
 
         if len(self.cat_feature_names) > 0:
-            print(
-                f"""The following categorical columns will be converted to 'string' 
-                type.\n {self.cat_feature_names}"""
+            logger.info(
+                """The following categorical columns will be converted to 'string' 
+                type.\n %s""",
+                self.cat_feature_names,
             )
 
             self._data[self.cat_feature_names] = self._data[

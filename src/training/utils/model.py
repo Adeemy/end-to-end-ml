@@ -34,7 +34,11 @@ from sklearn.metrics import (
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
+from src.utils.logger import get_console_logger
+
 ##########################################################
+# Get the logger objects by name
+logger = get_console_logger("model_logger")
 
 
 class ModelOptimizer:
@@ -249,11 +253,11 @@ class ModelOptimizer:
             previous_best_value = study.user_attrs.get("previous_best_value", None)
             if previous_best_value != study.best_value:
                 study.set_user_attr("previous_best_value", study.best_value)
-                print(
-                    f"""\n
-                    Trial {int(frozen_trial.number)} finished,
-                    best value: {frozen_trial.value}
-                    hyperparameters: {frozen_trial.params}."""
+                logger.info(
+                    "\nTrial %d finished, best value: %d hyperparameters: %s.",
+                    int(frozen_trial.number),
+                    frozen_trial.value,
+                    frozen_trial.params,
                 )
 
         sampler = optuna.samplers.TPESampler(
@@ -264,11 +268,12 @@ class ModelOptimizer:
         )
         study = optuna.create_study(sampler=sampler)
 
-        print(
-            f"""\n
+        logger.info(
+            """\n
         ----------------------------------------------------------------
-        --- Hyperparameter Optimization of {self.classifier_name} Starts ...
-        ----------------------------------------------------------------\n"""
+        --- Hyperparameter Optimization of %s Starts ...
+        ----------------------------------------------------------------\n""",
+            self.classifier_name,
         )
 
         study.optimize(
@@ -415,9 +420,11 @@ class ModelEvaluator(ModelOptimizer):
             valid_features_preprocessed=None,
             valid_class=None,
             n_features=None,
-            model=pipeline.named_steps["classifier"]
-            if is_voting_ensemble
-            else pipeline.named_steps["classifier"],
+            model=(
+                pipeline.named_steps["classifier"]
+                if is_voting_ensemble
+                else pipeline.named_steps["classifier"]
+            ),
             search_space_params=None,
             is_voting_ensemble=is_voting_ensemble,
         )
@@ -472,7 +479,7 @@ class ModelEvaluator(ModelOptimizer):
             plt.show()
 
         except ValueError as e:
-            print(f"Error plotting feature importance --> {e}")
+            logger.info("Error plotting feature importance --> %s", e)
 
         return figure_obj
 
@@ -539,8 +546,9 @@ class ModelEvaluator(ModelOptimizer):
                 if v
             ]
 
-            print(
-                f"No. of features including encoded categorical features: {len(col_names)}"
+            logger.info(
+                "No. of features including encoded categorical features: %d",
+                len(col_names),
             )
 
             # Note: there is no feature_importances_ attribute for LogisticRegression, hence,
@@ -569,7 +577,7 @@ class ModelEvaluator(ModelOptimizer):
             )
 
         except Exception as e:  # pylint: disable=W0718
-            print(f"Feature importance extraction error --> {e}")
+            logger.info("Feature importance extraction error --> %s", e)
             col_names = None
 
     def _log_feature_importance_fig(
@@ -614,6 +622,8 @@ class ModelEvaluator(ModelOptimizer):
                 figure=feature_importance_fig,
                 overwrite=True,
             )
+
+            logger.info("Feature importance figure was logged to workspace.")
 
     @staticmethod
     def plot_roc_curve(
@@ -831,12 +841,23 @@ class ModelEvaluator(ModelOptimizer):
                 original_class_labels=original_class_labels,
             )
 
+            logger.info("Confusion matrices were logged to workspace.")
+
         # Log calibration curve and plots
         self._log_calibration_curve(pred_valid_probs)
+        logger.info("Calibration curve was logged to workspace.")
+
         self._log_roc_curve(pred_valid_probs, self.encoded_pos_class_label)
+        logger.info("ROC curve was logged to workspace.")
+
         self._log_precision_recall_curve(pred_valid_probs, self.encoded_pos_class_label)
+        logger.info("Precision-Recall curve was logged to workspace.")
+
         self._log_cumulative_gains(pred_valid_probs, self.valid_class)
+        logger.info("Cumulative gains curve was logged to workspace.")
+
         self._log_lift_curve(pred_valid_probs, self.valid_class)
+        logger.info("Lift curve was logged to workspace.")
 
         return train_scores, valid_scores
 

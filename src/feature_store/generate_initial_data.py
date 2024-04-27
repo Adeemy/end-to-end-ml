@@ -13,14 +13,13 @@ data for the project and it isn't part of feature or inference pipelines.
 import argparse
 import logging
 import logging.config
-import sys
 from pathlib import PosixPath
 
 from ucimlrepo import fetch_ucirepo
 
 from src.feature_store.utils.config import Config
 from src.feature_store.utils.prep import DataSplitter
-from src.utils.logger import LoggerWriter
+from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR
 
 
@@ -105,7 +104,7 @@ def main(
         index=False,
     )
 
-    logger.info("Inference and raw dataset (for model development) were generated.")
+    logger.info("Inference and raw dataset (for model development) generated.")
     logger.info(
         f"""Ratio of raw dataset out of original dataset: 
                 {'{:0.1f}'.format(100 * (1-inference_set_ratio))}% ({raw_dataset.shape[0]} rows)."""
@@ -134,23 +133,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Load the configuration file
-    try:
-        logging.config.fileConfig(args.logger_path)
-    except KeyError as e:
-        raise KeyError(
-            f"Failed to load logger configuration file: {args.logger_path}"
-        ) from e
-
     # Get the logger objects by name
-    console_logger = logging.getLogger("console_logger")
-    print_logger = logging.getLogger("print_logger")
-
-    # Create a LoggerWriter object using the console logger and the print logger
-    writer = LoggerWriter(console_logger, print_logger)
-
-    # Redirect sys.stdout to the LoggerWriter object
-    sys.stdout = writer
+    console_logger = get_console_logger("gen_initial_data_logger")
 
     console_logger.info("Generating Raw Dataset Starts ...")
 

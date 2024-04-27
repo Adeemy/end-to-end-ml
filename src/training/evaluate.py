@@ -10,7 +10,6 @@ import argparse
 import logging
 import logging.config
 import os
-import sys
 from pathlib import PosixPath
 
 import joblib
@@ -21,7 +20,7 @@ from dotenv import load_dotenv
 
 from src.training.utils.config import Config
 from src.training.utils.model import ModelChampionManager, ModelEvaluator
-from src.utils.logger import LoggerWriter
+from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
 
 load_dotenv()
@@ -133,9 +132,9 @@ def main(
         valid_features=test_set.drop(class_col_name, axis=1),
         valid_class=np.array(test_set[class_col_name]),
         fbeta_score_beta=fbeta_score_beta_val,
-        is_voting_ensemble=True
-        if best_model_name == ve_registered_model_name
-        else False,
+        is_voting_ensemble=(
+            True if best_model_name == ve_registered_model_name else False
+        ),
     )
 
     # Evaluate best model on testing set to assess its generalization capability
@@ -208,23 +207,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Load the configuration file
-    try:
-        logging.config.fileConfig(args.logger_path)
-    except KeyError as e:
-        raise KeyError(
-            f"Failed to load logger configuration file: {args.logger_path}"
-        ) from e
-
     # Get the logger objects by name
-    console_logger = logging.getLogger("console_logger")
-    print_logger = logging.getLogger("print_logger")
-
-    # Create a LoggerWriter object using the console logger and the print logger
-    writer = LoggerWriter(console_logger, print_logger)
-
-    # Redirect sys.stdout to the LoggerWriter object
-    sys.stdout = writer
+    console_logger = get_console_logger("evaluate_logger")
 
     console_logger.info("Models Evaluation Starts ...")
 

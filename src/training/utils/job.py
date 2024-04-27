@@ -21,8 +21,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
 from src.training.utils.model import ModelEvaluator, ModelOptimizer
+from src.utils.logger import get_console_logger
 
-###########################################################
+##########################################################
+# Get the logger objects by name
+logger = get_console_logger("job_logger")
 
 
 class ModelTrainer:
@@ -471,7 +474,7 @@ class ModelTrainer:
             )
 
         except Exception as e:  # pylint: disable=W0718
-            print(f"\n\nModel training error --> {e}\n\n")
+            logger.info("\n\nModel training error --> %s\n\n", e)
             fitted_pipeline = None
 
         comet_exp.end()
@@ -553,19 +556,11 @@ class VotingEnsembleCreator(ModelTrainer):
         self.comet_api_key = comet_api_key
         self.comet_project_name = comet_project_name
         self.comet_exp_name = comet_exp_name
-        self.train_features = train_features
-        self.valid_features = valid_features
-        self.train_class = train_class
-        self.valid_class = valid_class
-        self.class_encoder = class_encoder
-        self.artifacts_path = artifacts_path
         self.lr_calib_pipeline = lr_calib_pipeline
         self.rf_calib_pipeline = rf_calib_pipeline
         self.lgbm_calib_pipeline = lgbm_calib_pipeline
         self.xgb_calib_pipeline = xgb_calib_pipeline
         self.voting_rule = voting_rule
-        self.encoded_pos_class_label = encoded_pos_class_label
-        self.fbeta_score_beta = fbeta_score_beta
         self.registered_model_name = registered_model_name or "VotingEnsemble"
         self.ece_nbins = ece_nbins
 
@@ -591,25 +586,25 @@ class VotingEnsembleCreator(ModelTrainer):
             model_lr = self.lr_calib_pipeline.named_steps["classifier"]
             base_models.append(("LR", model_lr))
         except Exception:  # pylint: disable=W0718
-            print("RF model does not exist or not in required type!")
+            logger.info("RF model does not exist or not in required type!")
 
         try:
             model_rf = self.rf_calib_pipeline.named_steps["classifier"]
             base_models.append(("RF", model_rf))
         except Exception:  # pylint: disable=W0718
-            print("RF model does not exist or not in required type!")
+            logger.info("RF model does not exist or not in required type!")
 
         try:
             model_lgbm = self.lgbm_calib_pipeline.named_steps["classifier"]
             base_models.append(("LightGBM", model_lgbm))
         except Exception:  # pylint: disable=W0718
-            print("LightGBM model does not exist or not in required type!")
+            logger.info("LightGBM model does not exist or not in required type!")
 
         try:
             model_xgb = self.xgb_calib_pipeline.named_steps["classifier"]
             base_models.append(("XGBoost", model_xgb))
         except Exception:  # pylint: disable=W0718
-            print("XGBoost model does not exist or not in required type!")
+            logger.info("XGBoost model does not exist or not in required type!")
 
         if len(base_models) < 2:
             raise ValueError(
@@ -737,7 +732,7 @@ class VotingEnsembleCreator(ModelTrainer):
             )
 
         except Exception as e:  # pylint: disable=W0718
-            print(f"\nVoting ensemble error --> {e}\n\n")
+            logger.info("\nVoting ensemble error --> %s\n\n", e)
             ve_pipeline = None
 
         comet_exp.end()
