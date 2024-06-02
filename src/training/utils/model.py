@@ -554,6 +554,9 @@ class ModelEvaluator(ModelOptimizer):
             # Note: there is no feature_importances_ attribute for LogisticRegression, hence,
             # this if statement is needed to LR coefficients instead.
             classifier_name = pipeline.named_steps["classifier"].__class__.__name__
+            feature_importances = (
+                None  # To avoid pylint error E0606 (using variable before assignment)
+            )
             if classifier_name == "LogisticRegression":
                 feature_importances = pipeline.named_steps["classifier"].coef_[0]
 
