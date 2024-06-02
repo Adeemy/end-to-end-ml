@@ -555,20 +555,20 @@ class ModelEvaluator(ModelOptimizer):
             # this if statement is needed to LR coefficients instead.
             classifier_name = pipeline.named_steps["classifier"].__class__.__name__
             if classifier_name == "LogisticRegression":
-                feature_importance_scores = pipeline.named_steps["classifier"].coef_[0]
+                feature_importances = pipeline.named_steps["classifier"].coef_[0]
 
             if classifier_name not in [
                 "LogisticRegression",
                 "VotingClassifier",
             ]:
-                feature_importance_scores = pipeline.named_steps[
+                feature_importances = pipeline.named_steps[
                     "classifier"
                 ].feature_importances_
 
             if classifier_name != "VotingClassifier":
                 self._log_feature_importance_fig(
                     classifier_name=classifier_name,
-                    feature_importance_scores=feature_importance_scores,
+                    feature_importance_scores=feature_importances,
                     col_names=col_names,
                     n_top_features=n_top_features,
                     figure_size=figure_size,
