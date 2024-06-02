@@ -552,10 +552,9 @@ class ModelEvaluator(ModelOptimizer):
             )
 
             # Note: there is no feature_importances_ attribute for LogisticRegression, hence,
-            # this if statement is needed.
+            # this if statement is needed to LR coefficients instead.
             classifier_name = pipeline.named_steps["classifier"].__class__.__name__
             if classifier_name == "LogisticRegression":
-                # Return LR coefficients instead.
                 feature_importance_scores = pipeline.named_steps["classifier"].coef_[0]
 
             if classifier_name not in [
@@ -566,15 +565,15 @@ class ModelEvaluator(ModelOptimizer):
                     "classifier"
                 ].feature_importances_
 
-            # Log feature importance figure
-            self._log_feature_importance_fig(
-                classifier_name=classifier_name,
-                feature_importance_scores=feature_importance_scores,
-                col_names=col_names,
-                n_top_features=n_top_features,
-                figure_size=figure_size,
-                font_size=font_size,
-            )
+            if classifier_name != "VotingClassifier":
+                self._log_feature_importance_fig(
+                    classifier_name=classifier_name,
+                    feature_importance_scores=feature_importance_scores,
+                    col_names=col_names,
+                    n_top_features=n_top_features,
+                    figure_size=figure_size,
+                    font_size=font_size,
+                )
 
         except Exception as e:  # pylint: disable=W0718
             logger.info("Feature importance extraction error --> %s", e)

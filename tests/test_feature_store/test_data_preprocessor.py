@@ -289,22 +289,22 @@ identify_cols_with_high_nans_data["E"] = pd.date_range(
 )  # date
 
 
-identify_cols_with_high_nans_data.loc[
-    :2, "A"
-] = np.nan  # 40% missing values in column A
+identify_cols_with_high_nans_data.loc[:2, "A"] = (
+    np.nan
+)  # 40% missing values in column A
 identify_cols_with_high_nans_data.loc[3:4, "A"] = None  # 40% missing values in column A
-identify_cols_with_high_nans_data.loc[
-    1:4, "B"
-] = np.nan  # 40% missing values in column B
+identify_cols_with_high_nans_data.loc[1:4, "B"] = (
+    np.nan
+)  # 40% missing values in column B
 identify_cols_with_high_nans_data.loc[3, "C"] = np.nan  # 40% missing values in column C
 identify_cols_with_high_nans_data.loc[4, "C"] = pd.NA  # 40% missing values in column C
 identify_cols_with_high_nans_data.loc[5, "C"] = None  # 40% missing values in column C
-identify_cols_with_high_nans_data.loc[
-    [0, 3], "D"
-] = np.nan  # 30% missing values in column D
-identify_cols_with_high_nans_data.loc[
-    [3], "E"
-] = np.nan  # 20% missing values in column E
+identify_cols_with_high_nans_data.loc[[0, 3], "D"] = (
+    np.nan
+)  # 30% missing values in column D
+identify_cols_with_high_nans_data.loc[[3], "E"] = (
+    np.nan
+)  # 20% missing values in column E
 
 
 @pytest.mark.parametrize(
