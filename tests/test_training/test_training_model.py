@@ -994,10 +994,10 @@ def test_calibrate_pipeline():
     mock_self = ModelChampionManager(champ_model_name="champion_model")
 
     # Set up the test data
-    train_features = pd.DataFrame(
+    valid_features = pd.DataFrame(
         np.random.randint(0, 100, size=(100, 4)), columns=list("ABCD")
     )
-    train_class = np.random.randint(2, size=100)
+    valid_class = np.random.randint(2, size=100)
     preprocessor_step = ColumnTransformer(
         transformers=[("scaler", StandardScaler(), ["A", "B", "C", "D"])]
     )
@@ -1005,12 +1005,39 @@ def test_calibrate_pipeline():
     model = LogisticRegression()
     cv_folds = 5
 
+    # Create a new pipeline with the calibrated classifier
+    unfitted_pipeline = Pipeline(
+        steps=[
+            ("preprocessor", preprocessor_step),
+            ("selector", selector_step),
+            ("classifier", model),
+        ]
+    )
+
+    # Test that the function raises a ValueError if the supplied pipeline is not fitted yet
+    with pytest.raises(
+        ValueError, match="The classifier in the fitted pipeline is not fitted."
+    ):
+        _ = mock_self.calibrate_pipeline(
+            valid_features=valid_features,
+            valid_class=valid_class,
+            fitted_pipeline=unfitted_pipeline,
+            cv_folds=cv_folds,
+        )
+
+    fitted_pipeline = Pipeline(
+        steps=[
+            ("preprocessor", preprocessor_step),
+            ("selector", selector_step),
+            ("classifier", model),
+        ]
+    )
+    fitted_pipeline = fitted_pipeline.fit(valid_features, valid_class)
+
     calib_pipeline = mock_self.calibrate_pipeline(
-        train_features=train_features,
-        train_class=train_class,
-        preprocessor_step=preprocessor_step,
-        selector_step=selector_step,
-        model=model,
+        valid_features=valid_features,
+        valid_class=valid_class,
+        fitted_pipeline=fitted_pipeline,
         cv_folds=cv_folds,
     )
 

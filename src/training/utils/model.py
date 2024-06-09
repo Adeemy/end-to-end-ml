@@ -1212,48 +1212,51 @@ class ModelChampionManager:
 
         return best_challenger_name
 
+    @staticmethod
     def calibrate_pipeline(
-        self,
-        train_features: pd.DataFrame,
-        train_class: np.ndarray,
-        preprocessor_step: ColumnTransformer,
-        selector_step: VarianceThreshold,
-        model: Callable,
+        valid_features: pd.DataFrame,
+        valid_class: np.ndarray,
+        fitted_pipeline: Pipeline,
         cv_folds: int = 5,
     ) -> Pipeline:
         """Takes a fitted pipeline and returns a calibrated pipeline.
 
         Args:
-            train_features (pd.DataFrame): train features.
-            train_class (np.ndarray): train class labels.
-            preprocessor_step (ColumnTransformer): data preprocessing step.
-            selector_step (VarianceThreshold): feature selection step.
-            model (Callable): model object.
-            cv_folds (int): number of cross-validation
-                            folds for calibration.
+            valid_features (np.ndarray): Validation features.
+            valid_class (np.ndarray): Validation class labels.
+            fitted_pipeline (Pipeline): Fitted pipeline on the training set.
+            cv_folds (int): Number of cross-validation folds for calibration.
 
         Returns:
-            calib_pipeline (Pipeline): calibrated pipeline.
+            calib_pipeline (Pipeline): Calibrated pipeline.
         """
 
-        # Fit a pipeline with a calibrated model
-        calib_pipeline = Pipeline(
-            steps=[
-                ("preprocessor", preprocessor_step),
-                ("selector", selector_step),
-                (
-                    "classifier",
-                    CalibratedClassifierCV(
-                        estimator=model,
-                        method="isotonic" if len(train_class) > 1000 else "sigmoid",
-                        cv=cv_folds,
-                    ),
-                ),
-            ]
+        # Extract preprocessor, selector, and classifier from the fitted pipeline
+        preprocessor = fitted_pipeline.named_steps.get("preprocessor")
+        selector = fitted_pipeline.named_steps.get("selector")
+        model = fitted_pipeline.named_steps.get("classifier")
+
+        if not hasattr(model, "classes_"):
+            raise ValueError("The classifier in the fitted pipeline is not fitted.")
+
+        # Calibrate the newly fitted model using the validation set
+        calibrator = CalibratedClassifierCV(
+            base_estimator=model,
+            method=("isotonic" if len(valid_class) > 1000 else "sigmoid"),
+            cv=cv_folds,  # Indicate that the model is already fitted
         )
 
-        # Fit pipelines
-        calib_pipeline.fit(train_features, train_class)
+        # Fit the calibrator on the validation set
+        calibrator.fit(valid_features, valid_class)
+
+        # Create a new pipeline with the calibrated classifier
+        calib_pipeline = Pipeline(
+            steps=[
+                ("preprocessor", preprocessor),
+                ("selector", selector),
+                ("classifier", calibrator),
+            ]
+        )
 
         return calib_pipeline
 

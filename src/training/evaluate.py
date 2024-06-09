@@ -62,6 +62,7 @@ def main(
     comparison_metric_name = config.params["train"]["comparison_metric"]
     exp_keys_file_name = config.params["files"]["experiments_keys_file_name"]
     train_set_file_name = config.params["files"]["train_set_file_name"]
+    valid_set_file_name = config.params["files"]["valid_set_file_name"]
     test_set_file_name = config.params["files"]["test_set_file_name"]
     ve_registered_model_name = config.params["modelregistry"][
         "voting_ensemble_registered_model_name"
@@ -74,6 +75,10 @@ def main(
     # test should be added to ensure the class labels are encoded.
     train_set = pd.read_parquet(
         data_dir / train_set_file_name,
+    )
+
+    valid_set = pd.read_parquet(
+        data_dir / valid_set_file_name,
     )
 
     test_set = pd.read_parquet(
@@ -150,14 +155,12 @@ def main(
     best_model_exp_obj.log_metrics(test_scores)
 
     # Calibrate champ model before deployment
-    training_features = train_set.drop(class_col_name, axis=1)
-    training_class = np.array(train_set[class_col_name])
+    valid_features = valid_set.drop(class_col_name, axis=1)
+    valid_class = np.array(valid_set[class_col_name])
     calib_pipeline = champ_model_manager.calibrate_pipeline(
-        train_features=training_features,
-        train_class=training_class,
-        preprocessor_step=best_model_pipeline.named_steps["preprocessor"],
-        selector_step=best_model_pipeline.named_steps["selector"],
-        model=best_model_pipeline.named_steps["classifier"],
+        valid_features=valid_features,
+        valid_class=valid_class,
+        fitted_pipeline=best_model_pipeline,
         cv_folds=calib_cv_folds,
     )
 
