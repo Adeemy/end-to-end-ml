@@ -1229,6 +1229,9 @@ class ModelChampionManager:
 
         Returns:
             calib_pipeline (Pipeline): Calibrated pipeline.
+
+        Raises:
+            ValueError: If the classifier in the fitted pipeline is not fitted.
         """
 
         # Extract preprocessor, selector, and classifier from the fitted pipeline
@@ -1241,7 +1244,7 @@ class ModelChampionManager:
 
         # Calibrate the newly fitted model using the validation set
         calibrator = CalibratedClassifierCV(
-            base_estimator=model,
+            estimator=model,
             method=("isotonic" if len(valid_class) > 1000 else "sigmoid"),
             cv=cv_folds,  # Indicate that the model is already fitted
         )
