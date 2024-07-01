@@ -10,18 +10,17 @@ update_reqs:
 PIP_CACHE_DIR ?= $(HOME)/.cache/pip
 install:
 	pip install --upgrade pip &&\
-		pip install black[jupyter] pytest pylint isort pytest-cov pytest-mock &&\
+		pip install black[jupyter] pytest pylint isort pytest-cov pytest-mock pre-commit &&\
 		pip install --cache-dir $(PIP_CACHE_DIR) -r requirements.txt
 
+pre-commit:
+	pre-commit install --hook-type pre-commit --hook-type pre-merge-commit
+
 isort:
-	isort --profile black ./notebooks
-	isort --profile black ./src
-	isort --profile black ./tests
+	isort --profile black --filter-files ./notebooks ./src ./tests
 
 format:
-	black ./notebooks
-	black ./src
-	black ./tests
+	black ./notebooks ./src ./tests
 
 test:	
 	coverage run -m pytest -vvv

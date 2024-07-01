@@ -4,8 +4,25 @@ repos:
     hooks:
       - id: isort
         args: ["--profile", "black", "--filter-files"]
+
   - repo: https://github.com/psf/black-pre-commit-mirror
     rev: 24.4.2
     hooks:
       - id: black
         language_version: python3.10
+
+  - repo: local
+    hooks:
+      - id: pylint
+        name: pylint
+        entry: pylint
+        language: system
+        types: [python]
+        args: [
+            ./src,
+            ./tests, # Directories to lint
+            "-rn", # Only display messages
+            "--rcfile=.pylintrc", # Link to your config file
+            "--disable=R,C,E0401,E0110,I1101,W0718,W9008",
+            "--load-plugins=pylint.extensions.docparams", # Load an extension
+          ]

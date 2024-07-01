@@ -12,7 +12,6 @@ optuna_distributed==0.6.1
 pandas==1.5.3
 plotly==5.18.0
 polars==0.20.10
-pre-commit==3.6.2
 pytest==7.4.4
 python-dotenv==1.0.1
 PyYAML==6.0.1

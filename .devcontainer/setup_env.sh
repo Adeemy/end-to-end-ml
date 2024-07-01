@@ -6,7 +6,6 @@ python3 -m venv .venv
 echo 'source .venv/bin/activate' >> ~/.bashrc
 pip install --upgrade pip 
 pip install -r requirements.txt
-pre-commit install
 
 # To remove the deprecation warning from jupyter_client when running tests
 touch pytest.ini
