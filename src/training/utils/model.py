@@ -1221,24 +1221,20 @@ class ModelChampionManager:
         if not hasattr(model, "classes_"):
             raise ValueError("The classifier in the fitted pipeline is not fitted.")
 
-        # Calibrate the newly fitted model using the validation set
-        calibrator = CalibratedClassifierCV(
-            estimator=model,
-            method=("isotonic" if len(valid_class) > 1000 else "sigmoid"),
-            cv=cv_folds,  # Indicate that the model is already fitted
-        )
-
-        # Apply the 'preprocessor' step
+        # Transform the validation set using the preprocessor and selector steps
         valid_features_transformed = fitted_pipeline.named_steps[
             "preprocessor"
         ].transform(valid_features)
-
-        # Apply the 'selector' step
         valid_features_transformed = fitted_pipeline.named_steps["selector"].transform(
             valid_features_transformed
         )
 
-        # Fit the calibrator on the validation set
+        # Calibrate the fitted model using the transformed validation set
+        calibrator = CalibratedClassifierCV(
+            estimator=model,
+            method=("isotonic" if len(valid_class) > 1000 else "sigmoid"),
+            cv=cv_folds,
+        )
         calibrator.fit(valid_features_transformed, valid_class)
 
         # Create a new pipeline with the calibrated classifier
