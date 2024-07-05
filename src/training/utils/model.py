@@ -603,9 +603,6 @@ class ModelEvaluator(ModelOptimizer):
             figure_size (tuple): figure size.
             font_size (float): font size.
             fig_name (str): figure name.
-
-        Returns:
-            None
         """
 
         # Log feature importance figure
@@ -925,9 +922,6 @@ class ModelEvaluator(ModelOptimizer):
             original_valid_class (np.ndarray): true class labels for validation set (expressive labels).
             pred_original_valid_class (np.ndarray): predicted class labels for validation set (expressive labels).
             original_class_labels (list): list of expressive class labels.
-
-        Returns:
-            None
         """
 
         train_cm = confusion_matrix(
@@ -984,9 +978,6 @@ class ModelEvaluator(ModelOptimizer):
         Args:
             pred_probs (np.ndarray): predicted probabilities of the positive class
             of the best model on the validation set.
-
-        Returns:
-            None
         """
 
         calib_curve = CalibrationDisplay.from_predictions(
@@ -1006,9 +997,6 @@ class ModelEvaluator(ModelOptimizer):
         Args:
             pred_probs (np.ndarray): predicted probabilities of the positive class.
             encoded_pos_class_label (int): encoded positive class label.
-
-        Returns:
-            None
         """
 
         roc_curve_fig = self.plot_roc_curve(
@@ -1028,9 +1016,6 @@ class ModelEvaluator(ModelOptimizer):
         Args:
             pred_probs (np.ndarray): predicted probabilities of the positive class.
             encoded_pos_class_label (int): encoded positive class label.
-
-        Returns:
-            None
         """
 
         prec_recall_fig = self.plot_precision_recall_curve(
@@ -1050,9 +1035,6 @@ class ModelEvaluator(ModelOptimizer):
         Args:
             pred_probs (1-D np.ndarray): predicted probabilities of the positive class.
             valid_class (np.ndarray): validation class labels.
-
-        Returns:
-            None
         """
 
         cum_gain_fig = self.plot_cumulative_gains(
@@ -1070,9 +1052,6 @@ class ModelEvaluator(ModelOptimizer):
         Args:
             pred_probs (1-D np.ndarray): predicted probabilities of the positive class.
             valid_class (np.ndarray): validation class labels.
-
-        Returns:
-            None
         """
 
         lift_curve_fig = self.plot_lift_curve(
@@ -1275,9 +1254,6 @@ class ModelChampionManager:
             local_path (str): local path to save champion model.
             pipeline (Pipeline): fitted pipeline.
             exp_obj (ExistingExperiment): comet experiment object.
-
-        Returns:
-            None.
         """
 
         if not os.path.exists(local_path):

@@ -339,9 +339,6 @@ class ModelTrainer:
             comet_exp (Experiment): Comet experiment object,
             pipeline (Pipeline): fitted pipeline object,
             registered_model_name (str): name of the registered model.
-
-        Returns:
-            None
         """
 
         joblib.dump(pipeline, f"{self.artifacts_path}/{registered_model_name}.pkl")
@@ -377,10 +374,9 @@ class ModelTrainer:
         Args:
             comet_api_key (str): Comet API key,
             comet_project_name (str): Comet project name,
-            comet_exp_name (str)L Comet experiment name,
+            comet_exp_name (str): Comet experiment name,
             model (Callable): model object that implements the fit and predict methods.
             search_space_params (dict): hyperparameter search space for the model.
-            artifacts_path (str): path to save training artificats, e.g., .pkl and .png files.
             max_search_iters (int, optional): maximum number of iterations for the hyperparameter
                 optimization algorithm. Default to 100.
             optimize_in_parallel (bool, optional): should optimization be run in parallel. Default
@@ -568,10 +564,6 @@ class VotingEnsembleCreator(ModelTrainer):
         self,
     ) -> list:
         """Creates a list of base models for the voting ensemble.
-
-        Args:
-            None
-
         Returns:
             base_models (list): list of base models.
 
@@ -618,9 +610,6 @@ class VotingEnsembleCreator(ModelTrainer):
     ) -> Pipeline:
         """Copies (deep copy) the data transformation pipeline from the first base
         model. It assumes all base models have the same data transformation pipeline.
-
-        Args:
-            None
 
         Returns:
             data_pipeline (Pipeline): data transformation pipeline object.
@@ -686,9 +675,6 @@ class VotingEnsembleCreator(ModelTrainer):
     ) -> Union[Pipeline, Experiment]:
         """Creates a voting ensemble classifier using the base models and evaluates the model
         using ModelEvaluator class. It logs the model metrics to Comet experiment.
-
-        Args:
-            None
 
         Returns:
             Pipeline: calibrated pipeline object that contains the model transformation pipeline

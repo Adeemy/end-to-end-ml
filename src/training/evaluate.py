@@ -26,7 +26,111 @@ from src.utils.path import ARTIFACTS_DIR, DATA_DIR
 load_dotenv()
 
 
-###########################################################
+def select_best_model(
+    config_yaml_path: str,
+    successful_exp_keys: pd.DataFrame,
+    champ_model_manager: ModelChampionManager,
+    comparison_metric_name: str,
+    fbeta_score_beta_val: float,
+    project_name: str,
+    workspace_name: str,
+) -> str:
+    """Selects the best model based on performance on validation set.
+
+    Args:
+        config_yaml_path (str): path to the config yaml file.
+        successful_exp_keys (pd.DataFrame): dataframe containing successful experiments keys.
+        champ_model_manager (ModelChampionManager): ModelChampionManager object.
+        comparison_metric_name (str): name of the comparison metric.
+        fbeta_score_beta_val (float): beta value for fbeta score.
+        project_name (str): name of the Comet project.
+        workspace_name (str): name of the Comet workspace.
+
+    Returns:
+        best_model_name (str): name of the best model.
+    """
+
+    # Get configuration parameters
+    config = Config(config_path=config_yaml_path)
+    project_name = config.params["train"]["comet_project_name"]
+    workspace_name = config.params["train"]["comet_workspace_name"]
+    fbeta_score_beta_val = config.params["train"]["fbeta_score_beta_val"]
+    comparison_metric_name = config.params["train"]["comparison_metric"]
+
+    # Rename comparison metric if it's fbeta_score to include beta value
+    if comparison_metric_name == "fbeta_score":
+        comparison_metric_name = f"f_{fbeta_score_beta_val}_score"
+
+    if successful_exp_keys.shape[0] == 0:
+        raise ValueError(
+            "No successful experiments found. Please check the experiment logs."
+        )
+
+    # Select the best performing model
+    best_model_name = champ_model_manager.select_best_performer(
+        comet_project_name=project_name,
+        comet_workspace_name=workspace_name,
+        comparison_metric=f"valid_{comparison_metric_name}",
+        comet_exp_keys=successful_exp_keys,
+    )
+
+    return best_model_name
+
+
+def evaluate_best_model(
+    best_model_exp_obj: ExistingExperiment,
+    best_model_pipeline: ModelEvaluator,
+    train_set: pd.DataFrame,
+    test_set: pd.DataFrame,
+    class_col_name: str,
+    fbeta_score_beta_val: float,
+    best_model_name: str,
+    ve_registered_model_name: str,
+) -> dict:
+    """Evaluate the best model on testing set to assess its generalization capability.
+
+    Args:
+        best_model_exp_obj (ExistingExperiment): ExistingExperiment object.
+        best_model_pipeline (ModelEvaluator): ModelEvaluator object.
+        train_set (pd.DataFrame): training set.
+        test_set (pd.DataFrame): testing set.
+        class_col_name (str): name of the class column.
+        fbeta_score_beta_val (float): beta value for fbeta score.
+        best_model_name (str): name of the best model.
+        ve_registered_model_name (str): name of the voting ensemble registered model.
+
+    Returns:
+        test_scores (dict): dictionary containing test scores.
+    """
+
+    best_model_evaluator = ModelEvaluator(
+        comet_exp=best_model_exp_obj,
+        pipeline=best_model_pipeline,
+        train_features=train_set.drop(class_col_name, axis=1),
+        train_class=np.array(train_set[class_col_name]),
+        valid_features=test_set.drop(class_col_name, axis=1),
+        valid_class=np.array(test_set[class_col_name]),
+        fbeta_score_beta=fbeta_score_beta_val,
+        is_voting_ensemble=(
+            True if best_model_name == ve_registered_model_name else False
+        ),
+    )
+
+    # Evaluate best model on testing set to assess its generalization capability
+    (
+        _,
+        test_scores,
+    ) = best_model_evaluator.evaluate_model_perf(
+        class_encoder=None,
+    )
+
+    test_scores = best_model_evaluator.convert_metrics_from_df_to_dict(
+        scores=test_scores, prefix="test_"
+    )
+
+    return test_scores
+
+
 def main(
     config_yaml_path: str,
     comet_api_key: str,
@@ -41,18 +145,16 @@ def main(
         comet_api_key (str): Comet API key.
         data_dir (PosixPath): path to the data directory.
         artifacts_dir (PosixPath): path to the artifacts directory.
-
-    Returns:
-        None.
+        logger (logging.Logger): logger object.
 
     Raises:
         ValueError: if no successful experiments are found.
         ValueError: if the best model score on the test set is lower than the deployment threshold.
     """
 
-    logger.info(f"Directory of training config file: {config_yaml_path}")
+    logger.info("Directory of training config file: %s", config_yaml_path)
 
-    # Experiment settings
+    # Get configuration parameters
     config = Config(config_path=config_yaml_path)
     project_name = config.params["train"]["comet_project_name"]
     workspace_name = config.params["train"]["comet_workspace_name"]
@@ -88,30 +190,22 @@ def main(
     logger.info("Imported train and test sets.")
 
     #############################################
-    # Rename comparison metric if it's fbeta_score to include beta value
-    if comparison_metric_name == "fbeta_score":
-        comparison_metric_name = f"f_{fbeta_score_beta_val}_score"
-
-    # Import experiment keys from artifacts folder
+    # Select the best model based on performance on validation set
     successful_exp_keys = pd.read_csv(
         f"{ARTIFACTS_DIR}/{exp_keys_file_name}.csv",
     )
-
-    if successful_exp_keys.shape[0] == 0:
-        raise ValueError(
-            "No successful experiments found. Please check the experiment logs."
-        )
-
-    # Select the best performing model
     champ_model_manager = ModelChampionManager(champ_model_name=champ_model_name)
-    best_model_name = champ_model_manager.select_best_performer(
-        comet_project_name=project_name,
-        comet_workspace_name=workspace_name,
-        comparison_metric=f"valid_{comparison_metric_name}",
-        comet_exp_keys=successful_exp_keys,
+    best_model_name = select_best_model(
+        config_yaml_path=config_yaml_path,
+        successful_exp_keys=successful_exp_keys,
+        champ_model_manager=champ_model_manager,
+        comparison_metric_name=comparison_metric_name,
+        fbeta_score_beta_val=fbeta_score_beta_val,
+        project_name=project_name,
+        workspace_name=workspace_name,
     )
 
-    logger.info(f"Best candidate model is {best_model_name}.")
+    logger.info("Best candidate model is %s.", best_model_name)
 
     # Create ExistingExperiment object to allow appending logging new metrics
     best_model_exp_key = successful_exp_keys.loc[
@@ -126,32 +220,16 @@ def main(
     # Note: test set was not exposed to any model during training or
     # evaluation to ensure all models are independent of the test set.
     best_model_pipeline = joblib.load(f"{ARTIFACTS_DIR}/{best_model_name}.pkl")
-
-    best_model_evaluator = ModelEvaluator(
-        comet_exp=best_model_exp_obj,
-        pipeline=best_model_pipeline,
-        train_features=train_set.drop(class_col_name, axis=1),
-        train_class=np.array(train_set[class_col_name]),
-        valid_features=test_set.drop(class_col_name, axis=1),
-        valid_class=np.array(test_set[class_col_name]),
-        fbeta_score_beta=fbeta_score_beta_val,
-        is_voting_ensemble=(
-            True if best_model_name == ve_registered_model_name else False
-        ),
+    test_scores = evaluate_best_model(
+        best_model_exp_obj=best_model_exp_obj,
+        best_model_pipeline=best_model_pipeline,
+        train_set=train_set,
+        test_set=test_set,
+        class_col_name=class_col_name,
+        fbeta_score_beta_val=fbeta_score_beta_val,
+        best_model_name=best_model_name,
+        ve_registered_model_name=ve_registered_model_name,
     )
-
-    # Evaluate best model on testing set to assess its generalization capability
-    (
-        _,
-        test_scores,
-    ) = best_model_evaluator.evaluate_model_perf(
-        class_encoder=None,
-    )
-
-    test_scores = best_model_evaluator.convert_metrics_from_df_to_dict(
-        scores=test_scores, prefix="test_"
-    )
-
     best_model_exp_obj.log_metrics(test_scores)
 
     # Calibrate champ model before deployment
@@ -164,7 +242,7 @@ def main(
         cv_folds=calib_cv_folds,
     )
 
-    logger.info(f"Champion model {best_model_name} was calibrated.")
+    logger.info("Champion model %s was calibrated.", best_model_name)
 
     # Log and register champion model (in Comet, model must be logged first)
     # Note: the best model should not be deployed in production if its score
@@ -178,7 +256,7 @@ def main(
             exp_obj=best_model_exp_obj,
         )
 
-        logger.info(f"Champion model was registered in {workspace_name} workspace.")
+        logger.info("Champion model was registered in %s workspace.", workspace_name)
 
         # Save the champion model in local direcotry to be packaged in docker container
         joblib.dump(best_model_pipeline, f"{ARTIFACTS_DIR}/{champ_model_name}.pkl")

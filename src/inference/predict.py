@@ -28,9 +28,7 @@ def main(
         config_yaml_path (str): path to the config yaml file.
         api_key (str): Comet API key.
         input_data (dict): dictionary containing the input data.
-
-    Returns:
-        None.
+        logger (logging.Logger): logger object.
     """
 
     # Extracts config params

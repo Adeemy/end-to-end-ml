@@ -318,9 +318,6 @@ class DataPreprocessor:
         Args:
             desired_date_format (str): desired date format.
             desired_datetime_format (str): desired datetime format.
-
-        Returns:
-            None
         """
 
         # Categorical variables are all veriables that are not numerical or date
@@ -507,9 +504,6 @@ class DataTransformer:
         Args:
             col_name (str): name of the categorical column.
             mapping_values (dict): dictionary of mapping values.
-
-        Returns:
-            None
         """
 
         if col_name in self.preprocessed_data.columns:
@@ -524,6 +518,7 @@ class DataTransformer:
 
         Args:
             class_col_name (str): name of the class column.
+            mapping_values (dict): dictionary of mapping values.
 
         Raises:
             ValueError: if class column doesn't exist in data.

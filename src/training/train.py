@@ -9,6 +9,7 @@ import logging.config
 import os
 from datetime import datetime
 from pathlib import PosixPath
+from typing import List, Tuple
 
 import comet_ml
 import pandas as pd
@@ -16,7 +17,12 @@ from dotenv import load_dotenv
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
+from sklearn.preprocessing import (
+    LabelEncoder,
+    MinMaxScaler,
+    RobustScaler,
+    StandardScaler,
+)
 from xgboost import XGBClassifier
 
 from src.training.utils.config import Config
@@ -28,42 +34,53 @@ from src.utils.path import ARTIFACTS_DIR, DATA_DIR
 load_dotenv()
 
 
-###########################################################
-def main(
+def prepare_data(
     config_yaml_path: str,
-    api_key: str,
-    data_dir: PosixPath,
-    artifacts_dir: PosixPath,
-    logger: logging.Logger,
-) -> None:
-    """
-    Takes a config file as input and submits experiments to perform
-    hyperparameters optimization for multiple models.
+    training_set: pd.DataFrame,
+    validation_set: pd.DataFrame,
+    testing_set: pd.DataFrame,
+) -> Tuple[
+    TrainingDataPrep,
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.Series,
+    pd.Series,
+    pd.Series,
+    List[str],
+    List[str],
+    LabelEncoder,
+    int,
+]:
+    """Prepare data for training by preprocessing training and validation sets.
 
     Args:
         config_yaml_path (str): path to config yaml file.
-        api_key (str): Comet API key.
-        data_dir (PosixPath): path to data directory.
-        artifacts_dir (PosixPath): path to artifacts directory.
+        training_set (pd.DataFrame): training set.
+        validation_set (pd.DataFrame): validation set.
+        testing_set (pd.DataFrame): testing set.
 
     Returns:
-        None.
-
-    Raises:
-        ValueError: if no model specified in config file.
+        data_prep (TrainingDataPrep): data preparation object.
+        data_transformation_pipeline (Pipeline): data transformation pipeline.
+        train_features (pd.DataFrame): preprocessed training features.
+        valid_features (pd.DataFrame): preprocessed validation features.
+        test_features (pd.DataFrame): preprocessed testing features.
+        train_class (pd.Series): training class labels.
+        valid_class (pd.Series): validation class labels.
+        test_class (pd.Series): testing class labels.
+        num_feature_names (List[str]): numerical feature names.
+        cat_feature_names (List[str]): categorical feature names.
+        class_encoder (LabelEncoder): class label encoder.
+        encoded_positive_class_label (int): encoded positive class label.
     """
 
-    logger.info(f"Directory of training config file: {config_yaml_path}")
-
-    # Experiment settings
     config = Config(config_path=config_yaml_path)
-    initiate_comet_project = bool(config.params["train"]["initiate_comet_project"])
-    project_name = config.params["train"]["comet_project_name"]
-    workspace_name = config.params["train"]["comet_workspace_name"]
     pk_col_name = config.params["data"]["pk_col_name"]
     class_column_name = config.params["data"]["class_col_name"]
     num_col_names = config.params["data"]["num_col_names"]
     cat_col_names = config.params["data"]["cat_col_names"]
+    pos_class = config.params["data"]["pos_class"]
 
     num_features_imputer = config.params["data"]["preprocessing"][
         "num_features_imputer"
@@ -80,59 +97,6 @@ def main(
         "cat_features_nans_replacement"
     ]
     var_thresh_val = config.params["data"]["preprocessing"]["var_thresh_val"]
-
-    search_max_iters = config.params["train"]["search_max_iters"]
-    parallel_jobs_count = config.params["train"]["parallel_jobs_count"]
-    exp_timeout_in_secs = config.params["train"]["exp_timout_secs"]
-    f_beta_score_beta_val = config.params["train"]["fbeta_score_beta_val"]
-    ve_voting_rule = config.params["train"]["voting_rule"]
-    train_file_name = config.params["files"]["train_set_file_name"]
-    valid_set_file_name = config.params["files"]["valid_set_file_name"]
-    test_set_file_name = config.params["files"]["test_set_file_name"]
-    exp_key_file_name = config.params["files"]["experiments_keys_file_name"]
-    lr_registered_model_name = config.params["modelregistry"][
-        "lr_registered_model_name"
-    ]
-    rf_registered_model_name = config.params["modelregistry"][
-        "rf_registered_model_name"
-    ]
-    lgbm_registered_model_name = config.params["modelregistry"][
-        "lgbm_registered_model_name"
-    ]
-    xgb_registered_model_name = config.params["modelregistry"][
-        "xgb_registered_model_name"
-    ]
-    ve_registered_model_name = config.params["modelregistry"][
-        "voting_ensemble_registered_model_name"
-    ]
-    pos_class = config.params["data"]["pos_class"]
-
-    lr_params = config.params["logisticregression"]["params"]
-    rf_params = config.params["randomforest"]["params"]
-    lgbm_params = config.params["lgbm"]["params"]
-    xgb_params = config.params["xgboost"]["params"]
-
-    lr_search_space_params = config.params["logisticregression"]["search_space_params"]
-    rf_search_space_params = config.params["randomforest"]["search_space_params"]
-    lgbm_search_space_params = config.params["lgbm"]["search_space_params"]
-    xgb_search_space_params = config.params["xgboost"]["search_space_params"]
-
-    # Import data splits
-    training_set = pd.read_parquet(
-        data_dir / train_file_name,
-    )
-
-    validation_set = pd.read_parquet(
-        data_dir / valid_set_file_name,
-    )
-
-    testing_set = pd.read_parquet(
-        data_dir / test_set_file_name,
-    )
-
-    # Ensure that columns provided in config files exists in training data
-    num_col_names = [col for col in num_col_names if col in training_set.columns]
-    cat_col_names = [col for col in cat_col_names if col in training_set.columns]
 
     # Prepare data for training
     data_prep = TrainingDataPrep(
@@ -185,6 +149,128 @@ def main(
     )
     data_prep.clean_up_feature_names()
     num_feature_names, cat_feature_names = data_prep.get_feature_names()
+
+    return (
+        data_prep,
+        data_transformation_pipeline,
+        train_features,
+        valid_features,
+        test_features,
+        train_class,
+        valid_class,
+        test_class,
+        num_feature_names,
+        cat_feature_names,
+        class_encoder,
+        encoded_positive_class_label,
+    )
+
+
+def main(
+    config_yaml_path: str,
+    api_key: str,
+    data_dir: PosixPath,
+    artifacts_dir: PosixPath,
+    logger: logging.Logger,
+) -> None:
+    """
+    Takes a config file as input and submits experiments to perform
+    hyperparameters optimization for multiple models.
+
+    Args:
+        config_yaml_path (str): path to config yaml file.
+        api_key (str): Comet API key.
+        data_dir (PosixPath): path to data directory.
+        artifacts_dir (PosixPath): path to artifacts directory.
+        logger (logging.Logger): logger object.
+
+    Raises:
+        ValueError: if no model specified in config file.
+    """
+
+    logger.info("Directory of training config file: %s", config_yaml_path)
+
+    # Get configuration parameters
+    config = Config(config_path=config_yaml_path)
+    initiate_comet_project = bool(config.params["train"]["initiate_comet_project"])
+    project_name = config.params["train"]["comet_project_name"]
+    workspace_name = config.params["train"]["comet_workspace_name"]
+    class_column_name = config.params["data"]["class_col_name"]
+    num_col_names = config.params["data"]["num_col_names"]
+    cat_col_names = config.params["data"]["cat_col_names"]
+
+    search_max_iters = config.params["train"]["search_max_iters"]
+    parallel_jobs_count = config.params["train"]["parallel_jobs_count"]
+    exp_timeout_in_secs = config.params["train"]["exp_timout_secs"]
+    f_beta_score_beta_val = config.params["train"]["fbeta_score_beta_val"]
+    ve_voting_rule = config.params["train"]["voting_rule"]
+    train_file_name = config.params["files"]["train_set_file_name"]
+    valid_set_file_name = config.params["files"]["valid_set_file_name"]
+    test_set_file_name = config.params["files"]["test_set_file_name"]
+    exp_key_file_name = config.params["files"]["experiments_keys_file_name"]
+    lr_registered_model_name = config.params["modelregistry"][
+        "lr_registered_model_name"
+    ]
+    rf_registered_model_name = config.params["modelregistry"][
+        "rf_registered_model_name"
+    ]
+    lgbm_registered_model_name = config.params["modelregistry"][
+        "lgbm_registered_model_name"
+    ]
+    xgb_registered_model_name = config.params["modelregistry"][
+        "xgb_registered_model_name"
+    ]
+    ve_registered_model_name = config.params["modelregistry"][
+        "voting_ensemble_registered_model_name"
+    ]
+
+    lr_params = config.params["logisticregression"]["params"]
+    rf_params = config.params["randomforest"]["params"]
+    lgbm_params = config.params["lgbm"]["params"]
+    xgb_params = config.params["xgboost"]["params"]
+
+    lr_search_space_params = config.params["logisticregression"]["search_space_params"]
+    rf_search_space_params = config.params["randomforest"]["search_space_params"]
+    lgbm_search_space_params = config.params["lgbm"]["search_space_params"]
+    xgb_search_space_params = config.params["xgboost"]["search_space_params"]
+
+    # Import data splits
+    training_set = pd.read_parquet(
+        data_dir / train_file_name,
+    )
+
+    validation_set = pd.read_parquet(
+        data_dir / valid_set_file_name,
+    )
+
+    testing_set = pd.read_parquet(
+        data_dir / test_set_file_name,
+    )
+
+    # Ensure that columns provided in config files exists in training data
+    num_col_names = [col for col in num_col_names if col in training_set.columns]
+    cat_col_names = [col for col in cat_col_names if col in training_set.columns]
+
+    # Prepare data for training
+    (
+        data_prep,
+        data_transformation_pipeline,
+        train_features,
+        valid_features,
+        test_features,
+        train_class,
+        valid_class,
+        test_class,
+        num_feature_names,
+        cat_feature_names,
+        class_encoder,
+        encoded_positive_class_label,
+    ) = prepare_data(
+        config_yaml_path=config_yaml_path,
+        training_set=training_set,
+        validation_set=validation_set,
+        testing_set=testing_set,
+    )
 
     # Preprocessed train and validation features are needed during hyperparams
     # optimization to avoid applying data transformation in each iteration.

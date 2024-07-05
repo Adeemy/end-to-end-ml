@@ -114,9 +114,6 @@ def main(
         config_yaml_path (str): path to the config yaml file.
         data_dir (PosixPath): path to the data directory.
         logger (logging.Logger): logger object.
-
-    Returns:
-        None.
     """
 
     logger.info(

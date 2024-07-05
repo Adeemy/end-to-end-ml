@@ -173,6 +173,7 @@ class DataPipelineCreator:
 
         Raises:
             AssertionError: if no numerical or categorical features are specified.
+            ValueError: if an error occurs while extracting feature names after preprocessing.
         """
 
         features_set = input_features.copy()
@@ -520,7 +521,19 @@ class TrainingDataPrep:
         """Creates a data transformation pipeline and fit it on training set.
 
         Args:
+            num_features_imputer (Literal["mean", "median", "most_frequent", "constant"], optional): strategy to
+                impute missing values in numerical features. Defaults to "median".
+            num_features_scaler (Optional[Union[Callable, None]], optional): scaler to scale numerical features.
+                Defaults to RobustScaler().
+            cat_features_imputer (Literal["most_frequent", "constant"], optional): strategy to impute missing values
+                in categorical features. Defaults to "constant".
+            cat_features_ohe_handle_unknown (Literal["error", "ignore", "infrequent_if_exist"], optional): strategy
+                to handle unknown categories in categorical features. Defaults to "infrequent_if_exist".
+            cat_features_nans_replacement (str, optional): value to replace NaNs in categorical features. Defaults to np.nan.
             var_thresh_val (float, optional): variance threshold value. Defaults to 0.05.
+
+        Returns:
+            data_transformation_pipeline (Pipeline): data transformation pipeline.
         """
 
         train_set_transformer = DataPipelineCreator(
