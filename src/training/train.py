@@ -82,21 +82,17 @@ def prepare_data(
     cat_col_names = config.params["data"]["cat_col_names"]
     pos_class = config.params["data"]["pos_class"]
 
-    num_features_imputer = config.params["data"]["preprocessing"][
-        "num_features_imputer"
-    ]
-    num_features_scaler = config.params["data"]["preprocessing"]["num_features_scaler"]
-    scaler_params = config.params["data"]["preprocessing"].get("scaler_params", {})
-    cat_features_imputer = config.params["data"]["preprocessing"][
-        "cat_features_imputer"
-    ]
-    cat_features_ohe_handle_unknown = config.params["data"]["preprocessing"][
+    num_features_imputer = config.params["preprocessing"]["num_features_imputer"]
+    num_features_scaler = config.params["preprocessing"]["num_features_scaler"]
+    scaler_params = config.params["preprocessing"].get("scaler_params", {})
+    cat_features_imputer = config.params["preprocessing"]["cat_features_imputer"]
+    cat_features_ohe_handle_unknown = config.params["preprocessing"][
         "cat_features_ohe_handle_unknown"
     ]
-    cat_features_nans_replacement = config.params["data"]["preprocessing"][
+    cat_features_nans_replacement = config.params["preprocessing"][
         "cat_features_nans_replacement"
     ]
-    var_thresh_val = config.params["data"]["preprocessing"]["var_thresh_val"]
+    var_thresh_val = config.params["preprocessing"]["var_thresh_val"]
 
     # Prepare data for training
     data_prep = TrainingDataPrep(
