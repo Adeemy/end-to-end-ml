@@ -52,7 +52,6 @@ def select_best_model(
     config = Config(config_path=config_yaml_path)
     project_name = config.params["train"]["comet_project_name"]
     workspace_name = config.params["train"]["comet_workspace_name"]
-    comparison_metric_name = config.params["train"]["comparison_metric"]
 
     if successful_exp_keys.shape[0] == 0:
         raise ValueError(
