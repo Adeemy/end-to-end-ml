@@ -1228,8 +1228,18 @@ class ModelChampionManager:
             cv=cv_folds,  # Indicate that the model is already fitted
         )
 
+        # Apply the 'preprocessor' step
+        valid_features_transformed = fitted_pipeline.named_steps[
+            "preprocessor"
+        ].transform(valid_features)
+
+        # Apply the 'selector' step
+        valid_features_transformed = fitted_pipeline.named_steps["selector"].transform(
+            valid_features_transformed
+        )
+
         # Fit the calibrator on the validation set
-        calibrator.fit(valid_features, valid_class)
+        calibrator.fit(valid_features_transformed, valid_class)
 
         # Create a new pipeline with the calibrated classifier
         calib_pipeline = Pipeline(

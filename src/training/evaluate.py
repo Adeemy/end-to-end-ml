@@ -31,7 +31,6 @@ def select_best_model(
     successful_exp_keys: pd.DataFrame,
     champ_model_manager: ModelChampionManager,
     comparison_metric_name: str,
-    fbeta_score_beta_val: float,
     project_name: str,
     workspace_name: str,
 ) -> str:
@@ -42,7 +41,6 @@ def select_best_model(
         successful_exp_keys (pd.DataFrame): dataframe containing successful experiments keys.
         champ_model_manager (ModelChampionManager): ModelChampionManager object.
         comparison_metric_name (str): name of the comparison metric.
-        fbeta_score_beta_val (float): beta value for fbeta score.
         project_name (str): name of the Comet project.
         workspace_name (str): name of the Comet workspace.
 
@@ -54,12 +52,7 @@ def select_best_model(
     config = Config(config_path=config_yaml_path)
     project_name = config.params["train"]["comet_project_name"]
     workspace_name = config.params["train"]["comet_workspace_name"]
-    fbeta_score_beta_val = config.params["train"]["fbeta_score_beta_val"]
     comparison_metric_name = config.params["train"]["comparison_metric"]
-
-    # Rename comparison metric if it's fbeta_score to include beta value
-    if comparison_metric_name == "fbeta_score":
-        comparison_metric_name = f"f_{fbeta_score_beta_val}_score"
 
     if successful_exp_keys.shape[0] == 0:
         raise ValueError(
@@ -172,6 +165,10 @@ def main(
     champ_model_name = config.params["modelregistry"]["champion_model_name"]
     deployment_score_thresh = config.params["train"]["deployment_score_thresh"]
 
+    # Rename comparison metric if it's fbeta_score to include beta value
+    if comparison_metric_name == "fbeta_score":
+        comparison_metric_name = f"f_{fbeta_score_beta_val}_score"
+
     # Import train and test sets to evaluate best model on test set
     # Note: it requires class labels to be encoded. An integration
     # test should be added to ensure the class labels are encoded.
@@ -200,7 +197,6 @@ def main(
         successful_exp_keys=successful_exp_keys,
         champ_model_manager=champ_model_manager,
         comparison_metric_name=comparison_metric_name,
-        fbeta_score_beta_val=fbeta_score_beta_val,
         project_name=project_name,
         workspace_name=workspace_name,
     )
