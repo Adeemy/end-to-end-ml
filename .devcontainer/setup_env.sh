@@ -17,3 +17,6 @@ echo -e '[pytest]\nfilterwarnings ='\
 # Install auxiliar tools
 sudo apt-get update
 sudo apt-get install tree # To print project structure
+
+# Install Azure CLI for Azure development (optional)
+# curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
