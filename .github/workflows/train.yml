@@ -51,11 +51,11 @@ jobs:
       #   run: |
       #     make test
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4.0.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: Adeemy/end-to-end-ml
+      # - name: Upload coverage reports to Codecov
+      #   uses: codecov/codecov-action@v4.0.1
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     slug: Adeemy/end-to-end-ml
 
       - name: Setup Azure CLI
         uses: azure/login@v2
