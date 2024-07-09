@@ -45,7 +45,7 @@ jobs:
 
       - name: Add project path to sys.path
         run: |
-          echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
+          echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
       # - name: Test with pytest
       #   run: |
@@ -84,12 +84,21 @@ jobs:
       - name: Check for Existing Service Principal in Key Vault
         id: check-sp-in-kv
         run: |
-          SP_SECRET_EXISTS=$(az keyvault secret show --vault-name ${{ steps.deploy-arm.outputs.key_vault_name }} --name ${{ secrets.SERVICEPRINCIPALNAME }} --query id -o tsv)
-          if [ -z "$SP_SECRET_EXISTS" ]; then
-            echo "SP_SECRET_EXISTS=false" >> $GITHUB_ENV
+          SP_SECRET_EXISTS=$(az keyvault secret show --vault-name ${{ steps.deploy-arm.outputs.key_vault_name }} --name ${{ secrets.SERVICEPRINCIPALNAME }} --query id -o tsv 2>&1)
+          if [[ $? -ne 0 ]]; then
+            if echo "$SP_SECRET_EXISTS" | grep -q "Forbidden"; then
+              echo "Error: Access to Key Vault is forbidden. Check if the GitHub Actions service principal has the correct permissions."
+              exit 1
+            elif echo "$SP_SECRET_EXISTS" | grep -q "not be found"; then
+              echo "SP_SECRET_EXISTS=false" >> $GITHUB_ENV
+            else
+              echo "An unexpected error occurred: $SP_SECRET_EXISTS"
+              exit 1
+            fi
           else
             echo "SP_SECRET_EXISTS=true" >> $GITHUB_ENV
           fi
+        shell: bash
 
       # Setup service principal for Azure ML
       - name: Create Service Principal
