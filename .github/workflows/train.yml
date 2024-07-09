@@ -58,19 +58,19 @@ jobs:
           slug: Adeemy/end-to-end-ml
 
       - name: Setup Azure CLI
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Login to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Create Resource Group
         run: |
           echo "Resource Group Location: ${{ env.RESOURCEGROUPLOCATION }}"
-          az group create --name ${{ env.RESOURCEGROUPNAME }} --location ${{ env.RESOURCEGROUPLOCATION }}
+          az group create --name ${{ env.RESOURCEGROUPNAME }} --location eastus
 
       # Deploy ARM template to create Azure resources for training
       - name: Deploy ARM Template
