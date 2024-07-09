@@ -69,6 +69,7 @@ jobs:
 
       - name: Create Resource Group
         run: |
+          echo "Resource Group Location: ${{ env.RESOURCEGROUPLOCATION }}"
           az group create --name ${{ env.RESOURCEGROUPNAME }} --location ${{ env.RESOURCEGROUPLOCATION }}
 
       # Deploy ARM template to create Azure resources for training
