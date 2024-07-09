@@ -3,7 +3,7 @@ name: Train
 
 on:
   push:
-    branches: ["main"]
+    branches: ["workflows"]
   # pull_request:
   #   branches: ["main"]
 
