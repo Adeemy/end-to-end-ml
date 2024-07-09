@@ -78,7 +78,7 @@
         "networkAcls": {
           "defaultAction": "Allow",
           "bypass": "AzureServices"
-        } // Note: enableSoftDelete and enablePurgeProtection are not explicitly set
+        }
       }
     },
     {
