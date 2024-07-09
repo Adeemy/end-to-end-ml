@@ -67,10 +67,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Create Resource Group
-        run: |
-          az group create --name ${{ vars.RESOURCEGROUPNAME }} --location eastus
-
       # Deploy ARM template to create Azure resources for training
       - name: Deploy ARM Template
         id: deploy-arm
@@ -79,41 +75,6 @@ jobs:
           KEY_VAULT_NAME=$(az group deployment show --resource-group ${{ vars.RESOURCEGROUPNAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
           echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
           echo "::set-output name=key_vault_name::$KEY_VAULT_NAME"
-
-      # Check if Service Principal credentials already exist in Azure Key Vault
-      - name: Check for Existing Service Principal in Key Vault
-        id: check-sp-in-kv
-        run: |
-          SP_SECRET_EXISTS=$(az keyvault secret show --vault-name ${{ steps.deploy-arm.outputs.key_vault_name }} --name ${{ secrets.SERVICEPRINCIPALNAME }} --query id -o tsv 2>&1)
-          if [[ $? -ne 0 ]]; then
-            if echo "$SP_SECRET_EXISTS" | grep -q "Forbidden"; then
-              echo "Error: Access to Key Vault is forbidden. Check if the GitHub Actions service principal has the correct permissions."
-              exit 1
-            elif echo "$SP_SECRET_EXISTS" | grep -q "not be found"; then
-              echo "SP_SECRET_EXISTS=false" >> $GITHUB_ENV
-            else
-              echo "An unexpected error occurred: $SP_SECRET_EXISTS"
-              exit 1
-            fi
-          else
-            echo "SP_SECRET_EXISTS=true" >> $GITHUB_ENV
-          fi
-        shell: bash
-
-      # Setup service principal for Azure ML
-      - name: Create Service Principal
-        id: create-sp
-        if: env.SP_SECRET_EXISTS == 'false'
-        run: |
-          az ad sp create-for-rbac --name ${{ secrets.SERVICEPRINCIPALNAME }} --role Contributor --scopes /subscriptions/${{ vars.SUBSCRIPTIONID }}/resourceGroups/${{ vars.RESOURCEGROUPNAME }}
-
-      - name: Store SP ID in Key Vault
-        if: env.SP_SECRET_EXISTS == 'false'
-        run: |
-          az keyvault set-policy --name ${{ steps.deploy-arm.outputs.key_vault_name }} --spn ${{ steps.create-sp.outputs.clientId }} --secret-permissions set
-          az login --service-principal -u ${{ steps.create-sp.outputs.clientId }} -p ${{ steps.create-sp.outputs.clientSecret }} --tenant ${{ steps.create-sp.outputs.tenantId }}
-          az keyvault secret set --vault-name ${{ steps.deploy-arm.outputs.key_vault_name }} --name ServicePrincipalID --value $(echo ${{ steps.create-sp.outputs.sp_json }} | jq -r '.clientId')
-          az keyvault secret set --vault-name ${{ steps.deploy-arm.outputs.key_vault_name }} --name ServicePrincipalPassword --value $(echo ${{ steps.create-sp.outputs.sp_json }} | jq -r '.clientSecret')
 
       # # The train step is resource intensive and should be on a local machine
       # # or on a remote compute cluster. When training is finished, this workflow
