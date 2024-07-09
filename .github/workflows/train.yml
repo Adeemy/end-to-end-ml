@@ -69,15 +69,15 @@ jobs:
 
       - name: Create Resource Group
         run: |
-          echo "Resource Group Location: ${{ env.RESOURCEGROUPLOCATION }}"
-          az group create --name ${{ env.RESOURCEGROUPNAME }} --location eastus
+          echo "Resource Group Location: ${{ vars.RESOURCEGROUPLOCATION }}"
+          az group create --name ${{ vars.RESOURCEGROUPNAME }} --location eastus
 
       # Deploy ARM template to create Azure resources for training
       - name: Deploy ARM Template
         id: deploy-arm
         run: |
-          az group deployment create --resource-group ${{ env.RESOURCEGROUPNAME }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
-          KEY_VAULT_NAME=$(az group deployment show --resource-group ${{ env.RESOURCEGROUPNAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
+          az group deployment create --resource-group ${{ vars.RESOURCEGROUPNAME }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
+          KEY_VAULT_NAME=$(az group deployment show --resource-group ${{ vars.RESOURCEGROUPNAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
           echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
           echo "::set-output name=key_vault_name::$KEY_VAULT_NAME"
 
@@ -97,7 +97,7 @@ jobs:
         id: create-sp
         if: env.SP_SECRET_EXISTS == 'false'
         run: |
-          az ad sp create-for-rbac --name ${{ secrets.SERVICEPRINCIPALNAME }} --role Contributor --scopes /subscriptions/${{ env.SUBSCRIPTIONID }}/resourceGroups/${{ env.RESOURCEGROUPNAME }}
+          az ad sp create-for-rbac --name ${{ secrets.SERVICEPRINCIPALNAME }} --role Contributor --scopes /subscriptions/${{ vars.SUBSCRIPTIONID }}/resourceGroups/${{ vars.RESOURCEGROUPNAME }}
 
       - name: Store SP ID in Key Vault
         if: env.SP_SECRET_EXISTS == 'false'
