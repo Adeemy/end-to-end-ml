@@ -62,11 +62,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
       # Deploy ARM template to create Azure resources for training
       - name: Deploy ARM Template
         id: deploy-arm
