@@ -1,4 +1,6 @@
-# Train model, evaluate and test champion model, build containerized model, and deploy model
+# Training pipeline that deploys ARM template to create Azure resources and triggers training on a remote Azure compute cluster.
+# Required secrets: AZURE_CREDENTIALS, COMET_API_KEY
+# Required environment variables: RESOURCEGROUPNAME, RESOURCEGROUPLOCATION, SUBSCRIPTIONID (for Azure)
 name: Train
 
 on:
@@ -10,7 +12,7 @@ on:
   # Run workflow manually from the Actions tab
   workflow_dispatch:
   # schedule:
-  #   - cron: '00 4 * * *' # Runs at 4:00 AM UTC every day
+  #   - cron: '00 4 * * *' # Runs at 4:00 AM UTC 21 days
 
 jobs:
   train:

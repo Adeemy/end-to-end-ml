@@ -1,8 +1,9 @@
 Steps to deploy ARM template to create Azure resources for training:
 
 1. Install Azure Tools VS code extension (extension ID ms-vscode.vscode-node-azure-pack)
-2. Install Azure CLI
+2. Install Azure CLI and ML workspace extension
    - `curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash`
+   - `az extension add -n ml -y`
 3. Log in to Azure subscription
    - `az login`
 4. Set the active subscription
