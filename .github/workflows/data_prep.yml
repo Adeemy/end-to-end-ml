@@ -1,0 +1,54 @@
+# Train model, evaluate and test champion model, build containerized model, and deploy model
+name: Data Prep
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '56 23 * * 0'
+
+jobs:
+  data_prep:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
+      # Use cache action to cache the virtual environment (https://stackoverflow.com/a/62639424)
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.10.*
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10.*
+
+      - name: Get pip cache dir
+        id: pip-cache
+        run: echo "PIP_CACHE_DIR=$(pip cache dir)" >> $GITHUB_ENV
+
+      # Use cache action to cache the virtual environment
+      - name: Cache pip dependencies
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.PIP_CACHE_DIR }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          make install
+
+      - name: Add project path to sys.path
+        run: |
+          echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
+
+      - name: Prepare data
+        run: |
+          make prep_data
+
+      - name: Setup Feast
+        run: |
+          make setup_feast
+
+      - name: Split data
+        run: |
+          make split_data

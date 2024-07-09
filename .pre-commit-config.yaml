@@ -15,12 +15,10 @@ repos:
     hooks:
       - id: pylint
         name: pylint
-        entry: pylint
+        entry: make lint
         language: system
         types: [python]
         args: [
-            ./src,
-            ./tests, # Directories to lint
             "-rn", # Only display messages
             "--rcfile=.pylintrc", # Link to your config file
             "--disable=R,C,E0401,E0110,I1101,W0718,W9008",
