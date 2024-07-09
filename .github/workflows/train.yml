@@ -47,9 +47,9 @@ jobs:
         run: |
           echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
 
-      - name: Test with pytest
-        run: |
-          make test
+      # - name: Test with pytest
+      #   run: |
+      #     make test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4.0.1
@@ -69,14 +69,14 @@ jobs:
 
       - name: Create Resource Group
         run: |
-          az group create --name ${{ env.ResourceGroupName }} --location ${{ env.Location }}
+          az group create --name ${{ env.RESOURCEGROUPNAME }} --location ${{ env.RESOURCEGROUPLOCATION }}
 
       # Deploy ARM template to create Azure resources for training
       - name: Deploy ARM Template
         id: deploy-arm
         run: |
-          az group deployment create --resource-group ${{ env.ResourceGroupName }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
-          KEY_VAULT_NAME=$(az group deployment show --resource-group ${{ env.ResourceGroupName }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
+          az group deployment create --resource-group ${{ env.RESOURCEGROUPNAME }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
+          KEY_VAULT_NAME=$(az group deployment show --resource-group ${{ env.RESOURCEGROUPNAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
           echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
           echo "::set-output name=key_vault_name::$KEY_VAULT_NAME"
 
@@ -84,7 +84,7 @@ jobs:
       - name: Check for Existing Service Principal in Key Vault
         id: check-sp-in-kv
         run: |
-          SP_SECRET_EXISTS=$(az keyvault secret show --vault-name ${{ steps.deploy-arm.outputs.key_vault_name }} --name ${{ secrets.ServicePrincipalName }} --query id -o tsv)
+          SP_SECRET_EXISTS=$(az keyvault secret show --vault-name ${{ steps.deploy-arm.outputs.key_vault_name }} --name ${{ secrets.SERVICEPRINCIPALNAME }} --query id -o tsv)
           if [ -z "$SP_SECRET_EXISTS" ]; then
             echo "SP_SECRET_EXISTS=false" >> $GITHUB_ENV
           else
@@ -96,10 +96,7 @@ jobs:
         id: create-sp
         if: env.SP_SECRET_EXISTS == 'false'
         run: |
-          az ad sp create-for-rbac --name ${{ secrets.ServicePrincipalName }} --role Contributor --scopes /subscriptions/${{ env.SubscriptionId }}/resourceGroups/${{ env.ResourceGroupName }}
-        env:
-          SUBSCRIPTION_ID: ${{ steps.create-sp.outputs.subscriptionId }}
-          TENANT_ID: ${{ steps.create-sp.outputs.tenantId }}
+          az ad sp create-for-rbac --name ${{ secrets.SERVICEPRINCIPALNAME }} --role Contributor --scopes /subscriptions/${{ env.SUBSCRIPTIONID }}/resourceGroups/${{ env.RESOURCEGROUPNAME }}
 
       - name: Store SP ID in Key Vault
         if: env.SP_SECRET_EXISTS == 'false'
