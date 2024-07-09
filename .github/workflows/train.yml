@@ -1,0 +1,128 @@
+# Train model, evaluate and test champion model, build containerized model, and deploy model
+name: Train
+
+on:
+  push:
+    branches: ["main"]
+  # pull_request:
+  #   branches: ["main"]
+
+  # Run workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
+      # Use cache action to cache the virtual environment (https://stackoverflow.com/a/62639424)
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10.*
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10.*
+
+      - name: Get pip cache dir
+        id: pip-cache
+        run: echo "PIP_CACHE_DIR=$(pip cache dir)" >> $GITHUB_ENV
+
+      # Use cache action to cache the virtual environment
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.PIP_CACHE_DIR }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          make install
+
+      - name: Add project path to sys.path
+        run: |
+          echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
+
+      - name: Test with pytest
+        run: |
+          make test
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: Adeemy/end-to-end-ml
+
+      - name: Setup Azure CLI
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: latest
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create Resource Group
+        run: |
+          az group create --name ${{ env.ResourceGroupName }} --location ${{ env.Location }}
+
+      # Deploy ARM template to create Azure resources for training
+      - name: Deploy ARM Template
+        id: deploy-arm
+        run: |
+          az group deployment create --resource-group ${{ env.ResourceGroupName }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
+          KEY_VAULT_NAME=$(az group deployment show --resource-group ${{ env.ResourceGroupName }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
+          echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
+          echo "::set-output name=key_vault_name::$KEY_VAULT_NAME"
+
+      # Check if Service Principal credentials already exist in Azure Key Vault
+      - name: Check for Existing Service Principal in Key Vault
+        id: check-sp-in-kv
+        run: |
+          SP_SECRET_EXISTS=$(az keyvault secret show --vault-name ${{ steps.deploy-arm.outputs.key_vault_name }} --name ${{ secrets.ServicePrincipalName }} --query id -o tsv)
+          if [ -z "$SP_SECRET_EXISTS" ]; then
+            echo "SP_SECRET_EXISTS=false" >> $GITHUB_ENV
+          else
+            echo "SP_SECRET_EXISTS=true" >> $GITHUB_ENV
+          fi
+
+      # Setup service principal for Azure ML
+      - name: Create Service Principal
+        id: create-sp
+        if: env.SP_SECRET_EXISTS == 'false'
+        run: |
+          az ad sp create-for-rbac --name ${{ secrets.ServicePrincipalName }} --role Contributor --scopes /subscriptions/${{ env.SubscriptionId }}/resourceGroups/${{ env.ResourceGroupName }}
+        env:
+          SUBSCRIPTION_ID: ${{ steps.create-sp.outputs.subscriptionId }}
+          TENANT_ID: ${{ steps.create-sp.outputs.tenantId }}
+
+      - name: Store SP ID in Key Vault
+        if: env.SP_SECRET_EXISTS == 'false'
+        run: |
+          az keyvault set-policy --name ${{ steps.deploy-arm.outputs.key_vault_name }} --spn ${{ steps.create-sp.outputs.clientId }} --secret-permissions set
+          az login --service-principal -u ${{ steps.create-sp.outputs.clientId }} -p ${{ steps.create-sp.outputs.clientSecret }} --tenant ${{ steps.create-sp.outputs.tenantId }}
+          az keyvault secret set --vault-name ${{ steps.deploy-arm.outputs.key_vault_name }} --name ServicePrincipalID --value $(echo ${{ steps.create-sp.outputs.sp_json }} | jq -r '.clientId')
+          az keyvault secret set --vault-name ${{ steps.deploy-arm.outputs.key_vault_name }} --name ServicePrincipalPassword --value $(echo ${{ steps.create-sp.outputs.sp_json }} | jq -r '.clientSecret')
+
+      # # The train step is resource intensive and should be on a local machine
+      # # or on a remote compute cluster. When training is finished, this workflow
+      # # can be resumed to evaluate the models and test the champion model. This
+      # # step is not implemented in this project. Thus, the training is run on a
+      # # local machine at this juncture and train step is included in the CI/CD
+      # # pipeline for demonstration purposes.
+      # - name: Trigger train
+      #   env:
+      #     COMET_API_KEY: ${{ secrets.COMET_API_KEY }}
+      #     TRAINING_SSH_KEY: ${{ secrets.TRAINING_SSH_KEY }}
+      #   run: |
+      #     ssh -i ${{ secrets.TRAINING_SSH_KEY }} training@my-cluster "make train"
+      #     # or use a web service:
+      #     # curl -X POST https://my-cluster/start-training
