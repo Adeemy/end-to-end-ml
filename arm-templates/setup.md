@@ -11,6 +11,7 @@ Steps to deploy ARM template to create Azure resources for training:
    - `az group create --name <ResourceGroupName> --location <ResourceGroupLocation>`
 6. Create ARM template using Quick Start as illustrated in Azure [Docs](https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/quickstart-create-templates-use-the-portal)
 7. Add the following resource definition for the compute cluster used for training:
+
    ```json
    {
      "type": "Microsoft.MachineLearningServices/workspaces/computes",
@@ -34,4 +35,13 @@ Steps to deploy ARM template to create Azure resources for training:
      }
    }
    ```
-
+8. Deploy the ARM template to create the needed resources in the Azure resource group
+   - `az deployment group create --name <YourResourcesDeployment> --resource-group <ResourceGroupName> --template-file ./arm-templates/azure_train_resource.json`
+9. Create Service Principal to access Azure resources remotely
+   - `az ad sp create-for-rbac --name "sp-e2e" --role contributor --scopes /subscriptions/<YourSubscriptionID>/resourceGroups/<ResourceGroupName>`
+10. Copy the output that includes the credentials to GitHub Actions Secrets (don't store anywhere else other than Azure Key Vault)
+11. Store the Service Principal credentials (clientId and clientSecret) to Azure Key Vault to be accessed by Python SDK
+    - `az keyvault set-policy --name <KeyVaultName> --spn <ServicePrincipalID> --secret-permissions set`
+    - `az login --service-principal -u <ServicePrincipalID> -p <ServicePrincipalPassword> --tenant <TenantID>`
+    - `az keyvault secret set --vault-name <KeyVaultName> --name ServicePrincipalID --value <ServicePrincipalID>`
+    - `az keyvault secret set --vault-name <KeyVaultName> --name ServicePrincipalPassword --value <ServicePrincipalPassword>`
