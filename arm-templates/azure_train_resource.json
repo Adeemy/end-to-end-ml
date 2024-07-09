@@ -4,7 +4,7 @@
   "parameters": {
     "workspaceName": {
       "type": "string",
-      "defaultValue": "[concat('ml-e2e-ml', uniqueString(resourceGroup().id))]",
+      "defaultValue": "[concat('ml-e2e', uniqueString(resourceGroup().id))]",
       "metadata": {
         "description": "Specifies the name of the Azure Machine Learning workspace."
       }
