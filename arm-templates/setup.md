@@ -34,13 +34,4 @@ Steps to deploy ARM template to create Azure resources for training:
      }
    }
    ```
-8. Deploy the ARM template to create the needed resources in the Azure resource group
-   - `az deployment group create --name <YourResourcesDeployment> --resource-group <ResourceGroupName> --template-file ./arm-templates/azure_train_resource.json`
-9. Create Service Principal to access Azure resources remotely
-   - `az ad sp create-for-rbac --name "sp-e2e" --role contributor --scopes /subscriptions/<YourSubscriptionID>/resourceGroups/<ResourceGroupName>`
-10. Copy the output that includes the credentials to GitHub Actions Secrets (don't store anywhere else other than Azure Key Vault)
-11. Store the Service Principal credentials (clientId and clientSecret) to Azure Key Vault to be accessed by Python SDK
-    - `az keyvault set-policy --name kv-e2e-ml-jpvfucwdep4dc --spn a1fb099b-6d33-4aba-a9a0-24e5d491b17d --secret-permissions set`
-    - `az login --service-principal -u a1fb099b-6d33-4aba-a9a0-24e5d491b17d -p eaH8Q~edxvpDsDFjDJ.16.hyPVtISP-Wei2iAbgI --tenant bd7d8290-77d5-4539-b7f6-59802055a290`
-    - `az keyvault secret set --vault-name kv-e2e-ml-jpvfucwdep4dc --name ServicePrincipalID --value a1fb099b-6d33-4aba-a9a0-24e5d491b17d`
-    - `az keyvault secret set --vault-name kv-e2e-ml-jpvfucwdep4dc --name ServicePrincipalPassword --value eaH8Q~edxvpDsDFjDJ.16.hyPVtISP-Wei2iAbgI`
+
