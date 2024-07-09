@@ -4,7 +4,7 @@ name: Data Prep
 on:
   workflow_dispatch:
   schedule:
-    - cron: '01 04 * * 0'
+    - cron: '05 04 * * 2'
 
 jobs:
   data_prep:
