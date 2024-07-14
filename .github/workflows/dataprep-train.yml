@@ -28,7 +28,7 @@ jobs:
       # - name: Deploy ARM Template
       #   id: deploy-arm
       #   run: |
-      #     az deployment group create --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
+      #     az deployment group create --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --template-file ./infrastructure/azure_train_resource.json --name TrainDeployment
       #     KEY_VAULT_NAME=$(az deployment group show --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
       #     echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
       #     echo "key_vault_name=$KEY_VAULT_NAME" >> $GITHUB_ENV

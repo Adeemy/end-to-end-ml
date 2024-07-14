@@ -37,7 +37,7 @@ Steps to deploy ARM template to create Azure resources for training:
    }
    ```
 8. Deploy the ARM template to create the needed resources in the Azure resource group
-   - `az deployment group create --name <YourResourcesDeployment> --resource-group <ResourceGroupName> --template-file ./arm-templates/azure_train_resource.json`
+   - `az deployment group create --name <YourResourcesDeployment> --resource-group <ResourceGroupName> --template-file ./infrastructure/azure_train_resource.json`
 9. Create Service Principal to access Azure resources remotely
    - `az ad sp create-for-rbac --name "sp-e2e" --role contributor --scopes /subscriptions/<YourSubscriptionID>/resourceGroups/<ResourceGroupName>`
 10. Copy the output that includes the credentials to GitHub Actions Secrets (don't store anywhere else other than Azure Key Vault)
