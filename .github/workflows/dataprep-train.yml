@@ -40,16 +40,16 @@ jobs:
           TENANT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.tenantId')
 
           echo "Upgrading Azure CLI..."
-          az upgrade --yes
+          az upgrade --yes --allow-preview false
 
           echo "Adding/upgrading Azure Machine Learning CLI extension..."
-          az extension add --name ml --upgrade --yes
+          az extension add --name ml --upgrade --yes 
 
           echo "Logging in to Azure..."
           az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
           echo "Creating/updating Azure Machine Learning environment from YAML file..."
-          az ml environment create --file train_env.yml --resource-group ${{ env.RESOURCE_GROUP_NAME }} --workspace-name ${{ env.WORKSPACE_NAME }}
+          az ml environment create --file train_env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
 
   data-prep:
     runs-on: ubuntu-latest
