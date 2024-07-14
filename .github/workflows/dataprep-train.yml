@@ -35,7 +35,20 @@ jobs:
         env:
           GITHUB_OUTPUT: ${{ github.output }}
 
-      - name: Setup Azure ML Environment
+      - name: Check if AML environment is updated
+        id: diff
+        run: |
+          az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --export > current-env.yml
+          if diff current-env.yml train-conda.yml; then
+            echo "No changes in the environment. Skipping update."
+            echo "::set-output name=update_required::false"
+          else
+            echo "Changes detected. Updating environment."
+            echo "::set-output name=update_required::true"
+          fi
+
+      - name: Create or update Azure ML Environment
+        if: steps.diff.outputs.update_required == 'true'
         run: |
           echo "Setting up Azure credentials..."
           AZURE_CREDENTIALS=$(echo '${{ secrets.AZURE_CREDENTIALS }}')
