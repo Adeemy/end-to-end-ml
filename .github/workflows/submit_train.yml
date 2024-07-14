@@ -37,6 +37,7 @@ jobs:
           CLIENT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.clientId')
           CLIENT_SECRET=$(echo $AZURE_CREDENTIALS | jq -r '.clientSecret')
           TENANT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.tenantId')
+          az extension add --name azure-cli-ml --yes
           az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
           az ml environment create --file ./train_env.yml --resource-group ${{ env.RESOURCEGROUPNAME }} --workspace-name ${{ env.AML_WORKSPACE }} --name "train-env-${{ github.run_id }}"
 
