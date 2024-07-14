@@ -52,7 +52,7 @@ jobs:
           echo "Logging in to Azure..."
           az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
-          LATEST_VERSION=$(az ml environment list --resource-group "${{ vars.RESOURCE_GROUP_NAME }}" --workspace-name "${{ vars.AML_WORKSPACE_NAME }}" --query "[?name=='${{ vars.AML_TRAIN_ENV_NAME }}'].versions | [0]" --output tsv | sort -V | tail -n 1)
+          LATEST_VERSION=$(az ml environment list --resource-group "${{ vars.RESOURCE_GROUP_NAME }}" --workspace-name "${{ vars.AML_WORKSPACE_NAME }}" --query "[?name=='${{ vars.AML_TRAIN_ENV_NAME }}'].versions[]" --output tsv | sort -V | tail -n 1)
           echo "Latest Version: $LATEST_VERSION"
 
           if [ -z "$LATEST_VERSION" ]; then
