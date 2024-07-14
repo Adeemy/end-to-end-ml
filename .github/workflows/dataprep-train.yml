@@ -53,7 +53,7 @@ jobs:
           echo "Logging in to Azure..."
           az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
-          az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} > current-env.yml
+          az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --version latest> current-env.yml
           if diff current-env.yml train-conda.yml; then
             echo "No changes in the environment. Skipping update."
             echo "::set-output name=update_required::false"
