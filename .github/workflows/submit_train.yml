@@ -2,6 +2,9 @@
 name: Data Prep
 
 on:
+  push:
+    branches: ["workflows"]
+
   workflow_dispatch:
   # schedule:
   #   - cron: '00 4 * * *' # Runs at 4:00 AM UTC every day
