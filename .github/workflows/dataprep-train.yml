@@ -57,16 +57,16 @@ jobs:
 
           if [ -z "$LATEST_VERSION" ]; then
             echo "Environment ${{ vars.AML_TRAIN_ENV_NAME }} not found. Setting update_required to true."
-            echo "::set-output name=update_required::true"
+            echo "update_required=true" >> $GITHUB_ENV
           else
             echo "Latest version of ${{ vars.AML_TRAIN_ENV_NAME }} is $LATEST_VERSION"
             az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --version $LATEST_VERSION --debug > current-env.yml
             if diff current-env.yml train-conda.yml; then
               echo "No changes in the environment. Skipping update."
-              echo "::set-output name=update_required::false"
+              echo "update_required=false" >> $GITHUB_ENV
             else
               echo "Changes detected. Updating environment."
-              echo "::set-output name=update_required::true"
+              echo "update_required=true" >> $GITHUB_ENV
             fi
           fi
 
