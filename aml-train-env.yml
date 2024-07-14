@@ -2,3 +2,7 @@ name: train-env
 image: mcr.microsoft.com/azureml/openmpi3.1.2-ubuntu18.04
 conda_file: train-conda.yml
 description: Environment created from a Docker image plus Conda environment to train model.
+tags:
+  project: "End-to-end ML Project"
+  stage: "Training"
+  owner: "adeemy"
