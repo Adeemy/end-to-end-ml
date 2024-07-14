@@ -56,7 +56,7 @@ jobs:
 
           if [ -z "$LATEST_VERSION" ]; then
             echo "Environment ${{ vars.AML_TRAIN_ENV_NAME }} not found. Creating it."
-            az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
+            az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --wait
           else
             echo "Latest version of ${{ vars.AML_TRAIN_ENV_NAME }} is $LATEST_VERSION"
             az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --version $LATEST_VERSION --debug > current-env.yml
@@ -64,7 +64,7 @@ jobs:
               echo "No changes in the environment. Skipping update."
             else
               echo "Changes detected. Updating environment."
-              az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
+              az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --wait
             fi
           fi
 
