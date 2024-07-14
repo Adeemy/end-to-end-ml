@@ -24,19 +24,18 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Deploys ARM template to create Azure resources for training
-      - name: Deploy ARM Template
-        id: deploy-arm
-        run: |
-          az deployment group create --resource-group ${{ vars.RESOURCEGROUPNAME }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
-          KEY_VAULT_NAME=$(az deployment group show --resource-group ${{ vars.RESOURCEGROUPNAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
-          echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
-          echo "key_vault_name=$KEY_VAULT_NAME" >> $GITHUB_ENV
-        env:
-          GITHUB_OUTPUT: ${{ github.output }}
+      # # Deploys ARM template to create Azure resources for training
+      # - name: Deploy ARM Template
+      #   id: deploy-arm
+      #   run: |
+      #     az deployment group create --resource-group ${{ vars.RESOURCEGROUPNAME }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
+      #     KEY_VAULT_NAME=$(az deployment group show --resource-group ${{ vars.RESOURCEGROUPNAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
+      #     echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
+      #     echo "key_vault_name=$KEY_VAULT_NAME" >> $GITHUB_ENV
+      #   env:
+      #     GITHUB_OUTPUT: ${{ github.output }}
 
-      - name: Check if AML environment is updated
-        id: diff
+      - name: Check and Update AML Environment if Necessary
         run: |
           echo "Setting up Azure credentials..."
           AZURE_CREDENTIALS=$(echo '${{ secrets.AZURE_CREDENTIALS }}')
@@ -56,140 +55,174 @@ jobs:
           LATEST_VERSION=$(az ml environment list --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --query "[?name=='${{ vars.AML_TRAIN_ENV_NAME }}'].version" --output tsv | sort -V | tail -n1)
 
           if [ -z "$LATEST_VERSION" ]; then
-            echo "Environment ${{ vars.AML_TRAIN_ENV_NAME }} not found. Setting update_required to true."
-            echo "update_required=true" >> $GITHUB_ENV
+            echo "Environment ${{ vars.AML_TRAIN_ENV_NAME }} not found. Creating it."
+            az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
           else
             echo "Latest version of ${{ vars.AML_TRAIN_ENV_NAME }} is $LATEST_VERSION"
             az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --version $LATEST_VERSION --debug > current-env.yml
             if diff current-env.yml train-conda.yml; then
               echo "No changes in the environment. Skipping update."
-              echo "update_required=false" >> $GITHUB_ENV
             else
               echo "Changes detected. Updating environment."
-              echo "update_required=true" >> $GITHUB_ENV
+              az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
             fi
           fi
 
-      - name: Create or update Azure ML Environment
-        if: steps.diff.outputs.update_required == 'true'
-        run: |
-          echo "Setting up Azure credentials..."
-          AZURE_CREDENTIALS=$(echo '${{ secrets.AZURE_CREDENTIALS }}')
-          CLIENT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.clientId')
-          CLIENT_SECRET=$(echo $AZURE_CREDENTIALS | jq -r '.clientSecret')
-          TENANT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.tenantId')
+      # - name: Check if AML environment is updated
+      #   id: diff
+      #   run: |
+      #     echo "Setting up Azure credentials..."
+      #     AZURE_CREDENTIALS=$(echo '${{ secrets.AZURE_CREDENTIALS }}')
+      #     CLIENT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.clientId')
+      #     CLIENT_SECRET=$(echo $AZURE_CREDENTIALS | jq -r '.clientSecret')
+      #     TENANT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.tenantId')
 
-          echo "Upgrading Azure CLI..."
-          az upgrade --yes --allow-preview false
+      #     echo "Upgrading Azure CLI..."
+      #     az upgrade --yes --allow-preview false
 
-          echo "Adding/upgrading Azure Machine Learning CLI extension..."
-          az extension add --name ml --upgrade --yes --allow-preview false
+      #     echo "Adding/upgrading Azure Machine Learning CLI extension..."
+      #     az extension add --name ml --upgrade --yes --allow-preview false
 
-          echo "Logging in to Azure..."
-          az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
+      #     echo "Logging in to Azure..."
+      #     az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
-          echo "Creating/updating Azure Machine Learning environment from YAML file..."
-          az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
+      #     LATEST_VERSION=$(az ml environment list --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --query "[?name=='${{ vars.AML_TRAIN_ENV_NAME }}'].version" --output tsv | sort -V | tail -n1)
 
-  data-prep:
-    runs-on: ubuntu-latest
-    needs: deploy-azure-resources
+      #     if [ -z "$LATEST_VERSION" ]; then
+      #       echo "Environment ${{ vars.AML_TRAIN_ENV_NAME }} not found. Setting update_required to true."
+      #       echo "update_required=true" >> $GITHUB_ENV
+      #     else
+      #       echo "Latest version of ${{ vars.AML_TRAIN_ENV_NAME }} is $LATEST_VERSION"
+      #       az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --version $LATEST_VERSION --debug > current-env.yml
+      #       if diff current-env.yml train-conda.yml; then
+      #         echo "No changes in the environment. Skipping update."
+      #         echo "update_required=false" >> $GITHUB_ENV
+      #       else
+      #         echo "Changes detected. Updating environment."
+      #         echo "update_required=true" >> $GITHUB_ENV
+      #       fi
+      #     fi
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      # - name: Create or update Azure ML Environment
+      #   if: steps.diff.outputs.update_required == 'true'
+      #   run: |
+      #     echo "Setting up Azure credentials..."
+      #     AZURE_CREDENTIALS=$(echo '${{ secrets.AZURE_CREDENTIALS }}')
+      #     CLIENT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.clientId')
+      #     CLIENT_SECRET=$(echo $AZURE_CREDENTIALS | jq -r '.clientSecret')
+      #     TENANT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.tenantId')
 
-      - name: Set up Python 3.10.*
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.10.*
+      #     echo "Upgrading Azure CLI..."
+      #     az upgrade --yes --allow-preview false
 
-      - name: Get pip cache dir
-        id: pip-cache
-        run: echo "PIP_CACHE_DIR=$(pip cache dir)" >> $GITHUB_ENV
+      #     echo "Adding/upgrading Azure Machine Learning CLI extension..."
+      #     az extension add --name ml --upgrade --yes --allow-preview false
 
-      # Use cache action to cache the virtual environment
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.PIP_CACHE_DIR }}
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+      #     echo "Logging in to Azure..."
+      #     az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
-      - name: Install dependencies
-        run: |
-          make install
+      #     echo "Creating/updating Azure Machine Learning environment from YAML file..."
+      #     az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
 
-      - name: Add project path to sys.path
-        run: |
-          echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
+  # data-prep:
+  #   runs-on: ubuntu-latest
+  #   needs: deploy-azure-resources
 
-      - name: Prepare data
-        run: |
-          make prep_data
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Setup Feast
-        run: |
-          make setup_feast
+  #     - name: Set up Python 3.10.*
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: 3.10.*
 
-      - name: Split data
-        run: |
-          make split_data
+  #     - name: Get pip cache dir
+  #       id: pip-cache
+  #       run: echo "PIP_CACHE_DIR=$(pip cache dir)" >> $GITHUB_ENV
 
-  train:
-    runs-on: ubuntu-latest
-    needs: data-prep
-    steps:
-      # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
-      # Use cache action to cache the virtual environment (https://stackoverflow.com/a/62639424)
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #     # Use cache action to cache the virtual environment
+  #     - name: Cache pip dependencies
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: ${{ env.PIP_CACHE_DIR }}
+  #         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-pip-
 
-      - name: Set up Python 3.10.*
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.10.*
+  #     - name: Install dependencies
+  #       run: |
+  #         make install
 
-      - name: Get pip cache dir
-        id: pip-cache
-        run: echo "PIP_CACHE_DIR=$(pip cache dir)" >> $GITHUB_ENV
+  #     - name: Add project path to sys.path
+  #       run: |
+  #         echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
 
-      # Use cache action to cache the virtual environment
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.PIP_CACHE_DIR }}
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+  #     - name: Prepare data
+  #       run: |
+  #         make prep_data
 
-      - name: Install dependencies
-        run: |
-          make install
+  #     - name: Setup Feast
+  #       run: |
+  #         make setup_feast
 
-      - name: Add project path to sys.path
-        run: |
-          echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+  #     - name: Split data
+  #       run: |
+  #         make split_data
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+  # train:
+  #   runs-on: ubuntu-latest
+  #   needs: data-prep
+  #   steps:
+  #     # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
+  #     # Use cache action to cache the virtual environment (https://stackoverflow.com/a/62639424)
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      # - name: Submit train.py to Azure Compute Cluster
-      #   uses: Azure/aml-compute@v1
-      #   with:
-      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
-      #     resource_group: ${{ vars.RESOURCEGROUPNAME }}
-      #     workspace_name: ${{ vars.AML_WORKSPACE }}
-      #     experiment_name: ${{ github.run_id }}
-      #     compute_name: ${{ vars.COMPUTE_CLUSTER }}
-      #     command: python train.py --arg1 value1
-      #     environment: azureml:AzureML-sklearn-0.24-ubuntu18.04-py37-cpu:1
-      #     inputs:
-      #       my_input_data:
-      #         data: azureml:my_dataset
-      #         mode: ro_mount
-      #     outputs:
-      #       my_output:
+  #     - name: Set up Python 3.10.*
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: 3.10.*
+
+  #     - name: Get pip cache dir
+  #       id: pip-cache
+  #       run: echo "PIP_CACHE_DIR=$(pip cache dir)" >> $GITHUB_ENV
+
+  #     # Use cache action to cache the virtual environment
+  #     - name: Cache pip dependencies
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: ${{ env.PIP_CACHE_DIR }}
+  #         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-pip-
+
+  #     - name: Install dependencies
+  #       run: |
+  #         make install
+
+  #     - name: Add project path to sys.path
+  #       run: |
+  #         echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+
+  #     - name: Login to Azure
+  #       uses: azure/login@v2
+  #       with:
+  #         creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+  #     # - name: Submit train.py to Azure Compute Cluster
+  #     #   uses: Azure/aml-compute@v1
+  #     #   with:
+  #     #     creds: ${{ secrets.AZURE_CREDENTIALS }}
+  #     #     resource_group: ${{ vars.RESOURCEGROUPNAME }}
+  #     #     workspace_name: ${{ vars.AML_WORKSPACE }}
+  #     #     experiment_name: ${{ github.run_id }}
+  #     #     compute_name: ${{ vars.COMPUTE_CLUSTER }}
+  #     #     command: python train.py --arg1 value1
+  #     #     environment: azureml:AzureML-sklearn-0.24-ubuntu18.04-py37-cpu:1
+  #     #     inputs:
+  #     #       my_input_data:
+  #     #         data: azureml:my_dataset
+  #     #         mode: ro_mount
+  #     #     outputs:
+  #     #       my_output:
