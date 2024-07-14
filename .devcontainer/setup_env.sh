@@ -2,8 +2,10 @@
 
 # Setup default virtual environment and install requirements
 echo -e 'export PYTHONPATH=$PYTHONPATH:~/' >> ~/.bashrc
-conda env create -f train-conda.yml
-echo 'conda activate train-env' >> ~/.bashrc
+python3 -m venv .venv
+echo 'source .venv/bin/activate' >> ~/.bashrc
+pip install --upgrade pip
+pip install -r requirements.txt
 
 # To remove the deprecation warning from jupyter_client when running tests
 touch pytest.ini
@@ -15,6 +17,3 @@ echo -e '[pytest]\nfilterwarnings ='\
 # Install auxiliar tools
 sudo apt-get update
 sudo apt-get install tree # To print project structure
-
-# Install Azure CLI for Azure development (optional)
-# curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
