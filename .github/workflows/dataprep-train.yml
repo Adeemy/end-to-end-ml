@@ -28,8 +28,8 @@ jobs:
       # - name: Deploy ARM Template
       #   id: deploy-arm
       #   run: |
-      #     az deployment group create --resource-group ${{ vars.RESOURCEGROUPNAME }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
-      #     KEY_VAULT_NAME=$(az deployment group show --resource-group ${{ vars.RESOURCEGROUPNAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
+      #     az deployment group create --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
+      #     KEY_VAULT_NAME=$(az deployment group show --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
       #     echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
       #     echo "key_vault_name=$KEY_VAULT_NAME" >> $GITHUB_ENV
       #   env:
@@ -52,20 +52,20 @@ jobs:
           echo "Logging in to Azure..."
           az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
-          LATEST_VERSION=$(az ml environment list --resource-group "${{ vars.RESOURCEGROUPNAME }}" --workspace-name "${{ vars.AML_WORKSPACE }}" --query "[?name=='${{ vars.AML_TRAIN_ENV_NAME }}'].versions[-1]" --output tsv)
+          LATEST_VERSION=$(az ml environment list --resource-group "${{ vars.RESOURCE_GROUP_NAME }}" --workspace-name "${{ vars.AML_WORKSPACE_NAME }}" --query "[?name=='${{ vars.AML_TRAIN_ENV_NAME }}'].versions | [0]" --output tsv | sort -V | tail -n 1)
           echo "Latest Version: $LATEST_VERSION"
 
           if [ -z "$LATEST_VERSION" ]; then
             echo "Environment ${{ vars.AML_TRAIN_ENV_NAME }} not found. Creating it."
-            az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
+            az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
           else
             echo "Latest version of ${{ vars.AML_TRAIN_ENV_NAME }} is $LATEST_VERSION"
-            az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --version $LATEST_VERSION --debug > current-env.yml
+            az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }} --version $LATEST_VERSION --debug > current-env.yml
             if diff current-env.yml train-conda.yml; then
               echo "No changes in the environment. Skipping update."
             else
               echo "Changes detected. Updating environment."
-              az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
+              az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
             fi
           fi
 
@@ -87,14 +87,14 @@ jobs:
       #     echo "Logging in to Azure..."
       #     az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
-      #     LATEST_VERSION=$(az ml environment list --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --query "[?name=='${{ vars.AML_TRAIN_ENV_NAME }}'].version" --output tsv | sort -V | tail -n1)
+      #     LATEST_VERSION=$(az ml environment list --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }} --query "[?name=='${{ vars.AML_TRAIN_ENV_NAME }}'].version" --output tsv | sort -V | tail -n1)
 
       #     if [ -z "$LATEST_VERSION" ]; then
       #       echo "Environment ${{ vars.AML_TRAIN_ENV_NAME }} not found. Setting update_required to true."
       #       echo "update_required=true" >> $GITHUB_ENV
       #     else
       #       echo "Latest version of ${{ vars.AML_TRAIN_ENV_NAME }} is $LATEST_VERSION"
-      #       az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --version $LATEST_VERSION --debug > current-env.yml
+      #       az ml environment show --name ${{ vars.AML_TRAIN_ENV_NAME }} --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }} --version $LATEST_VERSION --debug > current-env.yml
       #       if diff current-env.yml train-conda.yml; then
       #         echo "No changes in the environment. Skipping update."
       #         echo "update_required=false" >> $GITHUB_ENV
@@ -123,7 +123,7 @@ jobs:
       #     az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
       #     echo "Creating/updating Azure Machine Learning environment from YAML file..."
-      #     az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
+      #     az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
 
   # data-prep:
   #   runs-on: ubuntu-latest
@@ -215,8 +215,8 @@ jobs:
   #     #   uses: Azure/aml-compute@v1
   #     #   with:
   #     #     creds: ${{ secrets.AZURE_CREDENTIALS }}
-  #     #     resource_group: ${{ vars.RESOURCEGROUPNAME }}
-  #     #     workspace_name: ${{ vars.AML_WORKSPACE }}
+  #     #     resource_group: ${{ vars.RESOURCE_GROUP_NAME }}
+  #     #     workspace_name: ${{ vars.AML_WORKSPACE_NAME }}
   #     #     experiment_name: ${{ github.run_id }}
   #     #     compute_name: ${{ vars.COMPUTE_CLUSTER }}
   #     #     command: python train.py --arg1 value1
