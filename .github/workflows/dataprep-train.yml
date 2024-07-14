@@ -10,7 +10,7 @@ on:
   #   - cron: '00 4 * * *' # Runs at 4:00 AM UTC every day
 
 jobs:
-  create-azure-resources:
+  deploy-azure-resources:
     runs-on: ubuntu-latest
 
     steps:
@@ -49,11 +49,11 @@ jobs:
           az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
           echo "Creating/updating Azure Machine Learning environment from YAML file..."
-          az ml environment create --file train_env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
+          az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
 
   data-prep:
     runs-on: ubuntu-latest
-    needs: create-azure-resources
+    needs: deploy-azure-resources
 
     steps:
       # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it

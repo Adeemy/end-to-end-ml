@@ -1,0 +1,5 @@
+$shema: https://azuremlschemas.azureedge.net/latest/environment.schema.json
+name: train-env
+image: mcr.microsoft.com/azureml/openmpi3.1.2-ubuntu18.04 #mcr.microsoft.com/azureml/base:latest
+conda_file: train-conda.yml
+description: Environment created from a Docker image plus Conda environment to train model.
