@@ -33,14 +33,23 @@ jobs:
 
       - name: Setup Azure Machine Learning Environment
         run: |
+          echo "Setting up Azure credentials..."
           AZURE_CREDENTIALS=$(echo '${{ secrets.AZURE_CREDENTIALS }}')
           CLIENT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.clientId')
           CLIENT_SECRET=$(echo $AZURE_CREDENTIALS | jq -r '.clientSecret')
           TENANT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.tenantId')
+
+          echo "Upgrading Azure CLI..."
           az upgrade --yes
-          az extension add --name azure-cli-ml --upgrade --yes --allow-preview false
+
+          echo "Adding/upgrading Azure Machine Learning CLI extension..."
+          az extension add --name ml --upgrade --yes
+
+          echo "Logging in to Azure..."
           az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
-          az ml environment create --name train-env --file train_env.yml --image pytorch/pytorch --resource-group ${{ env.RESOURCE_GROUP_NAME }} --workspace-name ${{ env.WORKSPACE_NAME }}
+
+          echo "Creating/updating Azure Machine Learning environment from YAML file..."
+          az ml environment create --file train_env.yml --resource-group ${{ env.RESOURCE_GROUP_NAME }} --workspace-name ${{ env.WORKSPACE_NAME }}
 
   data-prep:
     runs-on: ubuntu-latest
