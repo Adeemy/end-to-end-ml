@@ -2,9 +2,6 @@
 name: Data Prep
 
 on:
-  push:
-    branches: ["workflows"]
-
   workflow_dispatch:
   # schedule:
   #   - cron: '00 4 * * *' # Runs at 4:00 AM UTC every day
@@ -26,14 +23,14 @@ jobs:
           echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
           echo "::set-output name=key_vault_name::$KEY_VAULT_NAME"
 
-      - name: Create Azure ML Environment from Conda File
-        uses: Azure/aml-registerenvironment@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-          resource_group: ${{ vars.RESOURCEGROUPNAME }}
-          workspace_name: ${{ vars.AML_WORKSPACE }}
-          environment_name: "MyCustomEnvironment-${{ github.run_id }}"
-          file_path: "./train_env.yml"
+      - name: Create or update Azure ML Environment from Conda File
+        run: |
+          AZURE_CREDENTIALS=$(echo '${{ secrets.AZURE_CREDENTIALS }}')
+          CLIENT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.clientId')
+          CLIENT_SECRET=$(echo $AZURE_CREDENTIALS | jq -r '.clientSecret')
+          TENANT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.tenantId')
+          az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
+          az ml environment create --file ./train_env.yml --resource-group ${{ env.RESOURCEGROUPNAME }} --workspace-name ${{ env.AML_WORKSPACE }} --name "train-env-${{ github.run_id }}"
 
   data_prep:
     runs-on: ubuntu-latest
