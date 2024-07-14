@@ -54,6 +54,8 @@ jobs:
 
           LATEST_VERSION=$(az ml environment list --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }} --query "[?name=='${{ vars.AML_TRAIN_ENV_NAME }}'].version" --output tsv | sort -V | tail -n1)
 
+          echo "LATEST_VERSION is '$LATEST_VERSION'"
+
           if [ -z "$LATEST_VERSION" ]; then
             echo "Environment ${{ vars.AML_TRAIN_ENV_NAME }} not found. Creating it."
             az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCEGROUPNAME }} --workspace-name ${{ vars.AML_WORKSPACE }}
