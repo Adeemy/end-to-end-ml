@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
+      # Use cache action to cache the virtual environment (https://stackoverflow.com/a/62639424)
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -31,7 +33,7 @@ jobs:
           echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
           echo "::set-output name=key_vault_name::$KEY_VAULT_NAME"
 
-      - name: Setup Azure Machine Learning Environment
+      - name: Setup Azure ML Environment
         run: |
           echo "Setting up Azure credentials..."
           AZURE_CREDENTIALS=$(echo '${{ secrets.AZURE_CREDENTIALS }}')
@@ -56,8 +58,6 @@ jobs:
     needs: deploy-azure-resources
 
     steps:
-      # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
-      # Use cache action to cache the virtual environment (https://stackoverflow.com/a/62639424)
       - name: Checkout code
         uses: actions/checkout@v4
 
