@@ -114,7 +114,7 @@
     {
       "type": "Microsoft.MachineLearningServices/workspaces/computes",
       "apiVersion": "2020-08-01",
-      "name": "[concat(parameters('workspaceName'), '/exampleComputeCluster')]",
+      "name": "[concat(parameters('workspaceName'), '/trainComputeCluster')]",
       "location": "[parameters('location')]",
       "dependsOn": [
         "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('workspaceName'))]"

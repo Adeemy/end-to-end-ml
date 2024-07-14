@@ -1,0 +1,138 @@
+# Train model, evaluate and test champion model, build containerized model, and deploy model
+name: Data Prep
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '00 4 * * *' # Runs at 4:00 AM UTC every day
+
+jobs:
+  create-azure-resource:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Deploy ARM template to create Azure resources for training
+      - name: Deploy ARM Template
+        id: deploy-arm
+        run: |
+          az deployment group create --resource-group ${{ vars.RESOURCEGROUPNAME }} --template-file ./arm-templates/azure_train_resource.json --name TrainDeployment
+          KEY_VAULT_NAME=$(az group deployment show --resource-group ${{ vars.RESOURCEGROUPNAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
+          echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
+          echo "::set-output name=key_vault_name::$KEY_VAULT_NAME"
+
+      - name: Create Azure ML Environment from Conda File
+        uses: Azure/aml-registerenvironment@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          resource_group: ${{ vars.RESOURCEGROUPNAME }}
+          workspace_name: ${{ vars.AML_WORKSPACE }}
+          environment_name: 'MyCustomEnvironment-${{ github.run_id }}'
+          file_path: './train_env.yml'
+
+  data_prep:
+    runs-on: ubuntu-latest
+    needs: create-azure-resource
+
+    steps:
+      # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
+      # Use cache action to cache the virtual environment (https://stackoverflow.com/a/62639424)
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10.*
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10.*
+
+      - name: Get pip cache dir
+        id: pip-cache
+        run: echo "PIP_CACHE_DIR=$(pip cache dir)" >> $GITHUB_ENV
+
+      # Use cache action to cache the virtual environment
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.PIP_CACHE_DIR }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          make install
+
+      - name: Add project path to sys.path
+        run: |
+          echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
+
+      - name: Prepare data
+        run: |
+          make prep_data
+
+      - name: Setup Feast
+        run: |
+          make setup_feast
+
+      - name: Split data
+        run: |
+          make split_data
+
+  train:
+    runs-on: ubuntu-latest
+    needs: data_prep
+    steps:
+      # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
+      # Use cache action to cache the virtual environment (https://stackoverflow.com/a/62639424)
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10.*
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10.*
+
+      - name: Get pip cache dir
+        id: pip-cache
+        run: echo "PIP_CACHE_DIR=$(pip cache dir)" >> $GITHUB_ENV
+
+      # Use cache action to cache the virtual environment
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.PIP_CACHE_DIR }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          make install
+
+      - name: Add project path to sys.path
+        run: |
+          echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # - name: Submit train.py to Azure Compute Cluster
+      #   uses: Azure/aml-compute@v1
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
+      #     resource_group: ${{ vars.RESOURCEGROUPNAME }}
+      #     workspace_name: ${{ vars.AML_WORKSPACE }}
+      #     experiment_name: ${{ github.run_id }}
+      #     compute_name: ${{ vars.COMPUTE_CLUSTER }}
+      #     command: python train.py --arg1 value1
+      #     environment: azureml:AzureML-sklearn-0.24-ubuntu18.04-py37-cpu:1
+      #     inputs:
+      #       my_input_data:
+      #         data: azureml:my_dataset
+      #         mode: ro_mount
+      #     outputs:
+      #       my_output:
