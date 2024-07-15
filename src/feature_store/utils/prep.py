@@ -1,4 +1,4 @@
-""" 
+"""
 Data preprocessing and transformation classes.
 """
 
@@ -223,7 +223,7 @@ class DataPreprocessor:
             self.cat_feature_names = []
 
         # Assert that at least one feature data type was passed
-        assert (
+        if not (
             len(
                 self.date_cols_names
                 + self.datetime_cols_names
@@ -231,7 +231,10 @@ class DataPreprocessor:
                 + self.cat_feature_names
             )
             > 0
-        ), "At least one feature data type must be provided. None was provided!"
+        ):
+            raise ValueError(
+                "At least one feature data type must be provided. None was provided!"
+            )
 
     def replace_blank_values_with_nan(self) -> None:
         """Replaces blank values with np.nan. It is useful when reading data from
@@ -274,7 +277,7 @@ class DataPreprocessor:
             ).sum()
             if duplicates_by_id_count > 0:
                 logger.info(
-                    """\n{duplicates_by_id_count} rows with the non-unique 
+                    """\n{duplicates_by_id_count} rows with the non-unique
                     %s in input data.""",
                     self.primary_key_names,
                 )
@@ -361,7 +364,7 @@ class DataPreprocessor:
 
         if len(self.cat_feature_names) > 0:
             logger.info(
-                """The following categorical columns will be converted to 'string' 
+                """The following categorical columns will be converted to 'string'
                 type.\n %s""",
                 self.cat_feature_names,
             )

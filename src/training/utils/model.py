@@ -104,9 +104,10 @@ class ModelOptimizer:
         self.classifier_name = self.model.__class__.__name__
 
         if not self.is_voting_ensemble:
-            assert (
-                self.classifier_name in self._supported_models
-            ), f"Supported models are: {self._supported_models}. Got {self.classifier_name}!"
+            if self.classifier_name not in self._supported_models:
+                raise ValueError(
+                    f"Supported models are: {self._supported_models}. Got {self.classifier_name}!"
+                )
 
     def generate_trial_params(self, trial: optuna.trial.Trial) -> dict:
         """Samples model parameters values from search space as specified in

@@ -1,5 +1,5 @@
 """
-Runs training experiments to perform hyperparameters optimization 
+Runs training experiments to perform hyperparameters optimization
 for multiple models. It tracks the experiments using Comet.ml.
 """
 
@@ -198,7 +198,7 @@ def main(
     search_max_iters = config.params["train"]["search_max_iters"]
     parallel_jobs_count = config.params["train"]["parallel_jobs_count"]
     exp_timeout_in_secs = config.params["train"]["exp_timout_secs"]
-    f_beta_score_beta_val = config.params["train"]["fbeta_score_beta_val"]
+    f_beta_score_beta_val = float(config.params["train"]["fbeta_score_beta_val"])
     ve_voting_rule = config.params["train"]["voting_rule"]
     train_file_name = config.params["files"]["train_set_file_name"]
     valid_set_file_name = config.params["files"]["valid_set_file_name"]

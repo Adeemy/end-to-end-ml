@@ -25,9 +25,3 @@ repos:
         entry: make lint
         language: system
         types: [python]
-        args: [
-            "-rn", # Only display messages
-            "--rcfile=.pylintrc", # Link to your config file
-            "--disable=R,C,E0401,E0110,I1101,W0718,W9008",
-            "--load-plugins=pylint.extensions.docparams", # Load an extension
-          ]

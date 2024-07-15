@@ -1,5 +1,5 @@
 """
-Test functions for the ModelOptimizer and ModelEvaluator classes in 
+Test functions for the ModelOptimizer and ModelEvaluator classes in
 the model module src/training/utils/model.py.
 """
 
@@ -833,8 +833,8 @@ def test_log_lift_curve(mocker, model_evaluator):
 
 def test_calc_expected_calibration_error(model_evaluator):
     """Tests that the calc_expected_calibration_error method returns the expected ECE for a perfectly
-    calibrated model and a highly uncalibrated model. The test checks that the method raises an
-    AssertionError if the decision threshold is not between 0 and 1.
+    calibrated model and a highly uncalibrated model. The test checks that the ECE is close to 0 for
+    a perfectly calibrated model and close to 1 for a highly uncalibrated model.
     """
 
     # 900 samples where the model is 90% confident and is correct

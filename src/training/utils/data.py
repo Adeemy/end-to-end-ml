@@ -186,9 +186,10 @@ class DataPipelineCreator:
             [] if cat_feature_col_names is None else cat_feature_col_names
         )
 
-        assert (
-            len(num_feature_col_names + cat_feature_col_names) > 0
-        ), "At least one numerical or categorical feature name must be specified!"
+        if len(num_feature_col_names + cat_feature_col_names) == 0:
+            raise ValueError(
+                "At least one numerical or categorical feature name must be specified!"
+            )
 
         # Create a numerical features transformer
         if len(num_feature_col_names) > 0:
@@ -313,10 +314,13 @@ class TrainingDataPrep:
         self.valid_features_preprocessed = None
 
         # Assert that at least one feature data type was passed
-        assert (
-            self.numerical_feature_names is not None
-            and self.categorical_feature_names is not None
-        ), "Names of numerical and/or categorical features must be provided. None was provided!"
+        if (
+            self.numerical_feature_names is None
+            and self.categorical_feature_names is None
+        ):
+            raise ValueError(
+                "Names of numerical and/or categorical features must be provided. None was provided!"
+            )
 
     def select_relevant_columns(self) -> None:
         """Ensures specified numerical and categorical features exist in train and test

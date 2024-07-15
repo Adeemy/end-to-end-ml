@@ -4,11 +4,7 @@ import yaml
 
 
 class PrettySafeLoader(yaml.SafeLoader):
-    """A YAML loader that loads mappings into ordered dictionaries.
-
-    Attributes:
-        None.
-    """
+    """A YAML loader that loads mappings into ordered dictionaries."""
 
     def construct_python_tuple(self, node: str) -> tuple:
         """Override the default constructor to create tuples instead of lists.
@@ -41,10 +37,13 @@ class Config:
             config_path (str): path of the config .yml file.
 
         Raises:
+            ValueError: if config path doesn't end with '.yml'.
             FileNotFoundError: if config file doesn't exist.
         """
 
-        assert config_path.endswith(".yml")
+        if not config_path.endswith(".yml"):
+            raise ValueError("Config path must end with '.yml'")
+
         self.config_path = config_path
 
         try:
@@ -61,25 +60,39 @@ class Config:
             params (dict): dictionary of parameters loaded from config file.
 
         Raises:
-            AssertionError: if any required value is missing.
+            ValueError: if description or data is not included in config file.
+            ValueError: if data parameters are not included in config file.
+            ValueError: if raw_dataset_source is not specified.
+            ValueError: if pk_col_name is not specified.
+            ValueError: if neither categorical nor numerical are specified.
+            ValueError: if uci_dataset_id is not integer type.
         """
 
-        assert "description" in params, "description is not included in config file"
-        assert "data" in params, "data is not included in config file"
+        if "description" not in params:
+            raise ValueError("description is not included in config file")
+        if "data" not in params:
+            raise ValueError("data is not included in config file")
 
         # Check beta value (primarily used to compare models)
-        if params["data"]["params"]["raw_dataset_source"] == "none":
+        raw_dataset_source = params.get("data", {}).get("raw_dataset_source", None)
+        if raw_dataset_source is None or raw_dataset_source == "none":
             raise ValueError("raw_dataset_source must be specified!")
 
-        if params["data"]["params"]["pk_col_name"] == "none":
+        pk_col_name = params.get("data", {}).get("pk_col_name", None)
+        if pk_col_name is None or pk_col_name == "none":
             raise ValueError("pk_col_name must be specified!")
 
-        if (params["data"]["params"]["num_col_names"] == "none") and (
-            params["data"]["params"]["cat_col_names"] == "none"
+        num_col_names = params.get("data", {}).get("num_col_names", None)
+        cat_col_names = params.get("data", {}).get("cat_col_names", None)
+        if (num_col_names is None or num_col_names == "none") and (
+            cat_col_names is None or cat_col_names == "none"
         ):
             raise ValueError("Neither categorical nor numerical are specified!")
 
-        if not isinstance(params["data"]["params"]["uci_raw_data_num"], int):
+        uci_raw_data_num = params.get("data", {}).get("uci_raw_data_num", None)
+        try:
+            _ = int(uci_raw_data_num)
+        except ValueError as exc:
             raise ValueError(
-                f"uci_dataset_id must be integer type. Got {params['data']['params']['uci_raw_data_num']}"
-            )
+                f"uci_dataset_id must be integer type. Got {uci_raw_data_num}"
+            ) from exc

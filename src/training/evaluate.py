@@ -2,7 +2,7 @@
 Evaluates trained models and selects the best model based on
 performance on validation set. The best model is then evaluated
 on testing set to assess its generalization capability and it
-will be registered as champion model only if its score on the 
+will be registered as champion model only if its score on the
 test set is better than a required threshold value.
 """
 
@@ -151,7 +151,7 @@ def main(
     project_name = config.params["train"]["comet_project_name"]
     workspace_name = config.params["train"]["comet_workspace_name"]
     class_col_name = config.params["data"]["class_col_name"]
-    fbeta_score_beta_val = config.params["train"]["fbeta_score_beta_val"]
+    fbeta_score_beta_val = float(config.params["train"]["fbeta_score_beta_val"])
     calib_cv_folds = config.params["train"]["cross_val_folds"]
     comparison_metric_name = config.params["train"]["comparison_metric"]
     exp_keys_file_name = config.params["files"]["experiments_keys_file_name"]
@@ -258,7 +258,7 @@ def main(
 
     else:
         raise ValueError(
-            f"""Best model score is {best_model_test_score}, which is lower than 
+            f"""Best model score is {best_model_test_score}, which is lower than
                          deployment threshold {deployment_score_thresh}."""
         )
 

@@ -45,7 +45,9 @@ class Config:
             FileNotFoundError: if config file doesn't exist.
         """
 
-        assert config_path.endswith(".yml")
+        if not config_path.endswith(".yml"):
+            raise ValueError("Config path must end with '.yml'")
+
         self.config_path = config_path
 
         try:
@@ -56,66 +58,94 @@ class Config:
 
     @staticmethod
     def _check_params(params: dict) -> None:
-        """Check all training exp values.
+        """Checks all training exp values.
 
         Args:
             params (dict): dictionary of config parameters.
 
         Raises:
-            AssertionError: if any required parameter is missing.
-            ValueError: if any parameter is of invalid type.
+            ValueError: if description or data is not included in config file.
+            ValueError: if data parameters are not included in config file.
+            ValueError: if train parameters are not included in config file.
+            ValueError: if modelregistry parameters are not included in config file.
+            ValueError: if split_rand_seed is not an integer.
+            ValueError: if split_type is not 'random' or 'time'.
+            ValueError: if fbeta_score_beta_val is not a positive float.
+            ValueError: if comparison_metric is not a valid value.
+            ValueError: if split_date_col_format is not a valid date format.
+            ValueError: if train_test_split_curoff_date or train_valid_split_curoff_date is not a date and split_type is 'time'.
+            ValueError: if voting_rule is not 'soft' or 'hard'.
         """
 
-        assert "description" in params, "description is not included in config file"
-        assert "data" in params, "data is not included in config file"
-        assert "train" in params, "train is not included in config file"
-        assert "modelregistry" in params, "modelregistry is not included in config file"
+        if "description" not in params:
+            raise ValueError("description is not included in config file")
+        if "data" not in params:
+            raise ValueError("data is not included in config file")
+        if "train" not in params:
+            raise ValueError("train is not included in config file")
+        if "modelregistry" not in params:
+            raise ValueError("modelregistry is not included in config file")
 
         # Check data split params are of correct types
-        if not isinstance(int(params["data"]["params"]["split_rand_seed"]), int):
+        try:
+            _ = int(params["data"]["split_rand_seed"])
+        except ValueError as exc:
             raise ValueError(
-                f"split_rand_seed must be integer type. Got {params['data']['params']['split_rand_seed']}"
-            )
+                f"split_rand_seed must be integer type. Got {params['data']['split_rand_seed']}"
+            ) from exc
 
-        if params["data"]["params"]["split_type"] not in ["random", "time"]:
+        split_type = params.get("data", {}).get("split_type", None)
+        if split_type not in ["random", "time"]:
             raise ValueError(
-                f"split_type must be either 'random' or 'time'. Got {params['data']['params']['split_type']}"
+                f"split_type must be either 'random' or 'time'. Got {split_type}"
             )
 
         # Check beta value (primarily used to compare models)
-        if isinstance(float(params["train"]["params"]["fbeta_score_beta_val"]), float):
-            fbeta_score_beta_val = float(
-                params["train"]["params"]["fbeta_score_beta_val"]
-            )
-
-            assert (
-                fbeta_score_beta_val > 0
-            ), f"fbeta_score_beta_val must be > 0. Got {fbeta_score_beta_val}"
-
-        else:
+        fbeta_score_beta_val = params.get("train", {}).get("fbeta_score_beta_val", 1.0)
+        try:
+            fbeta_score_beta_val = float(fbeta_score_beta_val)
+            if fbeta_score_beta_val <= 0:
+                raise ValueError(
+                    f"fbeta_score_beta_val must be > 0. Got {fbeta_score_beta_val}"
+                )
+        except ValueError as exc:
             raise ValueError(
-                f"fbeta_score_beta_val must be float type. Got {params['train']['params']['fbeta_score_beta_val']}"
-            )
+                f"fbeta_score_beta_val must be a positive float. Got {fbeta_score_beta_val}"
+            ) from exc
 
         # Check if comparison metric is a valid value
-        comparison_metric = params["train"]["params"]["comparison_metric"]
-        comparison_metrics = ("recall", "precision", "f1", "roc_auc", "fbeta_score")
-        assert (
-            comparison_metric in comparison_metrics
-        ), f"Supported metrics are {comparison_metrics}. Got {comparison_metric}!"
+        comparison_metric = params.get("train", {}).get("comparison_metric", None)
+        supported_comparison_metrics = [
+            "recall",
+            "precision",
+            "f1",
+            "roc_auc",
+            "fbeta_score",
+        ]
+        if comparison_metric not in supported_comparison_metrics:
+            raise ValueError(
+                f"Supported metrics are {supported_comparison_metrics}. Got {comparison_metric}!"
+            )
 
         # Check if input split cutoff date (if split_type == "time") is in proper date format
-        if params["data"]["params"]["split_type"] == "time" and (
-            params["data"]["params"]["train_test_split_curoff_date"] == "none"
-            or params["data"]["params"]["train_valid_split_curoff_date"] == "none"
+        date_format = params.get("data", {}).get("split_date_col_format", None)
+        train_test_split_curoff_date = params.get("data", {}).get(
+            "train_test_split_curoff_date", None
+        )
+        train_valid_split_curoff_date = params.get("data", {}).get(
+            "train_valid_split_curoff_date", None
+        )
+        if split_type == "time" and (
+            train_test_split_curoff_date == "none"
+            or train_valid_split_curoff_date == "none"
         ):
             raise ValueError(
-                f"train_test_split_curoff_date and train_valid_split_curoff_date must be a date (format {params['data']['params']['split_date_col_format']}) or None if split type is 'random'."
+                f"train_test_split_curoff_date and train_valid_split_curoff_date must be a date (format {date_format}) or None if split type is 'random'."
             )
 
         # Check if voting rule a valid value
-        voting_rule = params["train"]["params"]["voting_rule"]
-        assert voting_rule in (
-            "soft",
-            "hard",
-        ), f"Voting rule in Voting Ensemble must be 'soft' or 'hard'. Got {voting_rule}!"
+        voting_rule = params.get("train", {}).get("voting_rule", None)
+        if voting_rule not in ("soft", "hard"):
+            raise ValueError(
+                f"Voting rule in Voting Ensemble must be 'soft' or 'hard'. Got {voting_rule}!"
+            )

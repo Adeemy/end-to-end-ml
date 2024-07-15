@@ -34,13 +34,11 @@ def test_config_check_params():
     params = {
         "description": "Sample description",
         "data": {
-            "params": {
-                "raw_dataset_source": "raw_data_source",
-                "pk_col_name": "id",
-                "num_col_names": "num_col",
-                "cat_col_names": "cat_col",
-                "uci_raw_data_num": 123,
-            }
+            "raw_dataset_source": "raw_data_source",
+            "pk_col_name": "id",
+            "num_col_names": "num_col",
+            "cat_col_names": "cat_col",
+            "uci_raw_data_num": 123,
         },
     }
     Config._check_params(params)  # Should not raise any exceptions
@@ -51,7 +49,7 @@ def test_config_check_params_missing_raw_dataset_source():
     when raw_dataset_source is not specified."""
 
     params = {"raw_dataset_source": "none"}
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         Config._check_params(params)
 
 
@@ -62,10 +60,8 @@ def test_config_check_params_missing_pk_col_name():
     params = {
         "description": "Sample description",
         "data": {
-            "params": {
-                "raw_dataset_source": "raw_data_source",
-                "pk_col_name": "none",
-            }
+            "raw_dataset_source": "raw_data_source",
+            "pk_col_name": "none",
         },
     }
     with pytest.raises(ValueError):
@@ -79,12 +75,10 @@ def test_config_check_params_missing_num_and_cat_col_names():
     params = {
         "description": "Sample description",
         "data": {
-            "params": {
-                "raw_dataset_source": "raw_data_source",
-                "pk_col_name": "id",
-                "num_col_names": "none",
-                "cat_col_names": "none",
-            }
+            "raw_dataset_source": "raw_data_source",
+            "pk_col_name": "id",
+            "num_col_names": "none",
+            "cat_col_names": "none",
         },
     }
     with pytest.raises(ValueError):
@@ -98,13 +92,11 @@ def test_config_check_params_missing_uci_raw_data_num():
     params = {
         "description": "Sample description",
         "data": {
-            "params": {
-                "raw_dataset_source": "raw_data_source",
-                "pk_col_name": "id",
-                "num_col_names": "num_col_name",
-                "cat_col_names": "cat_col_name",
-                "uci_raw_data_num": "none",
-            }
+            "raw_dataset_source": "raw_data_source",
+            "pk_col_name": "id",
+            "num_col_names": "num_col_name",
+            "cat_col_names": "cat_col_name",
+            "uci_raw_data_num": "none",
         },
     }
     with pytest.raises(ValueError):
