@@ -1,7 +1,6 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 experiment_name: training-experiment
-code:
-  local_path: ./src/training/train.py
+code: ./src/training
 command: >-
   python train.py
   --config_yaml_path ./src/config/training-config.yml
@@ -9,13 +8,11 @@ command: >-
 environment:
   name: train-env
   version: 11
-  docker:
-    image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:20231024.v1
   conda_file: ./src/training/train-env.yml # Ensure this path is correct and the file exists
   python:
     user_managed_dependencies: false
 compute:
-  target: trainComputeCluster
+  target: azureml:trainComputeCluster
 # inputs:
 #   your_input_name:
 #     type: uri_folder
