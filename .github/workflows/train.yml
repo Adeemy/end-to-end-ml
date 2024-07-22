@@ -1,0 +1,26 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+experiment_name: training-experiment
+code:
+  local_path: ./src/training/train.py # Path to the directory containing your training script and any other necessary files
+command: >-
+  python train.py
+  --config_yaml_path ./src/config/training-config.yml
+  --logger_path ./src/config/logging.conf
+environment:
+  name: train-env
+  version: 11
+  docker:
+    image: mcr.microsoft.com/azureml/base:latest # Specify the base docker image
+  conda_file: ./src/training/train-env.yml # Path to your conda environment file
+  python:
+    user_managed_dependencies: false
+compute:
+  target: azureml:your-compute-cluster-name # Specify your Azure ML compute cluster
+# inputs:
+#   your_input_name:
+#     type: uri_folder
+#     path: azureml:your-dataset-name@latest  # Specify your input dataset
+# outputs:
+#   your_output_name:
+#     type: uri_folder
+#     path: azureml://datastores/workspaceblobstore/paths/your/output/path  # Specify your output path
