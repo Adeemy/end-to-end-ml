@@ -10,12 +10,12 @@ environment:
   name: train-env
   version: 11
   docker:
-    image: mcr.microsoft.com/azureml/base:latest # Confirm this is the correct Docker image
+    image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:20231024.v1
   conda_file: ./src/training/train-env.yml # Ensure this path is correct and the file exists
   python:
     user_managed_dependencies: false
 compute:
-  target: azureml:trainComputeCluster
+  target: trainComputeCluster
 # inputs:
 #   your_input_name:
 #     type: uri_folder
