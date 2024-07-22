@@ -1,7 +1,7 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 experiment_name: training-experiment
 code:
-  local_path: ./src/training/train.py # Path to the directory containing your training script and any other necessary files
+  local_path: ./src/training/train.py # Ensure this path is correct
 command: >-
   python train.py
   --config_yaml_path ./src/config/training-config.yml
@@ -10,12 +10,12 @@ environment:
   name: train-env
   version: 11
   docker:
-    image: mcr.microsoft.com/azureml/base:latest # Specify the base docker image
-  conda_file: ./src/training/train-env.yml # Path to your conda environment file
+    image: mcr.microsoft.com/azureml/base:latest # Confirm this is the correct Docker image
+  conda_file: ./src/training/train-env.yml # Ensure this path is correct and the file exists
   python:
     user_managed_dependencies: false
 compute:
-  target: azureml:your-compute-cluster-name # Specify your Azure ML compute cluster
+  target: azureml:trainComputeCluster
 # inputs:
 #   your_input_name:
 #     type: uri_folder
