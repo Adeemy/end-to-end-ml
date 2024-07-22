@@ -205,10 +205,5 @@ jobs:
           echo "Adding/upgrading Azure Machine Learning CLI extension..."
           az extension add --name ml --upgrade --yes --allow-preview false
 
-          echo "Logging in to Azure..."
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-
           echo "Submitting training script to Azure ML Compute..."
           az ml job create --file train.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
-        env:
-          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
