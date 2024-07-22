@@ -35,25 +35,25 @@ jobs:
       #   env:
       #     GITHUB_OUTPUT: ${{ github.output }}
 
-      - name: Check and Update AML Environment if Necessary
-        run: |
-          echo "Setting up Azure credentials..."
-          AZURE_CREDENTIALS=$(echo '${{ secrets.AZURE_CREDENTIALS }}')
-          CLIENT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.clientId')
-          CLIENT_SECRET=$(echo $AZURE_CREDENTIALS | jq -r '.clientSecret')
-          TENANT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.tenantId')
+      # - name: Check and Update AML Environment if Necessary
+      #   run: |
+      #     echo "Setting up Azure credentials..."
+      #     AZURE_CREDENTIALS=$(echo '${{ secrets.AZURE_CREDENTIALS }}')
+      #     CLIENT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.clientId')
+      #     CLIENT_SECRET=$(echo $AZURE_CREDENTIALS | jq -r '.clientSecret')
+      #     TENANT_ID=$(echo $AZURE_CREDENTIALS | jq -r '.tenantId')
 
-          echo "Upgrading Azure CLI..."
-          az upgrade --yes --allow-preview false
+      #     echo "Upgrading Azure CLI..."
+      #     az upgrade --yes --allow-preview false
 
-          echo "Adding/upgrading Azure Machine Learning CLI extension..."
-          az extension add --name ml --upgrade --yes --allow-preview false
+      #     echo "Adding/upgrading Azure Machine Learning CLI extension..."
+      #     az extension add --name ml --upgrade --yes --allow-preview false
 
-          echo "Logging in to Azure..."
-          az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
+      #     echo "Logging in to Azure..."
+      #     az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
-          echo "Creating/updating Azure Machine Learning environment from YAML file..."
-          az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
+      #     echo "Creating/updating Azure Machine Learning environment from YAML file..."
+      #     az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
 
       # - name: Check if AML environment is updated
       #   id: diff
@@ -206,7 +206,7 @@ jobs:
           az extension add --name ml --upgrade --yes --allow-preview false
 
           echo "Logging in to Azure..."
-          az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
+          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
 
           echo "Submitting training script to Azure ML Compute..."
           az ml job create --file train.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
