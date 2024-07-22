@@ -206,4 +206,4 @@ jobs:
           az extension add --name ml --upgrade --yes --allow-preview false
 
           echo "Submitting training script to Azure ML Compute..."
-          az ml job create --file train.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
+          az ml job create --file ./src/training/train.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
