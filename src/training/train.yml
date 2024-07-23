@@ -1,16 +1,14 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 experiment_name: training-experiment
-code: ./src/training
+code: ./src
 command: >-
-  python train.py
-  --config_yaml_path ./src/config/training-config.yml
-  --logger_path ./src/config/logging.conf
+  python src/training/train.py
+  --config_yaml_path src/config/training-config.yml
+  --logger_path src/config/logging.conf
 environment:
   name: train-env
   version: 11
-  conda_file: ./src/training/train-env.yml # Ensure this path is correct and the file exists
-  python:
-    user_managed_dependencies: false
+  conda_file: ./src/training/train-env.yml
 compute:
   target: azureml:trainComputeCluster
 # inputs:
