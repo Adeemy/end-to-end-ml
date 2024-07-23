@@ -10,13 +10,17 @@ import argparse
 import logging
 import logging.config
 import os
-from pathlib import PosixPath
+import sys
+from pathlib import Path, PosixPath
 
 import joblib
 import numpy as np
 import pandas as pd
 from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
+
+root_dir = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(root_dir))
 
 from src.training.utils.config import Config
 from src.training.utils.model import ModelChampionManager, ModelEvaluator
