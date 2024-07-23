@@ -1,6 +1,6 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 experiment_name: training-experiment
-code: .../  # To submit the src directory
+code: ../  # To submit the src directory
 command: >-
   python training/train.py
   --config_yaml_path config/training-config.yml
