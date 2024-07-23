@@ -31,10 +31,11 @@ root_dir = Path(__name__).resolve().parent.parent
 if str(root_dir) not in sys.path:
     sys.path.append(str(root_dir))
 
-
 # root_dir = Path(__name__).resolve().parent
 # if str(root_dir) not in sys.path:
 #     sys.path.append(str(root_dir))
+
+print("\n\n\n\nroot_dir: ", root_dir)
 
 from src.training.utils.config import Config
 from src.training.utils.data import TrainingDataPrep
