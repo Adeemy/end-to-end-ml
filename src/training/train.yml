@@ -10,7 +10,7 @@ environment:
   version: 11
   conda_file: src/training/train-env.yml
 compute:
-  target: azureml:trainComputeCluster
+  target: local #azureml:trainComputeCluster
 # inputs:
 #   your_input_name:
 #     type: uri_folder
