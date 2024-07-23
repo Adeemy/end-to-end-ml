@@ -295,16 +295,6 @@ if __name__ == "__main__":
         "Splitting Preprocessed Data into Train and Test Sets Starts ..."
     )
 
-    from pathlib import Path
-
-    file_path = Path(
-        "/workspaces/end-to-end-ml/src/feature_store/feature_repo/data/preprocessed_dataset_features.parquet"
-    )
-    if file_path.exists():
-        print("File exists and is accessible")
-    else:
-        print("File does not exist or is not accessible")
-
     main(
         config_yaml_path=args.config_yaml_path,
         feast_repo_dir=FEATURE_REPO_DIR,
