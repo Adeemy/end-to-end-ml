@@ -1,1 +1,15 @@
+notebooks/
+.devcontainer/
+.github/
+img/
+infrastructure/
 src/training/artifacts/
+tests/
+.env/
+.pre-commit-config.yaml
+.gitattributes
+.pylintrc
+LICENSE
+Makefile
+pytest.ini
+README.md
