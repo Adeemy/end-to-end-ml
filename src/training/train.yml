@@ -2,7 +2,7 @@ $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 experiment_name: training-experiment
 code: ../../  # To submit the src directory
 command: >-
-  python training/train.py
+  python src/training/train.py
   --config_yaml_path config/training-config.yml
   --logger_path config/logging.conf
 environment: azureml:train-env:11
