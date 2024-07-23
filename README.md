@@ -21,9 +21,11 @@ Some of the notable features of the project are:
 
 4. The project ensures **reproducibility** using Docker, which is a tool that creates isolated environments for running applications. The project containerizes the champion model with its dependencies, and provides a devcontainer configuration that allows the user to recreate the dev environment in VS code.
 
-5. The project uses **experiment tracking and logging** using Comet, which is a platform for managing and comparing ML experiments. The project logs model performance, hyperparameters, and artifacts to Comet, which can be accessed through a web dashboard. The user can also visualize and compare different experiments using Comet.
+5. The training job is submitted to an Azure compute cluster, ensuring **scalability** for large datasets. This allows for efficient processing and training of machine learning models, even when dealing with massive amounts of data. By leveraging the power of Azure's compute resources, the training process can be parallelized and distributed, significantly reducing the time required for model training and enabling the handling of complex ML tasks.
 
-6. This project uses a makefile to provide convenient CLI commands to improve the efficiency, reliability, and quality of development, testing, and deployment. For instance, running the command `make prep_data` will transform the raw data into features and stores them in local file to be ingested by feature store, whereas running `make setup_feast` will setup feature store and apply its feature definitions.
+6. The project uses **experiment tracking and logging** using Comet, which is a platform for managing and comparing ML experiments. The project logs model performance, hyperparameters, and artifacts to Comet, which can be accessed through a web dashboard. The user can also visualize and compare different experiments using Comet.
+
+7. This project uses a makefile to provide convenient CLI commands to improve the efficiency, reliability, and quality of development, testing, and deployment. For instance, running the command `make prep_data` will transform the raw data into features and stores them in local file to be ingested by feature store, whereas running `make setup_feast` will setup feature store and apply its feature definitions.
 
 ### Project structure
 
@@ -49,15 +51,19 @@ Below is the repo structure.
         ├── LICENSE
         ├── Makefile
         ├── README.md
-        ├── pytest.ini
-        ├── requirements.txt
         ├── __init__.py
+        ├── aml-train-env.yml
         ├── img
         │   └── feast_workflow.png
+        ├── infrastructure
+        │   ├── azure_train_resource.json
+        │   └── setup.md
         ├── notebooks
         │   ├── eda.ipynb
         │   ├── eda_requirements.txt
         │   └── utils.py
+        ├── pytest.ini
+        ├── requirements.txt
         ├── src
         │   ├── __init__.py
         │   ├── config
@@ -95,14 +101,23 @@ Below is the repo structure.
         │   │       ├── __init__.py
         │   │       └── model.py
         │   ├── training
+        │   │   ├── aml-train-env.yml
         │   │   ├── artifacts
         │   │   │   ├── champion_model.pkl
         │   │   │   ├── experiment_keys.csv
         │   │   │   ├── lightgbm.pkl
+        │   │   │   ├── logistic-regression.pkl
+        │   │   │   ├── random-forest.pkl
         │   │   │   ├── study_LGBMClassifier.csv
+        │   │   │   ├── study_LogisticRegression.csv
+        │   │   │   ├── study_RandomForestClassifier.csv
+        │   │   │   ├── study_XGBClassifier.csv
+        │   │   │   ├── voting-ensemble.pkl
+        │   │   │   └── xgboost.pkl
         │   │   ├── evaluate.py
         │   │   ├── split_data.py
         │   │   ├── train.py
+        │   │   ├── train.yml
         │   │   └── utils
         │   │       ├── __init__.py
         │   │       ├── config.py
@@ -111,23 +126,25 @@ Below is the repo structure.
         │   │       └── model.py
         │   └── utils
         │       ├── __init__.py
+        │       ├── __pycache__
         │       ├── logger.py
         │       └── path.py
-        └── tests
-        ├── __init__.py
-        ├── test_feature_store
-        │   ├── test_data_preprocessor.py
-        │   ├── test_data_splitter.py
-        │   ├── test_data_transformer.py
-        │   └── test_feature_store_config.py
-        ├── test_inference
-        │   └── test_inference_model.py
-        ├── test_training
-        │   ├── test_data_utils.py
-        │   ├── test_job.py
-        │   ├── test_training_model.py
-        │   └── test_training_config.py
-        └── test_utils.py
+        ├── tests
+        │   ├── __init__.py
+        │   ├── test_feature_store
+        │   │   ├── test_data_preprocessor.py
+        │   │   ├── test_data_splitter.py
+        │   │   ├── test_data_transformer.py
+        │   │   └── test_feature_store_config.py
+        │   ├── test_inference
+        │   │   └── test_inference_model.py
+        │   ├── test_training
+        │   │   ├── test_data_utils.py
+        │   │   ├── test_job.py
+        │   │   ├── test_training_config.py
+        │   │   └── test_training_model.py
+        │   └── test_utils.py
+        └── train-conda.yml
 
 ### Environment setup & usage
 
