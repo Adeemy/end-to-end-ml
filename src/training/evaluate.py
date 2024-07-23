@@ -19,13 +19,10 @@ import pandas as pd
 from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
 
-root_dir = Path(__name__).resolve().parent.parent.parent
-if str(root_dir) not in sys.path:
-    sys.path.append(str(root_dir))
-
-root_dir = Path(__name__).resolve().parent.parent
-if str(root_dir) not in sys.path:
-    sys.path.append(str(root_dir))
+# To import modules from the parent directory in Azure compute cluster
+# root_dir = Path(__name__).resolve().parent.parent
+# if str(root_dir) not in sys.path:
+#     sys.path.append(str(root_dir))
 
 
 root_dir = Path(__name__).resolve().parent
