@@ -1,5 +1,9 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 experiment_name: training-experiment
+description: "Training job for the model"  # Add your description here
+tags:  # Add your tags here
+  Task_Type: "Classification"
+  Classes_No: "Two"
 code: ../../
 command: >-
   sh -c "make setup_feast &&

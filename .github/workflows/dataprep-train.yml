@@ -28,8 +28,16 @@ jobs:
       - name: Deploy ARM Template
         id: deploy-arm
         run: |
-          az deployment group create --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --template-file ./infrastructure/azure_train_resource.json --name TrainDeployment
-          KEY_VAULT_NAME=$(az deployment group show --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --name TrainDeployment --query 'properties.outputs.keyVaultName.value' -o tsv)
+          az deployment group create \
+          --resource-group ${{ vars.RESOURCE_GROUP_NAME }} \
+          --template-file ./infrastructure/azure_train_resource.json \
+          --name TrainDeployment
+
+          KEY_VAULT_NAME=$(az deployment group show \
+          --resource-group ${{ vars.RESOURCE_GROUP_NAME }} \
+          --name TrainDeployment \
+          --query 'properties.outputs.keyVaultName.value' -o tsv)
+
           echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
           echo "key_vault_name=$KEY_VAULT_NAME" >> $GITHUB_ENV
         env:
@@ -53,7 +61,9 @@ jobs:
           az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
           echo "Creating/updating Azure Machine Learning environment from YAML file..."
-          az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
+          az ml environment create --file aml-train-env.yml \
+          --resource-group ${{ vars.RESOURCE_GROUP_NAME }} \
+          --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
 
       - name: Create or update Azure ML Environment
         run: |
@@ -73,7 +83,9 @@ jobs:
           az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
           echo "Creating/updating Azure Machine Learning environment from YAML file..."
-          az ml environment create --file aml-train-env.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
+          az ml environment create --file aml-train-env.yml \
+          --resource-group ${{ vars.RESOURCE_GROUP_NAME }} \
+          --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
 
   # data-prep:
   #   runs-on: ubuntu-latest
@@ -173,6 +185,4 @@ jobs:
           az ml job create --file ./src/training/train.yml \
            --resource-group ${{ vars.RESOURCE_GROUP_NAME }} \
            --workspace-name ${{ vars.AML_WORKSPACE_NAME }} \
-           --set environment_variables.COMET_API_KEY=${{ secrets.COMET_API_KEY }} \
-           --description "Training job for the model" \
-           -- tags Type=Classification ClassesNo=Two
+           --set environment_variables.COMET_API_KEY=${{ secrets.COMET_API_KEY }}
