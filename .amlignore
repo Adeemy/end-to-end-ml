@@ -6,6 +6,7 @@ infrastructure/
 notebooks/
 src/training/artifacts/
 tests/
+.gitignore
 .env
 .env_template
 .pre-commit-config.yaml
