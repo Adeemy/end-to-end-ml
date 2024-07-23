@@ -10,5 +10,5 @@ command: >-
          make split_data &&
          make train &&
          make evaluate"
-environment: azureml:train-env:latest
+environment: azureml:train-env
 compute: azureml:trainComputeCluster
