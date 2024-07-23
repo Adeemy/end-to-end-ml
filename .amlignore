@@ -1,8 +1,9 @@
-notebooks/
+.git/
 .devcontainer/
 .github/
 img/
 infrastructure/
+notebooks/
 src/training/artifacts/
 tests/
 .env/
@@ -10,6 +11,5 @@ tests/
 .gitattributes
 .pylintrc
 LICENSE
-Makefile
 pytest.ini
 README.md
