@@ -26,7 +26,6 @@ from sklearn.preprocessing import (
 )
 from xgboost import XGBClassifier
 
-# Assuming 'train.py' is in the 'src/training' directory and the root is two levels up
 root_dir = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(root_dir))
 

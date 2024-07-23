@@ -198,6 +198,8 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Submit train.py to Azure Compute Cluster
+        env:
+          COMET_API_KEY: ${{ secrets.COMET_API_KEY }}
         run: |
           echo "Upgrading Azure CLI..."
           az upgrade --yes --allow-preview false
@@ -206,4 +208,4 @@ jobs:
           az extension add --name ml --upgrade --yes --allow-preview false
 
           echo "Submitting training script to Azure ML Compute..."
-          az ml job create --file ./src/training/train.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
+          az ml job create --file ./src/training/train.yml --resource-group ${{ vars.RESOURCE_GROUP_NAME }} --workspace-name ${{ vars.AML_WORKSPACE_NAME }} --set environment_variables.COMET_API_KEY=$COMET_API_KEY
