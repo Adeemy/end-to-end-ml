@@ -52,7 +52,6 @@ Below is the repo structure.
         ├── Makefile
         ├── README.md
         ├── __init__.py
-        ├── aml-train-env.yml
         ├── img
         │   └── feast_workflow.png
         ├── infrastructure
@@ -101,7 +100,6 @@ Below is the repo structure.
         │   │       ├── __init__.py
         │   │       └── model.py
         │   ├── training
-        │   │   ├── aml-train-env.yml
         │   │   ├── artifacts
         │   │   │   ├── champion_model.pkl
         │   │   │   ├── experiment_keys.csv

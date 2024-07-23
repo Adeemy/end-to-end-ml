@@ -83,7 +83,7 @@ jobs:
           az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANT_ID
 
           echo "Creating/updating Azure Machine Learning environment from YAML file..."
-          az ml environment create --file aml-train-env.yml \
+          az ml environment create --file ./src/training/aml-train-env.yml \
           --resource-group ${{ vars.RESOURCE_GROUP_NAME }} \
           --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
 
