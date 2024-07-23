@@ -2,8 +2,8 @@ $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 experiment_name: training-experiment
 code: ../../
 command: >-
-  python src/training/train.py
-  --config_yaml_path src/config/training-config.yml
-  --logger_path src/config/logging.conf
+  sh -c "python src/training/split_data.py --config_yaml_path src/config/training-config.yml --logger_path src/config/logging.conf &&
+         python src/training/train.py --config_yaml_path src/config/training-config.yml --logger_path src/config/logging.conf &&
+         python src/training/evaluate.py --config_yaml_path src/config/training-config.yml --logger_path src/config/logging.conf"
 environment: azureml:train-env:11
 compute: azureml:trainComputeCluster
