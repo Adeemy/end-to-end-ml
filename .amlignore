@@ -6,10 +6,13 @@ infrastructure/
 notebooks/
 src/training/artifacts/
 tests/
-.env/
+.env
+.env_template
 .pre-commit-config.yaml
 .gitattributes
 .pylintrc
+requirements.txt
+train-conda.yml
 LICENSE
 pytest.ini
 README.md
