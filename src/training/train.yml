@@ -3,8 +3,8 @@ experiment_name: training-experiment
 code: ../../
 command: >-
   sh -c "make setup_feast &&
-         python src/training/split_data.py --config_yaml_path src/config/training-config.yml --logger_path src/config/logging.conf &&
-         python src/training/train.py --config_yaml_path src/config/training-config.yml --logger_path src/config/logging.conf &&
-         python src/training/evaluate.py --config_yaml_path src/config/training-config.yml --logger_path src/config/logging.conf"
+         make split_data &&
+         make train &&
+         make evaluate"
 environment: azureml:train-env:11
 compute: azureml:trainComputeCluster
