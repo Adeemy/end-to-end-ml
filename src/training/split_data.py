@@ -6,13 +6,19 @@ class labels, and creates data splits for model training.
 import argparse
 import logging
 import logging.config
+import sys
 from datetime import datetime
-from pathlib import PosixPath
+from pathlib import Path, PosixPath
 from typing import Tuple
 
 import pandas as pd
 from feast import FeatureStore
 from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
+
+# To import modules from the parent directory in Azure compute cluster
+root_dir = Path(__name__).resolve().parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.append(str(root_dir))
 
 from src.feature_store.utils.prep import DataSplitter
 from src.training.utils.config import Config

@@ -7,8 +7,9 @@ import argparse
 import logging
 import logging.config
 import os
+import sys
 from datetime import datetime
-from pathlib import PosixPath
+from pathlib import Path, PosixPath
 from typing import List, Tuple
 
 import comet_ml
@@ -24,6 +25,11 @@ from sklearn.preprocessing import (
     StandardScaler,
 )
 from xgboost import XGBClassifier
+
+# To import modules from the parent directory in Azure compute cluster
+root_dir = Path(__name__).resolve().parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.append(str(root_dir))
 
 from src.training.utils.config import Config
 from src.training.utils.data import TrainingDataPrep
