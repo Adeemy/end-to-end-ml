@@ -7,9 +7,8 @@ import argparse
 import logging
 import logging.config
 import os
-import sys
 from datetime import datetime
-from pathlib import Path, PosixPath
+from pathlib import PosixPath
 from typing import List, Tuple
 
 import comet_ml
@@ -25,9 +24,6 @@ from sklearn.preprocessing import (
     StandardScaler,
 )
 from xgboost import XGBClassifier
-
-root_dir = Path(__file__).resolve().parent.parent.parent
-sys.path.append(str(root_dir))
 
 from src.training.utils.config import Config
 from src.training.utils.data import TrainingDataPrep

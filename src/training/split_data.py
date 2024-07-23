@@ -6,17 +6,13 @@ class labels, and creates data splits for model training.
 import argparse
 import logging
 import logging.config
-import sys
 from datetime import datetime
-from pathlib import Path, PosixPath
+from pathlib import PosixPath
 from typing import Tuple
 
 import pandas as pd
 from feast import FeatureStore
 from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
-
-root_dir = Path(__file__).resolve().parent.parent.parent
-sys.path.append(str(root_dir))
 
 from src.feature_store.utils.prep import DataSplitter
 from src.training.utils.config import Config
@@ -298,6 +294,16 @@ if __name__ == "__main__":
     console_logger.info(
         "Splitting Preprocessed Data into Train and Test Sets Starts ..."
     )
+
+    from pathlib import Path
+
+    file_path = Path(
+        "/workspaces/end-to-end-ml/src/feature_store/feature_repo/data/preprocessed_dataset_features.parquet"
+    )
+    if file_path.exists():
+        print("File exists and is accessible")
+    else:
+        print("File does not exist or is not accessible")
 
     main(
         config_yaml_path=args.config_yaml_path,
