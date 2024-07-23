@@ -8,7 +8,7 @@ command: >-
 environment:
   name: train-env
   version: 11
-  conda_file: ./src/training/train-env.yml
+  conda_file: src/training/train-env.yml
 compute:
   target: azureml:trainComputeCluster
 # inputs:
