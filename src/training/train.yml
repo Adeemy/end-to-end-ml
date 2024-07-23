@@ -5,12 +5,9 @@ command: >-
   python training/train.py
   --config_yaml_path config/training-config.yml
   --logger_path config/logging.conf
-environment:
-  name: train-env
-  version: 11
-  conda_file: training/train-conda.yml
+environment: azureml:train-env:11
 compute:
-  target: local #azureml:trainComputeCluster
+  target: azureml:trainComputeCluster
 # inputs:
 #   your_input_name:
 #     type: uri_folder
