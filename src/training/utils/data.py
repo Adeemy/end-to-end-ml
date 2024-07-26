@@ -471,8 +471,8 @@ class TrainingDataPrep:
     def encode_class_labels(
         self,
         pos_class_label: str,
-    ) -> Union[pd.DataFrame, np.ndarray, LabelEncoder, int]:
-        """Encode class labels into integers and returns encoded class labels
+    ) -> Union[np.ndarray, np.ndarray, LabelEncoder, int]:
+        """Encodes class labels into integers and returns encoded class labels
         of training, validation, and testing sets in addition to encoded positive
         class label and fitted encoder.
 
@@ -483,20 +483,17 @@ class TrainingDataPrep:
             tuple: tuple containing:
             encoded_train_class (np.ndarray): encoded training set class labels.
             encoded_valid_class (np.ndarray): encoded validation set class labels.
-            encoded_test_class (np.ndarray): encoded testing set class labels.
             enc_pos_class_label (int): encoded positive class label.
             fitted_class_encoder (LabelEncoder): fitted class encoder.
         """
 
         train_class = self.train_set[[self.class_col_name]]
         valid_class = self.valid_set[[self.class_col_name]]
-        test_class = self.test_set[[self.class_col_name]]
 
         # Encode class labels
         fitted_class_encoder = LabelEncoder()
         encoded_train_class = fitted_class_encoder.fit_transform(ravel(train_class))
         encoded_valid_class = fitted_class_encoder.transform(ravel(valid_class))
-        encoded_test_class = fitted_class_encoder.transform(ravel(test_class))
 
         # Get the encoded value of the positive class label
         enc_pos_class_label = fitted_class_encoder.transform([pos_class_label])[0]
@@ -504,7 +501,6 @@ class TrainingDataPrep:
         return (
             encoded_train_class,
             encoded_valid_class,
-            encoded_test_class,
             enc_pos_class_label,
             fitted_class_encoder,
         )

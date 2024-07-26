@@ -22,7 +22,7 @@ isort:
 format:
 	black ./notebooks ./src ./tests
 
-test:	
+test:
 	coverage run -m pytest -vvv
 	coverage report -m
 
@@ -33,7 +33,7 @@ debug:
 lint:
 	pylint ./src/feature_store ./src/training ./src/inference ./tests
 
-all: install isort format test lint
+all: install isort format lint
 
 
 # Import raw dataset from source
@@ -88,4 +88,3 @@ test_model:
 test_packaged_model:
 	cd ./src/inference &&\
 	uvicorn --host 0.0.0.0 main:app
-

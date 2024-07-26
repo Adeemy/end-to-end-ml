@@ -1,19 +1,29 @@
 """
 Includes functions to submit training job, where the model is trained and evaluated
 using ModelOptimizer and ModelEvaluator classes. It also includes a class to create
-a voting ensemble classifier using the base models and evaluate the model using 
+a voting ensemble classifier using the base models and evaluate the model using
 ModelEvaluator.
 """
 
+import os
 import re
+import subprocess
 from copy import deepcopy
+from datetime import datetime
 from typing import Callable, Literal, Optional, Union
 
 import joblib
+import mlflow
 import numpy as np
 import optuna
 import pandas as pd
-from comet_ml import Experiment
+import sklearn
+from azureml.core import Environment, Workspace
+from azureml.core.compute import AmlCompute, ComputeTarget
+from azureml.core.compute_target import ComputeTargetException
+from azureml.data.tabular_dataset import TabularDataset
+from mlflow.models import infer_signature
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import VotingClassifier
 from sklearn.feature_selection import VarianceThreshold
@@ -23,35 +33,46 @@ from sklearn.preprocessing import LabelEncoder
 from src.training.utils.model import ModelEvaluator, ModelOptimizer
 from src.utils.logger import get_console_logger
 
-##########################################################
-# Get the logger objects by name
+###########################################################
+# Get console logger
 logger = get_console_logger("job_logger")
 
 
 class ModelTrainer:
     """Trains an sklearn classifier using ModelOptimizer and ModelEvaluator classes
-    and evaluates the model and logs its metrics to Comet experiment.
+    and evaluates the model and logs its metrics to experiment.
 
     Attributes:
-        train_features (pd.DataFrame): training features,
-        train_class (np.ndarray): training class labels,
-        valid_features (pd.DataFrame): validation features,
-        valid_class (np.ndarray): validation class labels,
-        train_features_preprocessed (pd.DataFrame): transformed training set for ModelOptimizer class,
-        valid_features_preprocessed (pd.DataFrame): transformed validation set for ModelOptimizer class,
-        n_features (int): count of all features after encoding and feature selection,
-        class_encoder (LabelEncoder): encoder object that maps the class labels to integers,
-        preprocessor_step (ColumnTransformer): preprocessing pipeline step that
-            transforms features,
-        selector_step (VarianceThreshold): feature selection pipeline step that removes
-            low variance features,
-        artifacts_path (str): path to save training artificats, e.g., .pkl and .png files,
-        num_feature_names (list, optional): list of original numerical feature names,
-        cat_feature_names (list, optional): list of original categorical feature names
-            (before encoding and feature selection). Default to None,
-        fbeta_score_beta (float): beta value (weight of recall) in fbeta_score(),
+        train_features (pd.DataFrame): features of training set before encoding and
+            feature selection for ModelEvaluator class.
+        train_class (np.ndarray): The target labels for the training set.
+        valid_features (pd.DataFrame): features of validation set before encoding and
+            feature selection for ModelEvaluator class.
+        valid_class (np.ndarray): The target labels for the validation set.
+        train_features_preprocessed (pd.DataFrame): features of training set after encoding and
+            feature selection for ModelOptimizer class.
+        valid_features_preprocessed (pd.DataFrame): features of validation set after encoding and
+            feature selection for ModelOptimizer class.
+        n_features (int): number of features in the training set.
+        class_encoder (LabelEncoder): encoder object that maps the class labels to integers.
+        preprocessor_step (ColumnTransformer): preprocessor step in the pipeline.
+        selector_step (VarianceThreshold): selector step in the pipeline.
+        registered_train_set (TabularDataset): registered training set in the workspace.
+        registered_test_set (TabularDataset): registered test set in the workspace.
+        artifacts_path (str): path to save training artificats, e.g., .pkl and .png files.
+        num_feature_names (Optional[list]): list of numerical feature names.
+        cat_feature_names (Optional[list]): list of categorical feature names.
+        fbeta_score_beta (float): beta value (weight of recall) in fbeta_score().
         encoded_pos_class_label (int): encoded label of positive class using LabelEncoder().
-                Default to 1.
+        conda_env (str): path to conda environment file.
+        max_search_iters (int): maximum number of iterations for the hyperparameter optimization
+            algorithm.
+        optimize_in_parallel (bool): should optimization be run in parallel.
+        n_parallel_jobs (int): number of parallel jobs to run during the hyperparameters optimization.
+        model_opt_timeout_secs (int): timeout in seconds for each trial of the hyperparameters
+            optimization.
+        conf_score_threshold_val (float): decision threshold value.
+        cv_folds (int): number of cross-validation folds for calibration.
     """
 
     def __init__(
@@ -66,11 +87,20 @@ class ModelTrainer:
         class_encoder: LabelEncoder,
         preprocessor_step: ColumnTransformer,
         selector_step: VarianceThreshold,
-        artifacts_path: str,
+        registered_train_set: TabularDataset,
+        registered_test_set: TabularDataset,
+        artifacts_path: str = "tmp",
         num_feature_names: Optional[list] = None,
         cat_feature_names: Optional[list] = None,
         fbeta_score_beta: float = 1.0,
         encoded_pos_class_label: int = 1,
+        conda_env: str = "train_env.yml",
+        max_search_iters: int = 50,
+        optimize_in_parallel: bool = False,
+        n_parallel_jobs: int = 1,
+        model_opt_timeout_secs: int = 600,
+        conf_score_threshold_val: float = 0.5,
+        cv_folds: int = 5,
     ):
         self.train_features = train_features
         self.train_class = train_class
@@ -82,43 +112,23 @@ class ModelTrainer:
         self.class_encoder = class_encoder
         self.preprocessor_step = preprocessor_step
         self.selector_step = selector_step
+        self.registered_train_set = registered_train_set
+        self.registered_test_set = registered_test_set
         self.artifacts_path = artifacts_path
         self.num_feature_names = num_feature_names
         self.cat_feature_names = cat_feature_names
         self.fbeta_score_beta = fbeta_score_beta
         self.encoded_pos_class_label = encoded_pos_class_label
-
-    @staticmethod
-    def _create_comet_experiment(
-        comet_api_key: str, comet_project_name: str, comet_exp_name: str
-    ) -> Experiment:
-        """Creates a Comet experiment object.
-
-        Args:
-            comet_api_key (str): Comet API key,
-            comet_project_name (str): Comet project name,
-            comet_exp_name (str)L Comet experiment name,
-
-        Returns:
-            Experiment: Comet experiment object.
-
-        Raises:
-            ValueError: if Comet experiment creation fails.
-        """
-
-        try:
-            comet_exp = Experiment(
-                api_key=comet_api_key, project_name=comet_project_name
-            )
-            comet_exp.log_code(folder=".")
-            comet_exp.set_name(comet_exp_name)
-        except ValueError as e:
-            raise ValueError(f"Comet experiment creation error --> {e}") from e
-        return comet_exp
+        self.conda_env = conda_env
+        self.max_search_iters = max_search_iters
+        self.optimize_in_parallel = optimize_in_parallel
+        self.n_parallel_jobs = n_parallel_jobs
+        self.model_opt_timeout_secs = model_opt_timeout_secs
+        self.conf_score_threshold_val = conf_score_threshold_val
+        self.cv_folds = cv_folds
 
     def _optimize_model(
         self,
-        comet_exp: Experiment,
         model: Callable,
         search_space_params: dict,
         max_search_iters: int = 100,
@@ -130,7 +140,6 @@ class ModelTrainer:
         """Optimizes the model using ModelOptimizer class.
 
         Args:
-            comet_exp (Experiment): Comet experiment object,
             model (Callable): model object that implements the fit and predict methods,
             search_space_params (dict): hyperparameter search space for the model,
             max_search_iters (int, optional): maximum number of iterations for the hyperparameter
@@ -150,7 +159,6 @@ class ModelTrainer:
         """
 
         optimizer = ModelOptimizer(
-            comet_exp=comet_exp,
             train_features_preprocessed=self.train_features_preprocessed,
             train_class=self.train_class,
             valid_features_preprocessed=self.valid_features_preprocessed,
@@ -179,19 +187,14 @@ class ModelTrainer:
 
     def _log_study_trials(
         self,
-        comet_exp: Experiment,
         study: optuna.study.Study,
         classifier_name: str,
     ) -> None:
-        """Logs Optuna study results to Comet experiment.
+        """Logs Optuna study results to experiment.
 
         Args:
-            comet_exp (Experiment): Comet experiment object,
             study (optuna.study.Study): Optuna study object,
             classifier_name (str): name of the classifier.
-
-        Returns:
-            None
         """
 
         study_results = study.trials_dataframe()
@@ -200,11 +203,10 @@ class ModelTrainer:
         )
         study_results.rename(columns=lambda x: re.sub("params_", "", x), inplace=True)
         study_results.to_csv(
-            f"{self.artifacts_path}/study_{classifier_name}.csv", index=False
+            f"/{self.artifacts_path}/study_{classifier_name}.csv", index=False
         )
-        comet_exp.log_asset(
-            file_data=f"{self.artifacts_path}/study_{classifier_name}.csv",
-            file_name=f"study_{classifier_name}",
+        mlflow.log_artifact(
+            f"/{self.artifacts_path}/study_{classifier_name}.csv",
         )
 
     def _fit_best_model(
@@ -235,7 +237,6 @@ class ModelTrainer:
 
     def _evaluate_model(
         self,
-        comet_exp: Experiment,
         fitted_pipeline: Pipeline,
         is_voting_ensemble: bool = False,
         ece_nbins: int = 5,
@@ -243,7 +244,6 @@ class ModelTrainer:
         """Evaluates the model using ModelEvaluator class.
 
         Args:
-            comet_exp (Experiment): Comet experiment object,
             fitted_pipeline (Pipeline): fitted pipeline object,
             is_voting_ensemble (bool, optional): is it a voting ensemble classifier? Default to False,
             ece_nbins (int, optional): number of bins for expected calibration error. Default to 5.
@@ -256,12 +256,12 @@ class ModelTrainer:
 
         # Evaluate model performance on training and validation sets
         evaluator = ModelEvaluator(
-            comet_exp=comet_exp,
             pipeline=fitted_pipeline,
             train_features=self.train_features,
             train_class=self.train_class,
             valid_features=self.valid_features,
             valid_class=self.valid_class,
+            encoded_pos_class_label=self.encoded_pos_class_label,
             fbeta_score_beta=self.fbeta_score_beta,
             is_voting_ensemble=is_voting_ensemble,
         )
@@ -270,7 +270,7 @@ class ModelTrainer:
             class_encoder=self.class_encoder
         )
 
-        # Plot feature importance and log it to Comet experiment
+        # Plot feature importance and log it to experiment
         evaluator.extract_feature_importance(
             pipeline=fitted_pipeline,
             num_feature_names=self.num_feature_names,
@@ -302,22 +302,17 @@ class ModelTrainer:
 
     def _log_model_metrics(
         self,
-        comet_exp: Experiment,
         train_metric_values: dict,
         valid_metric_values: dict,
         model_ece: float,
     ) -> None:
-        """Logs model metrics to Comet experiment.
+        """Logs model metrics to experiment.
 
         Args:
-            comet_exp (Experiment): Comet experiment object,
             evaluator (ModelEvaluator): ModelEvaluator object,
             train_metric_values (dict): training scores,
             valid_metric_values (dict): validation scores,
             model_ece (float): expected calibration error.
-
-        Returns:
-            None
         """
 
         metrics_to_log = {}
@@ -325,66 +320,180 @@ class ModelTrainer:
         metrics_to_log.update(valid_metric_values)
         metrics_to_log.update({"model_ece": model_ece})
 
-        comet_exp.log_metrics(metrics_to_log)
+        mlflow.log_metrics(metrics_to_log)
+
+    @staticmethod
+    def create_model_tags(
+        model_name: str,
+        pipeline: Pipeline,
+        decoded_class_labels: list,
+        registered_train_set: TabularDataset,
+        registered_test_set: TabularDataset,
+        train_scores: pd.DataFrame,
+        valid_scores: pd.DataFrame,
+        conf_score_threshold_val: float,
+        parent_run_id: str,
+        child_run_id: str,
+    ) -> dict:
+        """Creates model tags as dictionary to be added to model info when
+        it's registered. Note that 'Description' is included in tags because
+        mlflow.register_model (mlflow version: 2.8.1) doesn't have an argument
+        to add description.
+
+        Args:
+            model_name (str): name of the classifier,
+            pipeline (Pipeline): fitted pipeline object,
+            decoded_class_labels (list): list of class labels,
+            registered_train_set (TabularDataset): registered training set in the workspace,
+            registered_test_set (TabularDataset): registered test set in the workspace,
+            train_scores (pd.DataFrame): training scores,
+            valid_scores (pd.DataFrame): validation scores,
+            conf_score_threshold_val (float): decision threshold value,
+            parent_run_id (str): parent run ID for the experiment,
+            child_run_id (str): child run ID for the experiment,
+
+        Returns:
+            model_tags (dict): model tags.
+        """
+
+        # Create model tags
+        model_tags = {
+            "Name": model_name,
+            "Registration Timestamp": datetime.now().strftime("%Y-%d-%m %H:%M:%S"),
+            "scikit-learn Version": sklearn.__version__,
+            "Classes": decoded_class_labels,
+            "Training Set Name": registered_train_set.name,
+            "Training Set Version": registered_train_set.version,
+            "Testing Set Name": registered_test_set.name,
+            "Testing Set Version": registered_test_set.version,
+            "Training Scores": train_scores,
+            "Testing Scores": valid_scores,
+            "Decision Threshold Value": conf_score_threshold_val,
+            "Parent Exp. Run ID": parent_run_id,
+            "Child Exp. Run ID": child_run_id,
+        }
+
+        # Check if classifier name is VotingClassifier to split Model Parameters
+        # Note: model registration could fail for Voting Ensemble becuase Model
+        # Parameters is too long. So it has to be split into each base classifier.
+        model_tags["Model Parameters"] = str(
+            {
+                k: v
+                for k, v in pipeline.get_params().items()
+                if k.startswith("classifier__")
+            }
+        )
+
+        return model_tags
 
     def _register_model(
         self,
-        comet_exp: Experiment,
         pipeline: Pipeline,
+        classifier_name: str,
         registered_model_name: str,
+        model_uri: str,
+        tags: dict,
     ) -> None:
-        """Saves and registers the model to Comet experiment.
+        """Registers the model in the experiment using MLflow.
 
         Args:
-            comet_exp (Experiment): Comet experiment object,
             pipeline (Pipeline): fitted pipeline object,
-            registered_model_name (str): name of the registered model.
+            classifier_name (str): name of the classifier,
+            registered_model_name (str): name used for the registered model,
+            model_uri (str): URI of the model,
+            tags (dict): additional tags for the model,
         """
 
-        joblib.dump(pipeline, f"{self.artifacts_path}/{registered_model_name}.pkl")
-        comet_exp.log_model(
-            name=registered_model_name,
-            file_or_folder=f"{self.artifacts_path}/{registered_model_name}.pkl",
-            overwrite=False,
+        joblib.dump(pipeline, f"/{self.artifacts_path}/{classifier_name}.pkl")
+        signature = infer_signature(
+            self.train_features, pipeline.predict(self.train_features.iloc[0:10, :])
         )
-        comet_exp.register_model(model_name=registered_model_name)
+        mlflow.sklearn.log_model(
+            pipeline,
+            artifact_path="model",  # Model folder in the experiment UI
+            signature=signature,
+            input_example=self.train_features.iloc[0:10, :],
+            conda_env=self.conda_env,
+        )
+        mlflow.register_model(
+            model_uri=model_uri,
+            name=registered_model_name,
+            tags=tags,
+        )
+
+    @staticmethod
+    def calibrate_pipeline(
+        fitted_pipeline: Pipeline,
+        X_valid: np.ndarray,
+        y_valid: np.ndarray,
+        cv_folds: int = 5,
+    ) -> Pipeline:
+        """Takes a fitted pipeline and returns a calibrated pipeline.
+
+        Args:
+            fitted_pipeline (Pipeline): Fitted pipeline on the training set.
+            X_valid (np.ndarray): Validation features.
+            y_valid (np.ndarray): Validation class labels.
+            cv_folds (int): Number of cross-validation folds for calibration.
+
+        Returns:
+            calib_pipeline (Pipeline): Calibrated pipeline.
+
+        Raises:
+            ValueError: if fitted_pipeline is not fitted.
+        """
+
+        # Extract preprocessor, selector, and classifier from the fitted pipeline
+        preprocessor = fitted_pipeline.named_steps.get("preprocessor")
+        selector = fitted_pipeline.named_steps.get("selector")
+        model = fitted_pipeline.named_steps.get("classifier")
+
+        if not hasattr(model, "classes_"):
+            raise ValueError("The classifier in the fitted pipeline is not fitted.")
+
+        # Calibrate the newly fitted model using the validation set
+        calibrator = CalibratedClassifierCV(
+            base_estimator=model,
+            method=("isotonic" if len(y_valid) > 1000 else "sigmoid"),
+            cv=cv_folds,  # Indicate that the model is already fitted
+        )
+
+        # Fit the calibrator on the validation set
+        calibrator.fit(X_valid, y_valid)
+
+        # Create a new pipeline with the calibrated classifier
+        calib_pipeline = Pipeline(
+            steps=[
+                ("preprocessor", preprocessor),
+                ("selector", selector),
+                ("classifier", calibrator),
+            ]
+        )
+
+        return calib_pipeline
 
     def submit_train_exp(
         self,
-        comet_api_key: str,
-        comet_project_name: str,
-        comet_exp_name: str,
+        parent_run_id: str,
+        child_run_id: str,
         model: Callable,
         search_space_params: dict,
-        max_search_iters: int = 100,
-        optimize_in_parallel: bool = False,
-        n_parallel_jobs: int = 4,
-        model_opt_timeout_secs: int = 600,
         registered_model_name: Optional[str] = None,
         is_voting_ensemble: bool = False,
         ece_nbins: int = 5,
-    ) -> Union[Pipeline, Experiment]:
-        """Submits a training experiment to Comet project. This is a wrapper function
+    ) -> Pipeline:
+        """Submits a training experiment to workspace. This is a wrapper function
         that uses ModelOptimizer and ModelEvaluator classes to tune and evaluate the model,
-        and logs the model and its training metrics to Comet experiment. While the class instance
-        is used to store the training data and model transformation pipeline, this function can be
-        used to submit the training job for different models that use the same training and validation
-        sets and data tranformation pipeline.
+        and logs the model and its training metrics to experiment. While the class instance
+        is used to store the training data and model transformation pipeline, this function
+        can be used to submit the training job for different models that use the same training
+        and validation sets and data tranformation pipeline.
 
         Args:
-            comet_api_key (str): Comet API key,
-            comet_project_name (str): Comet project name,
-            comet_exp_name (str): Comet experiment name,
+            parent_run_id (str): parent run ID for the experiment,
+            child_run_id (str): child run ID for the experiment,
             model (Callable): model object that implements the fit and predict methods.
             search_space_params (dict): hyperparameter search space for the model.
-            max_search_iters (int, optional): maximum number of iterations for the hyperparameter
-                optimization algorithm. Default to 100.
-            optimize_in_parallel (bool, optional): should optimization be run in parallel. Default
-                to False.
-            n_parallel_jobs (int, optional): number of parallel jobs to run during the
-                hyperparameters optimization. Default to 4.
-            model_opt_timeout_secs (int, optional): timeout in seconds for each trial of the
-                hyperparameters optimization. Default to 600.
             registered_model_name (str, optional): name used for the registered model.
             is_voting_ensemble (bool, optional): is it a voting ensemble classifier? This is needed
                 for extracting model name in ModelOptimizer class.
@@ -393,7 +502,6 @@ class ModelTrainer:
         Returns:
             Pipeline: calibrated pipeline object that contains the model transformation pipeline
                 and calibrated classifier.
-            comet_exp (Experiment): Comet experiment object to be used to access returned model metrics.
 
         Raises:
             Exception: if model training fails.
@@ -404,29 +512,20 @@ class ModelTrainer:
         if registered_model_name is None:
             registered_model_name = classifier_name
 
-        # Create Comet experiment
-        comet_exp = self._create_comet_experiment(
-            comet_api_key=comet_api_key,
-            comet_project_name=comet_project_name,
-            comet_exp_name=comet_exp_name,
-        )
-
         try:
             # Tune model
             study, optimizer = self._optimize_model(
-                comet_exp=comet_exp,
                 model=model,
                 search_space_params=search_space_params,
-                max_search_iters=max_search_iters,
-                optimize_in_parallel=optimize_in_parallel,
-                n_parallel_jobs=n_parallel_jobs,
-                model_opt_timeout_secs=model_opt_timeout_secs,
+                max_search_iters=self.max_search_iters,
+                optimize_in_parallel=self.optimize_in_parallel,
+                n_parallel_jobs=self.n_parallel_jobs,
+                model_opt_timeout_secs=self.model_opt_timeout_secs,
                 is_voting_ensemble=is_voting_ensemble,
             )
 
             # Log study trials
             self._log_study_trials(
-                comet_exp=comet_exp,
                 study=study,
                 classifier_name=classifier_name,
             )
@@ -444,11 +543,10 @@ class ModelTrainer:
                 for k, v in fitted_pipeline.get_params().items()
                 if k.startswith("classifier__")
             }
-            comet_exp.log_parameters(model_params)
+            mlflow.log_params(model_params)
 
             # Evaluate best model
             train_metric_values, valid_metric_values, model_ece = self._evaluate_model(
-                comet_exp=comet_exp,
                 fitted_pipeline=fitted_pipeline,
                 is_voting_ensemble=is_voting_ensemble,
                 ece_nbins=ece_nbins,
@@ -456,50 +554,74 @@ class ModelTrainer:
 
             # Log model metrics
             self._log_model_metrics(
-                comet_exp=comet_exp,
                 train_metric_values=train_metric_values,
                 valid_metric_values=valid_metric_values,
                 model_ece=model_ece,
             )
 
-            # Save and register model
-            self._register_model(
-                comet_exp=comet_exp,
-                pipeline=fitted_pipeline,
-                registered_model_name=registered_model_name,
+            # Calibrate model
+            pipeline = self.calibrate_pipeline(
+                X_valid=self.valid_features_preprocessed,
+                y_valid=self.valid_class,
+                fitted_pipeline=fitted_pipeline,
+                cv_folds=self.cv_folds,
             )
 
+            # Save and register model
+            model_tags = self.create_model_tags(
+                model_name=classifier_name,
+                pipeline=pipeline,
+                decoded_class_labels=self.class_encoder.inverse_transform(
+                    range(len(self.class_encoder.classes_))
+                ),
+                registered_train_set=self.registered_train_set,
+                registered_test_set=self.registered_test_set,
+                train_scores=train_metric_values,
+                valid_scores=valid_metric_values,
+                conf_score_threshold_val=self.conf_score_threshold_val,
+                parent_run_id=parent_run_id,
+                child_run_id=child_run_id,
+            )
+            self._register_model(
+                pipeline=pipeline,
+                classifier_name=classifier_name,
+                registered_model_name=registered_model_name,
+                model_uri=f"runs:/{child_run_id}/model",
+                tags=model_tags,
+            )
+
+            logger.info(f"{classifier_name} model registered successfully!")
+
         except Exception as e:  # pylint: disable=W0718
-            logger.info("\n\nModel training error --> %s\n\n", e)
-            fitted_pipeline = None
+            logger.info(f"\n\nModel training error --> {e}\n\n")
+            pipeline = None
 
-        comet_exp.end()
-
-        return fitted_pipeline, comet_exp
+        return pipeline
 
 
 class VotingEnsembleCreator(ModelTrainer):
     """Creates a voting ensemble classifier. It uses ModelEvaluator class to
-    evaluate the model and logs the model and its metrics to Comet experiment.
+    evaluate the model and logs the model and its metrics to experiment.
     It is a subclass of ModelTrainer class and utilizes some of its methods like
-    create_comet_experiment, evaluate_model, log_model_metrics,
+    create_experiment, evaluate_model, log_model_metrics,
 
     Attributes:
-        comet_api_key (str): Comet API key,
-        comet_project_name (str): Comet project name,
-        comet_exp_name (str)L Comet experiment name,
+        parent_run_id (str): parent run ID for the experiment.
+        child_run_id (str): child run ID for the experiment.
         train_features (pd.DataFrame): features of training set before encoding and
-        feature selection for ModelEvaluator class.
+            feature selection for ModelEvaluator class.
         valid_features (pd.DataFrame): features of validation set before encoding and
-        feature selection for ModelEvaluator class.
+            feature selection for ModelEvaluator class.
         train_class (np.ndarray): The target labels for the training set.
         valid_class (np.ndarray): The target labels for the validation set.
         class_encoder (LabelEncoder): encoder object that maps the class labels to integers.
         artifacts_path (str): path to save training artificats, e.g., .pkl and .png files.
-        lr_calib_pipeline (Pipeline): calibrated pipeline for logistic regression model,
-        rf_calib_pipeline (Pipeline): calibrated pipeline for random forest model,
-        lgbm_calib_pipeline (Pipeline): calibrated pipeline for LightGBM model,
-        xgb_calib_pipeline (Pipeline): calibrated pipeline for XGBoost model,
+        registered_train_set (TabularDataset): registered training set in the workspace.
+        registered_test_set (TabularDataset): registered test set in the workspace.
+        lr_pipeline (Pipeline): calibrated pipeline for logistic regression model,
+        rf_pipeline (Pipeline): calibrated pipeline for random forest model,
+        lgbm_pipeline (Pipeline): calibrated pipeline for LightGBM model,
+        xgb_pipeline (Pipeline): calibrated pipeline for XGBoost model,
         voting_rule (Literal["hard", "soft"], optional): voting rule for the ensemble classifier.
             Default to "soft".
         encoded_pos_class_label (int, optional): encoded label of positive class using LabelEncoder().
@@ -508,28 +630,33 @@ class VotingEnsembleCreator(ModelTrainer):
             Default to 1 (same as F1).
         registered_model_name (str, optional): name used for the registered model.
         ece_nbins (int, optional): number of bins for expected calibration error. Default to 5.
+        conf_score_threshold_val (float, optional): decision threshold value. Default to 0.5.
     """
 
     def __init__(
         self,
-        comet_api_key: str,
-        comet_project_name: str,
-        comet_exp_name: str,
+        parent_run_id: str,
+        child_run_id: str,
         train_features: pd.DataFrame,
         valid_features: pd.DataFrame,
         train_class: np.ndarray,
         valid_class: np.ndarray,
         class_encoder: LabelEncoder,
         artifacts_path: str,
-        lr_calib_pipeline: Optional[Pipeline] = None,
-        rf_calib_pipeline: Optional[Pipeline] = None,
-        lgbm_calib_pipeline: Optional[Pipeline] = None,
-        xgb_calib_pipeline: Optional[Pipeline] = None,
+        registered_train_set: TabularDataset,
+        registered_test_set: TabularDataset,
+        lr_pipeline: Optional[Pipeline] = None,
+        rf_pipeline: Optional[Pipeline] = None,
+        lgbm_pipeline: Optional[Pipeline] = None,
+        xgb_pipeline: Optional[Pipeline] = None,
         voting_rule: Literal["hard", "soft"] = "soft",
         encoded_pos_class_label: int = 1,
+        conda_env: str = "train_env.yml",
         fbeta_score_beta: float = 1.0,
         registered_model_name: Optional[str] = None,
         ece_nbins: int = 5,
+        conf_score_threshold_val: float = 0.5,
+        cv_folds: int = 5,
     ):
         super().__init__(
             train_features=train_features,
@@ -542,28 +669,33 @@ class VotingEnsembleCreator(ModelTrainer):
             class_encoder=class_encoder,
             preprocessor_step=None,
             selector_step=None,
+            registered_train_set=registered_train_set,
+            registered_test_set=registered_test_set,
             artifacts_path=artifacts_path,
             num_feature_names=None,
             cat_feature_names=None,
             fbeta_score_beta=fbeta_score_beta,
             encoded_pos_class_label=encoded_pos_class_label,
+            conda_env=conda_env,
+            cv_folds=cv_folds,
         )
 
-        self.comet_api_key = comet_api_key
-        self.comet_project_name = comet_project_name
-        self.comet_exp_name = comet_exp_name
-        self.lr_calib_pipeline = lr_calib_pipeline
-        self.rf_calib_pipeline = rf_calib_pipeline
-        self.lgbm_calib_pipeline = lgbm_calib_pipeline
-        self.xgb_calib_pipeline = xgb_calib_pipeline
+        self.parent_run_id = parent_run_id
+        self.child_run_id = child_run_id
+        self.lr_pipeline = lr_pipeline
+        self.rf_pipeline = rf_pipeline
+        self.lgbm_pipeline = lgbm_pipeline
+        self.xgb_pipeline = xgb_pipeline
         self.voting_rule = voting_rule
         self.registered_model_name = registered_model_name or "VotingEnsemble"
+        self.conf_score_threshold_val = conf_score_threshold_val
         self.ece_nbins = ece_nbins
 
     def _get_base_models(
         self,
     ) -> list:
         """Creates a list of base models for the voting ensemble.
+
         Returns:
             base_models (list): list of base models.
 
@@ -575,25 +707,25 @@ class VotingEnsembleCreator(ModelTrainer):
         # Note: some base models may not exist if all its losses are zero.
         base_models = []
         try:
-            model_lr = self.lr_calib_pipeline.named_steps["classifier"]
+            model_lr = self.lr_pipeline.named_steps["classifier"]
             base_models.append(("LR", model_lr))
         except Exception:  # pylint: disable=W0718
             logger.info("RF model does not exist or not in required type!")
 
         try:
-            model_rf = self.rf_calib_pipeline.named_steps["classifier"]
+            model_rf = self.rf_pipeline.named_steps["classifier"]
             base_models.append(("RF", model_rf))
         except Exception:  # pylint: disable=W0718
             logger.info("RF model does not exist or not in required type!")
 
         try:
-            model_lgbm = self.lgbm_calib_pipeline.named_steps["classifier"]
+            model_lgbm = self.lgbm_pipeline.named_steps["classifier"]
             base_models.append(("LightGBM", model_lgbm))
         except Exception:  # pylint: disable=W0718
             logger.info("LightGBM model does not exist or not in required type!")
 
         try:
-            model_xgb = self.xgb_calib_pipeline.named_steps["classifier"]
+            model_xgb = self.xgb_pipeline.named_steps["classifier"]
             base_models.append(("XGBoost", model_xgb))
         except Exception:  # pylint: disable=W0718
             logger.info("XGBoost model does not exist or not in required type!")
@@ -619,16 +751,14 @@ class VotingEnsembleCreator(ModelTrainer):
         """
 
         # Copy fitted data transformation steps from any base pipeline
-        if hasattr(self, "lr_calib_pipeline") and self.lr_calib_pipeline is not None:
-            data_pipeline = deepcopy(self.lr_calib_pipeline)
-        elif hasattr(self, "rf_calib_pipeline") and self.lr_calib_pipeline is not None:
-            data_pipeline = deepcopy(self.rf_calib_pipeline)
-        elif (
-            hasattr(self, "lgbm_calib_pipeline") and self.lr_calib_pipeline is not None
-        ):
-            data_pipeline = deepcopy(self.lgbm_calib_pipeline)
-        elif hasattr(self, "xgb_calib_pipeline") and self.lr_calib_pipeline is not None:
-            data_pipeline = deepcopy(self.xgb_calib_pipeline)
+        if hasattr(self, "lr_pipeline") and self.lr_pipeline is not None:
+            data_pipeline = deepcopy(self.lr_pipeline)
+        elif hasattr(self, "rf_pipeline") and self.lr_pipeline is not None:
+            data_pipeline = deepcopy(self.rf_pipeline)
+        elif hasattr(self, "lgbm_pipeline") and self.lr_pipeline is not None:
+            data_pipeline = deepcopy(self.lgbm_pipeline)
+        elif hasattr(self, "xgb_pipeline") and self.lr_pipeline is not None:
+            data_pipeline = deepcopy(self.xgb_pipeline)
         else:
             raise ValueError("No base model pipelines found!")
 
@@ -645,8 +775,10 @@ class VotingEnsembleCreator(ModelTrainer):
             base_models (list): list of base models,
 
         Returns:
-            ve_model (VotingClassifier): voting ensemble classifier object,
-            ve_pipeline (Pipeline): voting ensemble pipeline object.
+            ve_pipeline (Pipeline): fitted voting ensemble pipeline.
+
+        Raises:
+            ValueError: if less than two base models are provided.
         """
 
         ve_model = VotingClassifier(estimators=base_models, voting=self.voting_rule)
@@ -672,9 +804,9 @@ class VotingEnsembleCreator(ModelTrainer):
 
     def create_voting_ensemble(
         self,
-    ) -> Union[Pipeline, Experiment]:
+    ) -> Pipeline:
         """Creates a voting ensemble classifier using the base models and evaluates the model
-        using ModelEvaluator class. It logs the model metrics to Comet experiment.
+        using ModelEvaluator class. It logs the model metrics to experiment.
 
         Returns:
             Pipeline: calibrated pipeline object that contains the model transformation pipeline
@@ -684,43 +816,286 @@ class VotingEnsembleCreator(ModelTrainer):
             Exception: if model training fails.
         """
 
-        # Create Comet experiment
-        comet_exp = self._create_comet_experiment(
-            comet_api_key=self.comet_api_key,
-            comet_project_name=self.comet_project_name,
-            comet_exp_name=self.comet_exp_name,
-        )
-
         try:
             # Create voting ensemble pipeline (data transformation pipeline and base models)
             base_models = self._get_base_models()
             ve_pipeline = self._create_fitted_ensemble_pipeline(base_models)
+            logger.info("Voting ensemble model created successfully!")
 
             # Evaluate voting ensemble classifier
             train_metric_values, valid_metric_values, model_ece = self._evaluate_model(
-                comet_exp=comet_exp,
                 fitted_pipeline=ve_pipeline,
                 is_voting_ensemble=True,
                 ece_nbins=self.ece_nbins,
             )
 
             self._log_model_metrics(
-                comet_exp=comet_exp,
                 train_metric_values=train_metric_values,
                 valid_metric_values=valid_metric_values,
                 model_ece=model_ece,
             )
+            logger.info("Voting ensemble model metrics logged successfully!")
+
+            model_tags = self.create_model_tags(
+                model_name=ve_pipeline.named_steps["classifier"].__class__.__name__,
+                pipeline=ve_pipeline,
+                decoded_class_labels=self.class_encoder.inverse_transform(
+                    range(len(self.class_encoder.classes_))
+                ),
+                registered_train_set=self.registered_train_set,
+                registered_test_set=self.registered_test_set,
+                train_scores=train_metric_values,
+                valid_scores=valid_metric_values,
+                parent_run_id=self.parent_run_id,
+                child_run_id=self.child_run_id,
+                conf_score_threshold_val=self.conf_score_threshold_val,
+            )
+
+            ve_pipeline = self.calibrate_pipeline(
+                X_valid=self.valid_features,
+                y_valid=self.valid_class,
+                fitted_pipeline=ve_pipeline,
+                cv_folds=self.cv_folds,
+            )
 
             self._register_model(
-                comet_exp=comet_exp,
                 pipeline=ve_pipeline,
+                classifier_name={
+                    ve_pipeline.named_steps["classifier"].__class__.__name__
+                },
                 registered_model_name=self.registered_model_name,
+                model_uri=f"runs:/{self.child_run_id}/model",
+                tags=model_tags,
+            )
+            logger.info("Voting ensemble model metrics registered successfully!")
+
+        except Exception as e:  # pylint: disable=W0718
+            logger.info(f"\nVoting ensemble error --> {e}\n\n")
+            ve_pipeline = None
+
+        return ve_pipeline
+
+
+class EnvCreator:
+    def __init__(self, workspace: Workspace) -> None:
+        self.workspace = workspace
+
+    def create_compute_cluster(
+        self,
+        aml_clust_name: str,
+        aml_clust_vm_type: str = "STANDARD_D16S_V3",
+        aml_clust_vm_priority: str = "lowpriority",
+        aml_clust_max_node_no: int = 1,
+        aml_clust_min_node_no: int = 0,
+        aml_clust_idle_secs_scaledown: int = 120,
+        aml_clust_identity_type: str = "SystemAssigned",
+    ) -> ComputeTarget:
+        """Creates Azure ML compute cluster if they don't exist.
+
+        Args:
+            aml_clust_name (str): The name of the compute cluster.
+            aml_clust_vm_type (str): The VM type of the cluster.
+            aml_clust_vm_priority (str): The VM priority of the cluster.
+            aml_clust_max_node_no (int): The maximum number of nodes in the cluster.
+            aml_clust_min_node_no (int): The minimum number of nodes in the cluster.
+            aml_clust_idle_secs_scaledown (int): The number of idle seconds before the cluster scales down.
+            aml_clust_identity_type (str): The identity type of the cluster.
+
+        Returns:
+            aml_compute_clust (ComputeTarget): The created or existing compute target.
+        """
+
+        try:
+            aml_compute_clust = ComputeTarget(
+                workspace=self.workspace, name=aml_clust_name
+            )
+            logger.info(f"Compute cluster {aml_clust_name} exists and it will be used.")
+
+        except ComputeTargetException:
+            compute_config = AmlCompute.provisioning_configuration(
+                vm_size=aml_clust_vm_type,
+                vm_priority=aml_clust_vm_priority,
+                max_nodes=aml_clust_max_node_no,
+                min_nodes=aml_clust_min_node_no,
+                idle_seconds_before_scaledown=aml_clust_idle_secs_scaledown,
+                identity_type=aml_clust_identity_type,
+            )
+            aml_compute_clust = ComputeTarget.create(
+                self.workspace, aml_clust_name, compute_config
+            )
+            aml_compute_clust.wait_for_completion(show_output=True)
+
+        return aml_compute_clust
+
+    def is_env_updated(
+        self,
+        env_name: str,
+        conda_yml_path: str,
+    ) -> bool:
+        """Checks if registered env in Azure workspace has identical dependencies to that
+        of a local conda file. It returns a True/False flag indicating whether to recreate
+        env or not.
+
+        Args:
+            env_name (str): name of the registered environment in Azure ML workspace,
+            conda_yml_path (str): path to the local conda yaml file.
+
+        Returns:
+            local_and_remote_env_mismatch (bool): flag indicating whether to recreate env or not.
+        """
+
+        try:
+            # Import training environment object from a Conda specification file
+            # Note: Environment.from_conda_specification returns broad Exception
+            # rather than specific exception. Thus, pylint must ignore it.
+            local_env_yml = Environment.from_conda_specification(
+                name=env_name, file_path=conda_yml_path
             )
 
         except Exception as e:  # pylint: disable=W0718
-            logger.info("\nVoting ensemble error --> %s\n\n", e)
-            ve_pipeline = None
+            logger.error(f"Local conda file {conda_yml_path} does not exist! --> {e}")
 
-        comet_exp.end()
+        try:
+            # Get latest version of training environment conda file
+            registered_env = Environment.get(
+                workspace=self.workspace, name=env_name, version=None
+            )
 
-        return ve_pipeline, comet_exp
+        except UnboundLocalError:
+            logger.error(f"Registered env {env_name} does not exist!")
+
+        # Extract dependencies from imported yaml files
+        local_env_depends = (
+            local_env_yml.python.conda_dependencies.serialize_to_string()
+        )
+        registered_env_depends = (
+            registered_env.python.conda_dependencies.serialize_to_string()
+        )
+
+        # Split serialized dependencies on newline characters
+        local_env_depends_lines = local_env_depends.split("\n")
+        registered_env_depends_lines = registered_env_depends.split("\n")
+
+        # Extract only the lines that represent dependencies
+        local_env_depends = [
+            line
+            for line in local_env_depends_lines
+            if not line.startswith("#") and line.strip()
+        ]
+        registered_env_depends = [
+            line
+            for line in registered_env_depends_lines
+            if not line.startswith("#") and line.strip()
+        ]
+
+        # Remove whitespace and leading hyphens from each dependency
+        local_env_depends = [
+            dep.replace(" ", "").replace("- ", "") for dep in local_env_depends
+        ]
+        registered_env_depends = [
+            dep.replace(" ", "").replace("- ", "") for dep in registered_env_depends
+        ]
+
+        logger.info(f"Required dependencies for model training: {local_env_depends}\n")
+        logger.info(
+            f"Dependencies in latest version of registered training environment: {registered_env_depends}\n"
+        )
+
+        # Compare dependencies
+        common_depends_in_both_envs = set(local_env_depends) & set(
+            registered_env_depends
+        )
+        only_in_local_env = set(local_env_depends) - set(registered_env_depends)
+        only_in_registered_env = set(registered_env_depends) - set(local_env_depends)
+        logger.info(f"Common dependencies: {common_depends_in_both_envs}")
+        logger.info(f"Dependencies only in data update env: {only_in_local_env}")
+        logger.info(
+            f"Dependencies only in the latest version of registered data update env: {only_in_registered_env}"
+        )
+
+        local_and_remote_env_mismatch = False
+        if len(only_in_local_env) > 0 or len(only_in_registered_env) > 0:
+            local_and_remote_env_mismatch = True
+            logger.warning("Training environment needs to be updated!")
+
+        return local_and_remote_env_mismatch
+
+    def create_or_update_existing_env(
+        self,
+        env_name: str,
+        conda_yml_path: str,
+        env_base_image_path: str,
+        wait_until_build_completed: bool = False,
+    ) -> None:
+        """Creates or updates an environment from conda specifications (yaml file "env_name"
+        in local path "conda_yml_path") and register it in Azure ML workspace. It
+        gives the option to wait until docker image build is completed (default: False)
+        if you need to make sure the image build is finished before submitting script
+        to compute cluster. Container registry image path "env_base_image_path" can be
+        found when editing Parent Image path in registered env. This method can be used
+        when training script is updated during dev and training env needs to be updated
+        in prod during CI instead of updating environment manually.
+
+        Args:
+            env_name (str): name of the registered environment in Azure ML workspace,
+            conda_yml_path (str): path to the local conda yaml file,
+            env_base_image_path (str): container registry image path of the registered env,
+            wait_until_build_completed (bool, optional): wait until docker image build is completed.
+        """
+
+        # Create local environment object from a Conda specification file
+        env_obj = Environment.from_conda_specification(
+            name=env_name, file_path=conda_yml_path
+        )
+
+        # Update existing environment
+        # docker_config = DockerConfiguration(use_docker=True)
+        env_obj.docker.base_image = env_base_image_path
+        env_obj.register(self.workspace)
+        env_docker_image_build = env_obj.build(self.workspace)
+        if wait_until_build_completed == True:
+            env_docker_image_build.wait_for_completion(show_output=True)
+
+    @staticmethod
+    def build_and_push_docker_image(
+        acr_name: str,
+        acr_username: str,
+        acr_password: str,
+        image_name: str,
+        dockerfile_local_path: str,
+    ) -> None:
+        """
+        Build and push Docker image to Azure Container Registry to be used by in job submission in Azure DevOps.
+
+        Args:
+            acr_name (str): The name of the Azure Container Registry.
+            acr_username (str): The username for the Azure Container Registry, which is usually dev service principal.
+            acr_password (str): The password for the Azure Container Registry, which is usually dev service principal.
+            image_name (str): The name of the Docker image.
+            dockerfile_local_path (str): The path to the Dockerfile.
+        """
+
+        # Upgrade Azure CLI
+        os.system("az upgrade --yes")
+
+        # Upgrade some packages to avoid issues with Azure CLI
+        subprocess.run(
+            [
+                "pip",
+                "install",
+                "--upgrade",
+                "azure-cli",
+                "azure-mgmt-resource",
+                "azure-core",
+            ]
+        )
+
+        # Login to Azure Container Registry and build image and push to ACR
+        # os.system(f"az acr login --name {acr_name}")
+        os.system(
+            f"az acr login --name {acr_name} --username {acr_username} --password {acr_password}"
+        )
+        os.system(
+            f"docker build -t {acr_name}.azurecr.io/{image_name} -f {dockerfile_local_path} ."
+        )
+        os.system(f"docker push {acr_name}.azurecr.io/{image_name}")

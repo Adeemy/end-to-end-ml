@@ -2,24 +2,27 @@
 Includes functions for model optimization and evaluation.
 """
 
-import os
-from typing import Callable, Optional, Union
+from datetime import datetime
+from typing import Callable, Literal, Optional, Union
 
 import joblib
 import kds
 import matplotlib.pyplot as plt
+import mlflow
 import numpy as np
 import optuna
 import optuna_distributed
 import pandas as pd
-from comet_ml import API, ExistingExperiment, Experiment
+from azureml.core import Model, Workspace
 from dask.distributed import Client
 from matplotlib.figure import Figure
+from mlflow.models import infer_signature
 from numpy.typing import ArrayLike
-from sklearn.calibration import CalibratedClassifierCV, CalibrationDisplay
+from sklearn.calibration import CalibrationDisplay, calibration_curve
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.metrics import (
+    ConfusionMatrixDisplay,
     accuracy_score,
     average_precision_score,
     confusion_matrix,
@@ -37,7 +40,8 @@ from sklearn.preprocessing import LabelEncoder
 from src.utils.logger import get_console_logger
 
 ##########################################################
-# Get the logger objects by name
+
+# Get console logger
 logger = get_console_logger("model_logger")
 
 
@@ -47,7 +51,6 @@ class ModelOptimizer:
     in each objective function call during hyperparameters optimization.
 
     Attributes:
-        comet_exp (Experiment): Comet experiment object.
         train_features_preprocessed (pd.DataFrame): preprocessed train features.
         train_class (np.ndarray): train class labels.
         valid_features_preprocessed (pd.DataFrame): preprocessed validation features.
@@ -69,11 +72,11 @@ class ModelOptimizer:
         "RandomForestClassifier",
         "LGBMClassifier",
         "XGBClassifier",
+        "CalibratedClassifierCV",
     )
 
     def __init__(
         self,
-        comet_exp: Experiment,
         train_features_preprocessed: pd.DataFrame,
         train_class: np.ndarray,
         valid_features_preprocessed: pd.DataFrame,
@@ -81,8 +84,8 @@ class ModelOptimizer:
         n_features: int,
         model: Callable,
         search_space_params: dict,
+        encoded_pos_class_label: int,
         fbeta_score_beta: float = 1.0,
-        encoded_pos_class_label: int = 1,
         is_voting_ensemble: bool = False,
     ) -> None:
         """Creates a ModelOptimizer instance.
@@ -90,7 +93,6 @@ class ModelOptimizer:
         Raises:
             AssertionError: if the specified model name is not supported.
         """
-        self.comet_exp = comet_exp
         self.train_features_preprocessed = train_features_preprocessed
         self.train_class = train_class
         self.valid_features_preprocessed = valid_features_preprocessed
@@ -98,16 +100,15 @@ class ModelOptimizer:
         self.n_features = n_features
         self.model = model
         self.search_space_params = search_space_params
-        self.fbeta_score_beta = fbeta_score_beta
         self.encoded_pos_class_label = encoded_pos_class_label
+        self.fbeta_score_beta = fbeta_score_beta
         self.is_voting_ensemble = is_voting_ensemble
         self.classifier_name = self.model.__class__.__name__
 
         if not self.is_voting_ensemble:
-            if self.classifier_name not in self._supported_models:
-                raise ValueError(
-                    f"Supported models are: {self._supported_models}. Got {self.classifier_name}!"
-                )
+            assert (
+                self.classifier_name in self._supported_models
+            ), f"Supported models are: {self._supported_models}. Got {self.classifier_name}!"
 
     def generate_trial_params(self, trial: optuna.trial.Trial) -> dict:
         """Samples model parameters values from search space as specified in
@@ -222,8 +223,8 @@ class ModelOptimizer:
             valid_scores["Metric"] == f"f_{self.fbeta_score_beta}_score", "Score"
         ]
 
-        self.comet_exp.log_metric(name="training_score", value=train_score)
-        self.comet_exp.log_metric(name="validation_score", value=valid_score)
+        mlflow.log_metric("training_score", train_score)
+        mlflow.log_metric("validation_score", valid_score)
 
         # Return the validation score to ensure it's used for model selsection
         return -valid_score
@@ -255,10 +256,10 @@ class ModelOptimizer:
             if previous_best_value != study.best_value:
                 study.set_user_attr("previous_best_value", study.best_value)
                 logger.info(
-                    "\nTrial %d finished, best value: %d hyperparameters: %s.",
-                    int(frozen_trial.number),
-                    frozen_trial.value,
-                    frozen_trial.params,
+                    f"""\n
+                    Trial {int(frozen_trial.number)} finished,
+                    best value: {frozen_trial.value}
+                    hyperparameters: {frozen_trial.params}."""
                 )
 
         sampler = optuna.samplers.TPESampler(
@@ -270,11 +271,10 @@ class ModelOptimizer:
         study = optuna.create_study(sampler=sampler)
 
         logger.info(
-            """\n
+            f"""\n
         ----------------------------------------------------------------
-        --- Hyperparameter Optimization of %s Starts ...
-        ----------------------------------------------------------------\n""",
-            self.classifier_name,
+        --- Hyperparameter Optimization of {self.classifier_name} Starts ...
+        ----------------------------------------------------------------\n"""
         )
 
         study.optimize(
@@ -393,29 +393,29 @@ class ModelEvaluator(ModelOptimizer):
 
     Attributes:
         ModelOptimizer (ModelOptimizer): ModelOptimizer class.
-        comet_exp (Experiment): Comet experiment object.
         pipeline (Pipeline): fitted pipeline.
         train_features (pd.DataFrame): train features.
         train_class (np.ndarray): train class labels.
         valid_features (pd.DataFrame): validation features.
         valid_class (np.ndarray): validation class labels.
+        encoded_pos_class_label (int): encoded positive class label.
         fbeta_score_beta (float): beta value for fbeta score.
         is_voting_ensemble (bool): whether the model is a voting ensemble or not.
     """
 
     def __init__(
         self,
-        comet_exp: Experiment,
         pipeline: Pipeline,
         train_features: pd.DataFrame,
         train_class: np.ndarray,
         valid_features: pd.DataFrame,
         valid_class: np.ndarray,
+        encoded_pos_class_label: int,
         fbeta_score_beta: float = 0.5,
         is_voting_ensemble: bool = False,
+        artifacts_path: str = "tmp",
     ) -> None:
         super().__init__(
-            self,
             train_features_preprocessed=None,
             train_class=None,
             valid_features_preprocessed=None,
@@ -427,17 +427,17 @@ class ModelEvaluator(ModelOptimizer):
                 else pipeline.named_steps["classifier"]
             ),
             search_space_params=None,
+            encoded_pos_class_label=encoded_pos_class_label,
+            fbeta_score_beta=fbeta_score_beta,
             is_voting_ensemble=is_voting_ensemble,
         )
 
-        self.comet_exp = comet_exp
         self.pipeline = pipeline
         self.train_features = train_features
         self.train_class = train_class
         self.valid_features = valid_features
         self.valid_class = valid_class
-        self.fbeta_score_beta = fbeta_score_beta
-        self.is_voting_ensemble = is_voting_ensemble
+        self.artifacts_path = artifacts_path
 
     def plot_feature_importance(
         self,
@@ -480,15 +480,15 @@ class ModelEvaluator(ModelOptimizer):
             plt.show()
 
         except ValueError as e:
-            logger.info("Error plotting feature importance --> %s", e)
+            logger.info(f"Error plotting feature importance --> {e}")
 
         return figure_obj
 
     def extract_feature_importance(
         self,
         pipeline: Pipeline,
-        num_feature_names: Optional[list] = None,
-        cat_feature_names: Optional[list] = None,
+        num_feature_names: list,
+        cat_feature_names: list,
         n_top_features: int = 30,
         figure_size: tuple = (24, 36),
         font_size: float = 10.0,
@@ -512,75 +512,73 @@ class ModelEvaluator(ModelOptimizer):
         # Catch any error raised in this method to prevent experiment
         # from registering a model as it's not worth failing experiment.
         try:
-            # Get feature names
-            if num_feature_names is None and cat_feature_names is not None:
-                col_names = list(
-                    pipeline.named_steps["preprocessor"]
-                    .transformers_[1][1]
-                    .named_steps["onehot_encoder"]
-                    .get_feature_names_out(cat_feature_names)
-                )
-
-            elif num_feature_names is not None and cat_feature_names is None:
-                col_names = num_feature_names
-
-            elif num_feature_names is not None and cat_feature_names is not None:
-                col_names = num_feature_names + list(
-                    pipeline.named_steps["preprocessor"]
-                    .transformers_[1][1]
-                    .named_steps["onehot_encoder"]
-                    .get_feature_names_out(cat_feature_names)
-                )
-
-            else:
-                raise ValueError(
-                    f"{num_feature_names} and/or {cat_feature_names} must be provided."
-                )
-
-            # Extract transformed feature names
-            col_names = [
-                i
-                for (i, v) in zip(
-                    col_names,
-                    list(pipeline.named_steps["selector"].get_support()),
-                )
-                if v
-            ]
-
-            logger.info(
-                "No. of features including encoded categorical features: %d",
-                len(col_names),
-            )
-
             # Note: there is no feature_importances_ attribute for LogisticRegression, hence,
-            # this if statement is needed to LR coefficients instead.
+            # this if statement is needed.
             classifier_name = pipeline.named_steps["classifier"].__class__.__name__
-            feature_importances = (
-                None  # To avoid pylint error E0606 (using variable before assignment)
-            )
             if classifier_name == "LogisticRegression":
-                feature_importances = pipeline.named_steps["classifier"].coef_[0]
+                # Return LR coefficients instead.
+                feature_importance_scores = pipeline.named_steps["classifier"].coef_[0]
 
             if classifier_name not in [
                 "LogisticRegression",
                 "VotingClassifier",
             ]:
-                feature_importances = pipeline.named_steps[
+                feature_importance_scores = pipeline.named_steps[
                     "classifier"
                 ].feature_importances_
 
-            if classifier_name != "VotingClassifier":
+                # Get feature names
+                num_feature_names = (
+                    [] if num_feature_names is None else num_feature_names
+                )
+                cat_feature_names = (
+                    [] if cat_feature_names is None else cat_feature_names
+                )
+                if len(num_feature_names) == 0 and len(cat_feature_names) > 0:
+                    col_names = list(
+                        pipeline.named_steps["preprocessor"]
+                        .transformers_[1][1]
+                        .named_steps["onehot_encoder"]
+                        .get_feature_names_out(cat_feature_names)
+                    )
+
+                elif len(num_feature_names) > 0 and len(cat_feature_names) == 0:
+                    col_names = num_feature_names
+
+                elif len(num_feature_names) > 0 and len(cat_feature_names) > 0:
+                    col_names = num_feature_names + list(
+                        pipeline.named_steps["preprocessor"]
+                        .transformers_[1][1]
+                        .named_steps["onehot_encoder"]
+                        .get_feature_names_out(cat_feature_names)
+                    )
+
+                else:
+                    raise ValueError(f"Numerical or categorical must be provided.")
+
+                # Extract transformed feature names after feature selection
+                col_names = [
+                    i
+                    for (i, v) in zip(
+                        col_names,
+                        list(pipeline.named_steps["selector"].get_support()),
+                    )
+                    if v
+                ]
+
+                # Log feature importance figure
                 self._log_feature_importance_fig(
                     classifier_name=classifier_name,
-                    feature_importance_scores=feature_importances,
+                    feature_importance_scores=feature_importance_scores,
                     col_names=col_names,
                     n_top_features=n_top_features,
                     figure_size=figure_size,
                     font_size=font_size,
+                    fig_name=f"{classifier_name}_feature_importance.png",
                 )
 
         except Exception as e:  # pylint: disable=W0718
-            logger.info("Feature importance extraction error --> %s", e)
+            logger.info(f"Feature importance extraction error --> {e}")
             col_names = None
 
     def _log_feature_importance_fig(
@@ -591,10 +589,10 @@ class ModelEvaluator(ModelOptimizer):
         n_top_features: int = 30,
         figure_size: tuple = (24, 36),
         font_size: float = 10.0,
-        fig_name: str = "Feature Importance",
+        fig_name: str = "feature_importance.png",
     ) -> None:
         """Plots feature importance figure given feature importance scores and
-        column names and logs it to Comet workspace.
+        column names and logs it to workspace.
 
         Args:
             classifier_name (str): name of the classifier.
@@ -617,13 +615,8 @@ class ModelEvaluator(ModelOptimizer):
                 font_size=font_size,
                 fig_size=figure_size,
             )
-            self.comet_exp.log_figure(
-                figure_name=fig_name,
-                figure=feature_importance_fig,
-                overwrite=True,
-            )
 
-            logger.info("Feature importance figure was logged to workspace.")
+            mlflow.log_figure(feature_importance_fig, fig_name)
 
     @staticmethod
     def plot_roc_curve(
@@ -770,13 +763,100 @@ class ModelEvaluator(ModelOptimizer):
 
         return metrics_values
 
+    @staticmethod
+    def convert_class_prob_to_label(
+        value,
+        class_threshold: float = 0.5,
+        class_label_above_threshold: str = "Y",
+        class_label_below_threshold: str = "N",
+    ):
+        """
+        Converts class probability to N/Y label based on threshold value.
+
+        Args:
+            value (float): class probability
+            class_threshold (float): threshold value to map class probability to No/Yes label
+            class_label_above_threshold (string): class label if value >= class_threshold
+            class_label_below_threshold (string): class label if value < class_threshold
+
+        Returns:
+            predicted_class_label (string): class label ("No" if value < class_threshold, otherwise "Yes")
+        """
+
+        if value < class_threshold:
+            predicted_class_label = class_label_below_threshold
+        else:
+            predicted_class_label = class_label_above_threshold
+
+        return predicted_class_label
+
+    def calc_registered_model_scores(
+        self,
+        serialized_model: Pipeline,
+        dataset: pd.DataFrame,
+        true_labels: np.ndarray,
+        model_name: str,
+        model_version: str,
+        pos_class_threshold: float = 0.5,
+        pos_class_label: str = "Y",
+        neg_class_label: str = "N",
+    ) -> Union[pd.DataFrame, list]:
+        """
+        Evaluates binary classifier (pkl files) and returns a pandas dataframe with the scores
+        of each model and predicated class labels using the provided threshold value.
+
+        Args:
+            serialized_model (pkl file): the imported pickle file with pipeline transformer.
+            dataset (pandas dataframe): dataset to predict its class label.
+            true_labels (np.ndarray): encoded actual class labels.
+            model_name (str): full model name as it will appear in the final dataframe.
+            pos_class_threshold (float): threshold value for positive class label.
+            pos_class_label (str): positive class label.
+            neg_class_label (str): negative class label.
+
+        Returns:
+            models_scores (pandas dataframe): models scores alongsoide a column for model's name.
+            pred_class_label (list): predicted class label (not encoded) using the provided thershold value.
+        """
+
+        predicted_class_prob = pd.DataFrame(
+            serialized_model.predict_proba(dataset),
+            columns=[neg_class_label, pos_class_label],
+        )
+        pred_class_label = (
+            predicted_class_prob[pos_class_label]
+            .map(
+                lambda x: self.convert_class_prob_to_label(
+                    x,
+                    class_threshold=pos_class_threshold,
+                    class_label_above_threshold=pos_class_label,
+                    class_label_below_threshold=neg_class_label,
+                )
+            )
+            .values
+        )
+        predicted_class_labels = LabelEncoder().fit_transform(pred_class_label)
+
+        # Calculate model performance metrics
+        models_scores = self.calc_perf_metrics(
+            true_class=true_labels,
+            pred_class=predicted_class_labels,
+        )
+
+        # Add model and version
+        models_scores.loc[:, ["Model Name"]] = model_name
+        models_scores.loc[:, ["Model Version"]] = model_version
+
+        return models_scores, pred_class_label
+
     def evaluate_model_perf(
         self,
         class_encoder: Optional[LabelEncoder] = None,
         pos_class_label_thresh: float = 0.5,
     ) -> Union[pd.DataFrame, pd.DataFrame, list]:
         """Evaluates the best model returned by hyperparameters optimization procedure
-        on both training and validation set.
+        on both training and validation set and logs confusion matrices, calibration curve,
+        ROC curve, precision-recall curve, cumulative gains curve, and lift curve.
 
         Args:
             class_encoder (LabelEncoder): class encoder object.
@@ -834,30 +914,73 @@ class ModelEvaluator(ModelOptimizer):
 
             # Log confusion matrices
             self._log_confusion_matrix(
-                original_train_class=original_train_class,
-                pred_original_train_class=pred_original_train_class,
-                original_valid_class=original_valid_class,
-                pred_original_valid_class=pred_original_valid_class,
+                original_class=original_train_class,
+                pred_original_class=pred_original_train_class,
                 original_class_labels=original_class_labels,
+                saved_fig_path=f"/{self.artifacts_path}/train_set_cm.png",
+                normalize=None,
+                fig_size=(11, 11),
+            )
+            self._log_confusion_matrix(
+                original_class=original_train_class,
+                pred_original_class=pred_original_train_class,
+                original_class_labels=original_class_labels,
+                saved_fig_path=f"/{self.artifacts_path}/norm_train_set_cm.png",
+                normalize="true",
+                fig_size=(11, 11),
+            )
+            self._log_confusion_matrix(
+                original_class=original_valid_class,
+                pred_original_class=pred_original_valid_class,
+                original_class_labels=original_class_labels,
+                saved_fig_path=f"/{self.artifacts_path}/valid_set_cm.png",
+                normalize=None,
+                fig_size=(11, 11),
+            )
+            self._log_confusion_matrix(
+                original_class=original_valid_class,
+                pred_original_class=pred_original_valid_class,
+                original_class_labels=original_class_labels,
+                saved_fig_path=f"/{self.artifacts_path}/norm_valid_cm.png",
+                normalize="true",
+                fig_size=(11, 11),
             )
 
-            logger.info("Confusion matrices were logged to workspace.")
+            logger.info("Confusion matrices logged successfully.")
 
-        # Log calibration curve and plots
-        self._log_calibration_curve(pred_valid_probs)
-        logger.info("Calibration curve was logged to workspace.")
+        self._log_calibration_curve(
+            pred_probs=pred_valid_probs,
+            true_class=self.valid_class,
+            saved_fig_path=f"/{self.artifacts_path}/calibration_curve.png",
+        )
+        logger.info("Calibration curve logged successfully.")
 
-        self._log_roc_curve(pred_valid_probs, self.encoded_pos_class_label)
-        logger.info("ROC curve was logged to workspace.")
-
-        self._log_precision_recall_curve(pred_valid_probs, self.encoded_pos_class_label)
-        logger.info("Precision-Recall curve was logged to workspace.")
-
-        self._log_cumulative_gains(pred_valid_probs, self.valid_class)
-        logger.info("Cumulative gains curve was logged to workspace.")
-
-        self._log_lift_curve(pred_valid_probs, self.valid_class)
-        logger.info("Lift curve was logged to workspace.")
+        self._log_roc_curve(
+            pred_probs=pred_valid_probs,
+            true_class=self.valid_class,
+            encoded_pos_class_label=self.encoded_pos_class_label,
+            fig_name=f"roc_curve.png",
+        )
+        logger.info("ROC curve logged successfully.")
+        self._log_precision_recall_curve(
+            pred_probs=pred_valid_probs,
+            true_class=self.valid_class,
+            encoded_pos_class_label=self.encoded_pos_class_label,
+            fig_name=f"precision_recall_curve.png",
+        )
+        logger.info("Precision-recall curve logged successfully.")
+        self._log_cumulative_gains(
+            pred_probs=pred_valid_probs,
+            true_class=self.valid_class,
+            fig_name=f"cumulative_gains.png",
+        )
+        logger.info("Cumulative gains curve logged successfully.")
+        self._log_lift_curve(
+            pred_probs=pred_valid_probs,
+            true_class=self.valid_class,
+            fig_name=f"lift_curve.png",
+        )
+        logger.info("Lift curve logged successfully.")
 
         return train_scores, valid_scores
 
@@ -907,162 +1030,265 @@ class ModelEvaluator(ModelOptimizer):
 
     def _log_confusion_matrix(
         self,
-        original_train_class: np.ndarray,
-        pred_original_train_class: np.ndarray,
-        original_valid_class: np.ndarray,
-        pred_original_valid_class: np.ndarray,
+        original_class: np.ndarray,
+        pred_original_class: np.ndarray,
         original_class_labels: list,
+        saved_fig_path: str = "confusion_maxtrix.png",
+        normalize: Literal[None, "true"] = None,
+        fig_size: tuple = (11, 11),
     ) -> None:
-        """Logs confusion matrices (normalized and non-normalized) for the best model on
-        both the training and validation sets using expressive labels, e.g., Y/N, instead
-        of encoded class labels.
+        """Logs confusion matrices using expressive labels, e.g., Y/N, instead of encoded
+        class labels. If normalize is set to 'true', then confusion matrix is normalized,
+        otherwise it's not normalized. It saved_fig_path is provided, then confusion matrix
+        figure is saved to that path, otherwise it's saved as 'confusion_matrix.png' in the
+        current working directory.
 
         Args:
-            original_train_class (np.ndarray): true class labels for training set (expressive labels).
-            pred_original_train_class (np.ndarray): predicted class labels for training set (expressive labels).
-            original_valid_class (np.ndarray): true class labels for validation set (expressive labels).
-            pred_original_valid_class (np.ndarray): predicted class labels for validation set (expressive labels).
+            original_class (np.ndarray): true class labels (expressive labels).
+            pred_original_class (np.ndarray): predicted class labels (expressive labels).
             original_class_labels (list): list of expressive class labels.
+            saved_fig_path (str): path to save confusion matrix figure. Defaults to None (not saved).
+            normalize (str): normalization type. Defaults to None (not normalized).
+            fig_size (tuple): figure size. Defaults to (11, 11).
         """
 
-        train_cm = confusion_matrix(
-            y_true=original_train_class,
-            y_pred=pred_original_train_class,
+        # Plot confusion matrix
+        calc_cm = confusion_matrix(
+            y_true=original_class,
+            y_pred=pred_original_class,
             labels=original_class_labels,
-            normalize=None,
+            normalize=normalize,
         )
-        self.comet_exp.log_confusion_matrix(
-            matrix=train_cm,
-            title="Train Set Confusion Matrix",
-            file_name="Train Set Confusion Matrix.json",
+        calc_cm_fig = ConfusionMatrixDisplay(
+            confusion_matrix=calc_cm,
+            display_labels=original_class_labels,
         )
+        _, ax = plt.subplots(figsize=fig_size)
+        calc_cm_fig.plot(ax=ax, xticks_rotation=75)
 
-        train_cm_norm = confusion_matrix(
-            y_true=original_train_class,
-            y_pred=pred_original_train_class,
-            labels=original_class_labels,
-            normalize="true",
-        )
-        self.comet_exp.log_confusion_matrix(
-            matrix=train_cm_norm,
-            title="Train Set Normalized Confusion Matrix",
-            file_name="Train Set Normalized Confusion Matrix.json",
-        )
+        # Log confusion matrix figure
+        calc_cm_fig.figure_.savefig(saved_fig_path)
+        mlflow.log_artifact(saved_fig_path)
 
-        valid_cm = confusion_matrix(
-            y_true=original_valid_class,
-            y_pred=pred_original_valid_class,
-            labels=original_class_labels,
-            normalize=None,
-        )
-        self.comet_exp.log_confusion_matrix(
-            matrix=valid_cm,
-            title="Validation Set Confusion Matrix",
-            file_name="Validation Set Confusion Matrix.json",
-        )
-
-        valid_cm_norm = confusion_matrix(
-            y_true=original_valid_class,
-            y_pred=pred_original_valid_class,
-            labels=original_class_labels,
-            normalize="true",
-        )
-        self.comet_exp.log_confusion_matrix(
-            matrix=valid_cm_norm,
-            title="Validation Set Normalized Confusion Matrix",
-            file_name="Validation Set Normalized Confusion Matrix.json",
-        )
-
-    def _log_calibration_curve(self, pred_probs: np.ndarray) -> None:
-        """Logs calibration curve for the best model on the validation set.
-
-        Args:
-            pred_probs (np.ndarray): predicted probabilities of the positive class
-            of the best model on the validation set.
-        """
-
-        calib_curve = CalibrationDisplay.from_predictions(
-            self.valid_class,
-            pred_probs[:, self.encoded_pos_class_label],
-            n_bins=10,
-        )
-        self.comet_exp.log_figure(
-            figure_name="Calibration Curve", figure=calib_curve.figure_, overwrite=True
-        )
-
-    def _log_roc_curve(
-        self, pred_probs: np.ndarray, encoded_pos_class_label: int
+    def _log_calibration_curve(
+        self,
+        pred_probs: np.ndarray,
+        true_class: np.ndarray,
+        saved_fig_path: str = "calibration_curve.png",
+        n_bins: int = 10,
     ) -> None:
-        """Logs ROC curve for the best model on the validation set.
+        """Logs calibration curve in the experiment. It must be calculated on validation or test set.
 
         Args:
             pred_probs (np.ndarray): predicted probabilities of the positive class.
+            true_class (np.ndarray): true class labels.
+            saved_fig_path (str):  path to save calibration curve figure. Defaults to None.
+            n_bins (int): number of bins. Defaults to 10.
+        """
+
+        _ = CalibrationDisplay.from_predictions(
+            true_class,
+            pred_probs[:, self.encoded_pos_class_label],
+            n_bins=n_bins,
+        )
+
+        plt.savefig(saved_fig_path)
+        mlflow.log_artifact(saved_fig_path)
+
+    def _log_roc_curve(
+        self,
+        pred_probs: np.ndarray,
+        true_class: np.ndarray,
+        encoded_pos_class_label: int,
+        fig_name: str = "roc_curve.png",
+        fig_size: tuple = (6, 6),
+    ) -> None:
+        """Logs ROC curve in the experiment.
+
+        Args:
+            pred_probs (np.ndarray): predicted probabilities of the positive class.
+            true_class (np.ndarray): true class labels (encoded).
             encoded_pos_class_label (int): encoded positive class label.
+            fig_name (str): name of ROC curve figure. Defaults to 'roc_curve.png'.
+            fig_size (tuple): figure size. Defaults to (6, 6).
         """
 
         roc_curve_fig = self.plot_roc_curve(
-            y_true=self.valid_class,
+            y_true=true_class,
             y_pred=pred_probs[:, encoded_pos_class_label],
-            fig_size=(6, 6),
+            fig_size=fig_size,
         )
-        self.comet_exp.log_figure(
-            figure_name="ROC Curve", figure=roc_curve_fig, overwrite=True
-        )
+        mlflow.log_figure(roc_curve_fig, fig_name)
 
     def _log_precision_recall_curve(
-        self, pred_probs: np.ndarray, encoded_pos_class_label: int
+        self,
+        pred_probs: np.ndarray,
+        true_class: np.ndarray,
+        encoded_pos_class_label: int,
+        fig_name: str = "precision_recall_curve.png",
+        fig_size: tuple = (6, 6),
     ) -> None:
-        """Logs precision-recall curve for the best model on the validation set.
+        """Logs precision-recall curve in the experiment.
 
         Args:
             pred_probs (np.ndarray): predicted probabilities of the positive class.
+            true_class (np.ndarray): true class labels.
             encoded_pos_class_label (int): encoded positive class label.
+            fig_name (str): name of precision-recall curve figure. Defaults to 'precision_recall_curve.png'.
+            fig_size (tuple): figure size. Defaults to (6, 6).
         """
 
         prec_recall_fig = self.plot_precision_recall_curve(
-            y_true=self.valid_class,
+            y_true=true_class,
             y_pred=pred_probs[:, encoded_pos_class_label],
-            fig_size=(6, 6),
+            fig_size=fig_size,
         )
-        self.comet_exp.log_figure(
-            figure_name="Precision-Recall Curve", figure=prec_recall_fig, overwrite=True
-        )
+        mlflow.log_figure(prec_recall_fig, fig_name)
 
     def _log_cumulative_gains(
-        self, pred_probs: np.ndarray, valid_class: np.ndarray
+        self,
+        pred_probs: np.ndarray,
+        true_class: np.ndarray,
+        fig_name: str = "cumulative_gains_curve.png",
+        fig_size: tuple = (6, 6),
     ) -> None:
-        """Logs cumulative gains curve for the best model on the validation set.
+        """Logs cumulative gains curve in the experiment.
 
         Args:
             pred_probs (1-D np.ndarray): predicted probabilities of the positive class.
-            valid_class (np.ndarray): validation class labels.
+            true_class (np.ndarray): true class labels.
+            fig_name (str): name of cumulative gains curve figure. Defaults to 'cumulative_gains_curve.png'.
+            fig_size (tuple): figure size. Defaults to (6, 6).
         """
 
         cum_gain_fig = self.plot_cumulative_gains(
-            y_true=valid_class,
+            y_true=true_class,
             y_pred=pred_probs[:, self.encoded_pos_class_label],
-            fig_size=(6, 6),
+            fig_size=fig_size,
         )
-        self.comet_exp.log_figure(
-            figure_name="Cumulative Gain", figure=cum_gain_fig, overwrite=True
-        )
+        mlflow.log_figure(cum_gain_fig, fig_name)
 
-    def _log_lift_curve(self, pred_probs: np.ndarray, valid_class: np.ndarray) -> None:
-        """Logs lift curve for the best model on the validation set.
+    def _log_lift_curve(
+        self,
+        pred_probs: np.ndarray,
+        true_class: np.ndarray,
+        fig_name: str = "lift_curve.png",
+        fig_size: tuple = (6, 6),
+    ) -> None:
+        """Logs lift curve in the experiment.
 
         Args:
             pred_probs (1-D np.ndarray): predicted probabilities of the positive class.
-            valid_class (np.ndarray): validation class labels.
+            true_class (np.ndarray): true class labels.
+            fig_name (str): name of lift curve figure. Defaults to 'lift_curve.png'.
+            fig_size (tuple): figure size. Defaults to (6, 6).
         """
 
         lift_curve_fig = self.plot_lift_curve(
-            y_true=valid_class,
+            y_true=true_class,
             y_pred=pred_probs[:, self.encoded_pos_class_label],
-            fig_size=(6, 6),
+            fig_size=fig_size,
         )
-        self.comet_exp.log_figure(
-            figure_name="Lift Curve", figure=lift_curve_fig, overwrite=True
+        mlflow.log_figure(lift_curve_fig, fig_name)
+
+    def plot_confusion_matrix(
+        self,
+        y_decoded: np.ndarray,
+        pred_y_decoded: np.ndarray,
+        decoded_class_labels: list,
+        normalize_conf_mat: Literal["true", None] = None,
+        confusion_matrix_fig_name: str = "confusion_matrix.png",
+    ) -> None:
+        """Plots confusion matrix: normalized and un-normalized."""
+        confusion_mat_norm = confusion_matrix(
+            y_true=y_decoded,
+            y_pred=pred_y_decoded,
+            labels=decoded_class_labels,
+            normalize=normalize_conf_mat,
         )
+        confusion_mat_norm = ConfusionMatrixDisplay(
+            confusion_matrix=confusion_mat_norm,
+            display_labels=decoded_class_labels,
+        )
+        _, ax = plt.subplots(figsize=(11, 11))
+        confusion_mat_norm.plot(ax=ax, xticks_rotation=75)
+        confusion_mat_norm.figure_.savefig(
+            self.artifacts_path + confusion_matrix_fig_name
+        )
+
+    def plot_calibration_curve(
+        self,
+        y_true: np.ndarray,
+        y_prob: np.ndarray,
+        n_bins: int = 5,
+        plot_title: str = "Calibration plot",
+        calibration_matrix_fig_name: Optional[str] = None,
+    ) -> None:
+        """
+        Plot calibration curve for est w/o and with calibration.
+
+        Args:
+            y_true (np.ndarray): true class labels.
+            y_prob (np.ndarray): predicted probabilities.
+            n_bins (int): number of bins to use for calibration curve.
+            plot_title (str): title of the plot.
+            calibration_matrix_fig_name (str): name of the figure to save.
+        """
+
+        # Calculate the calibration curve
+        prob_true, prob_pred = calibration_curve(y_true, y_prob, n_bins=n_bins)
+
+        fig = plt.figure()
+        ax1 = fig.add_subplot(111)
+        ax1.plot(prob_pred, prob_true, "s-", label="Predictions")
+        ax1.plot([0, 1], [0, 1], "k:", label="Perfectly calibrated")
+        ax1.set_ylabel("Fraction of positives")
+        ax1.set_xlabel("Mean predicted value")
+        ax1.set_ylim([-0.05, 1.05])
+        ax1.legend()
+        plt.title(plot_title)
+        if calibration_matrix_fig_name is not None:
+            plt.savefig(self.artifacts_path + calibration_matrix_fig_name)
+        plt.show()
+
+    @staticmethod
+    def select_best_model(
+        models_scores: pd.DataFrame,
+        selection_metric: str,
+    ) -> str:
+        """
+        Selects the best model based on a given selection metric, like f1.
+
+        Args:
+            models_scores (pd.DataFrame): a dataframe with "Model Name" column and other columns each
+                                            representing a performance metric, e.g., Recall and Precision.
+            selection_metric (str): the column name of the selection metric.
+
+        Returns:
+            best_model_name (str): the name of the best model.
+
+        Raises:
+            ValueError: if models_scores is empty.
+        """
+
+        # Check if models scores dataframe is not empty
+        if models_scores.shape[0] > 0:
+            # Sort models by primary and secondary metrics
+            models_scores.sort_values(
+                by=[selection_metric],
+                ascending=[False],
+                inplace=True,
+                na_position="last",
+            )
+
+            # Extract the name of the best model
+            best_model_name = models_scores["Model Name"].iloc[0]
+            best_model_version = int(models_scores["Model Version"].iloc[0])
+
+        else:
+            raise ValueError("Models scores dataframe 'models_scores' is empty.")
+
+        return best_model_name, best_model_version, models_scores
 
     @staticmethod
     def calc_expected_calibration_error(
@@ -1134,142 +1360,86 @@ class ModelEvaluator(ModelOptimizer):
         return ece[0]
 
 
-class ModelChampionManager:
-    """Manages all champion model related activities, such as selecting the best
-    performer from candidate models, calibrating the best model, and registering
-    it in workspace.
+class ModelManager:
+    """Loads and registers models in Azure workspace."""
 
-    Attributes:
-        champ_model_name (str): name of the champion model.
-    """
+    def __init__(self, registered_model_workspace: Workspace):
+        self.ws = registered_model_workspace
 
-    def __init__(self, champ_model_name: str) -> None:
-        self.champ_model_name = champ_model_name
-
-    def select_best_performer(
+    def load_registered_model(
         self,
-        comet_project_name: str,
-        comet_workspace_name: str,
-        comparison_metric: str,
-        comet_exp_keys: dict,
-        comet_api: API = None,
-    ) -> str:
-        """Selects the best performer from all challenger models. The comet_exp_keys
-        is a dictionary of model names as keys and their corresponding experiment
-        objects as values. It returns the name of the best challenger model.
+        registered_model_name: str,
+        registered_model_version: Optional[str] = None,
+        is_mlflow_model: bool = False,
+    ) -> Union[Pipeline, str]:
+        """
+        Imports registered models in Azure workspace if they exists. It's meant to be used in automated process
+        where we need to evaluate retraining results (registered models) that may not be registered. One such case is when a
+        retraining experiment results in an overfitted model, which should not be registered, so attempting to load that model
+        will result in an error that might break model retraining pipeline. Hence, this function accounts for such situations.
 
         Args:
-            comet_project_name (str): comet project name.
-            comet_workspace_name (str): comet workspace name.
-            comparison_metric (str): metric name to compare models.
-            comet_exp_keys (dict): dictionary of model names as keys and their
-                                   corresponding experiment objects as values.
-            comet_api (API): comet API object.
+            registered_model_name (str): name of the registered model
+            registered_model_version (str): the version of the registered model (default: None which gives the latest version)
+            is_mlflow_model (bool): was the model registered using mlflow. Default to False.
 
         Returns:
-            best_challenger_name (str): name of the best challenger model.
+            registered_model_pkl (Pipeline): pkl file of the registered model
+            registered_model_path (str): local directory to downloaded model.
         """
 
-        if comet_api is None:
-            comet_api = API()
+        # Get register model path
+        registered_model_path = Model.get_model_path(
+            model_name=registered_model_name,
+            version=registered_model_version,
+            _workspace=self.ws,
+        )
 
-        exp_scores = {}
-        for i in range(comet_exp_keys.shape[0]):
-            experiment = comet_api.get_experiment(
-                project_name=comet_project_name,
-                workspace=comet_workspace_name,
-                experiment=comet_exp_keys.iloc[i, 1],
-            )
-            exp_metric_score = float(
-                experiment.get_metrics(comparison_metric)[0]["metricValue"]
-            )
+        if is_mlflow_model:
+            registered_model_pkl = mlflow.sklearn.load_model(registered_model_path)
 
-            # Extract the model name from the experiment keys and attach its score from experiment
-            exp_scores.update(**{f"{comet_exp_keys.iloc[i, 0]}": exp_metric_score})
+        else:
+            registered_model_pkl = joblib.load(registered_model_path)
 
-        # Select the best performer
-        best_challenger_name = max(exp_scores, key=exp_scores.get)
-
-        return best_challenger_name
+        return registered_model_pkl, registered_model_path
 
     @staticmethod
-    def calibrate_pipeline(
-        valid_features: pd.DataFrame,
-        valid_class: np.ndarray,
-        fitted_pipeline: Pipeline,
-        cv_folds: int = 5,
-    ) -> Pipeline:
-        """Takes a fitted pipeline and returns a calibrated pipeline.
-
-        Args:
-            valid_features (np.ndarray): Validation features.
-            valid_class (np.ndarray): Validation class labels.
-            fitted_pipeline (Pipeline): Fitted pipeline on the training set.
-            cv_folds (int): Number of cross-validation folds for calibration.
-
-        Returns:
-            calib_pipeline (Pipeline): Calibrated pipeline.
-
-        Raises:
-            ValueError: If the classifier in the fitted pipeline is not fitted.
-        """
-
-        # Extract preprocessor, selector, and classifier from the fitted pipeline
-        preprocessor = fitted_pipeline.named_steps.get("preprocessor")
-        selector = fitted_pipeline.named_steps.get("selector")
-        model = fitted_pipeline.named_steps.get("classifier")
-
-        if not hasattr(model, "classes_"):
-            raise ValueError("The classifier in the fitted pipeline is not fitted.")
-
-        # Transform the validation set using the preprocessor and selector steps
-        valid_features_transformed = fitted_pipeline.named_steps[
-            "preprocessor"
-        ].transform(valid_features)
-        valid_features_transformed = fitted_pipeline.named_steps["selector"].transform(
-            valid_features_transformed
-        )
-
-        # Calibrate the fitted model using the transformed validation set
-        calibrator = CalibratedClassifierCV(
-            estimator=model,
-            method=("isotonic" if len(valid_class) > 1000 else "sigmoid"),
-            cv=cv_folds,
-        )
-        calibrator.fit(valid_features_transformed, valid_class)
-
-        # Create a new pipeline with the calibrated classifier
-        calib_pipeline = Pipeline(
-            steps=[
-                ("preprocessor", preprocessor),
-                ("selector", selector),
-                ("classifier", calibrator),
-            ]
-        )
-
-        return calib_pipeline
-
-    def log_and_register_champ_model(
-        self,
-        local_path: str,
+    def log_and_register_model(
+        X_train: pd.DataFrame,
         pipeline: Pipeline,
-        exp_obj: ExistingExperiment,
+        registered_model_name: str,
+        model_uri: str,
+        tags: dict,
+        conda_env: str = "train_env.yml",
     ) -> None:
-        """Logs and registers champion model in workspace.
+        """Logs and registers the model in the experiment using MLflow.
 
         Args:
-            local_path (str): local path to save champion model.
+            X_train (pd.DataFrame): train features.
             pipeline (Pipeline): fitted pipeline.
-            exp_obj (ExistingExperiment): comet experiment object.
+            registered_model_name (str): registered model name.
+            model_uri (str): model URI.
+            tags (dict): dictionary of tags.
+            conda_env (str): conda environment file. Defaults to 'train_env.yml'.
         """
 
-        if not os.path.exists(local_path):
-            os.makedirs(local_path)
-        joblib.dump(pipeline, f"{local_path}/{self.champ_model_name}.pkl")
-        exp_obj.log_model(
-            name=self.champ_model_name,
-            file_or_folder=f"{local_path}/{self.champ_model_name}.pkl",
-            overwrite=False,
+        signature = infer_signature(
+            X_train, pipeline.predict(X_train.iloc[0 : X_train.shape[0], :])
         )
-        exp_obj.register_model(model_name=self.champ_model_name)
-        exp_obj.end()
+        mlflow.sklearn.log_model(
+            pipeline,
+            artifact_path="model",  # Model folder in the experiment UI
+            signature=signature,
+            input_example=X_train.iloc[0 : X_train.shape[0], :],
+            conda_env=conda_env,
+        )
+        mlflow.register_model(
+            model_uri=model_uri,
+            name=registered_model_name,
+            tags=tags,
+        )
+
+        logger.info(
+            "Model {registered_model_name} was registered on %s"
+            % datetime.now().strftime("%Y-%d-%m %H:%M:%S")
+        )

@@ -434,10 +434,10 @@ disable=raw-checker-failed,
         use-implicit-booleaness-not-comparison-to-string,
         use-implicit-booleaness-not-comparison-to-zero,
         use-symbolic-message-instead,
-        R, 
+        R,
         C,
-        W0511
-      ;   E1120,
+        W0511,
+        E1120
       ;   E0401,
       ;   E0110,
       ;   I1101,

@@ -77,11 +77,8 @@ preprocessing:
   var_thresh_val: 0.05 # Thresh. value to remove low variance features in VarianceThreshold
 
 train:
-  initiate_comet_project: False # Should be True if new Comet project should be created
-  comet_project_name: "end-to-end-ml"
-  comet_workspace_name: "6bmod5d8"
   search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization
-  parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
+  parallel_jobs_no: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
   exp_timout_secs: 3600 # Experiment timeout
   cross_val_folds: 5 # No. of folds used for cross-validation for model calibration
   fbeta_score_beta_val: 0.5 # Value of beta in f_beta_score, which is a metric used for hyperparams optimization
@@ -149,14 +146,20 @@ xgboost:
     learning_rate: [1e-5, 1e2, true]
     n_estimators: [20, 100, false]
 
-files:
+datasets:
   historical_data_file_name: "historical_data.parquet"
   preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
   preprocessed_dataset_features_file_name: "preprocessed_dataset_features.parquet"
-  train_set_file_name: "train.parquet"
-  valid_set_file_name: "validation.parquet"
-  test_set_file_name: "test.parquet"
-  experiments_keys_file_name: "experiment_keys" # Name of the csv file storing keys of experiments that ran successfully (needed for evaluate.py)
+  datastore_name: "diabetes_datastore"
+  train_set_name: "diabetes_train_set"
+  valid_set_name: "diabetes_valid_set"
+  test_set_name: "diabetes_test_set"
+  train_set_version: "latest"
+  valid_set_version: "latest"
+  test_set_version: "latest"
+  train_set_desc: "diabetes train set"
+  valid_set_desc: "diabetes valid set"
+  test_set_desc: "diabetes test set"
 
 modelregistry:
   lr_registered_model_name: "logistic-regression" # Name used to register logistic regression model

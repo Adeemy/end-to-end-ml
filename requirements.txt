@@ -20,5 +20,4 @@ scipy==1.11.4
 seaborn==0.13.2
 ucimlrepo==0.0.3
 xgboost==2.0.3
-
-
+mlflow==2.14.3

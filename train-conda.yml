@@ -5,6 +5,7 @@ dependencies:
   - python=3.10
   - pip:
       - comet_ml==3.35.5
+      - mlflow
       - dask==2023.12.1
       - fastapi<0.100
       - feast==0.34.1
