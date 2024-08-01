@@ -36,6 +36,7 @@ Steps to deploy ARM template to create Azure resources for training:
      }
    }
    ```
+
 8. Deploy the ARM template to create the needed resources in the Azure resource group
    - `az deployment group create --name <YourResourcesDeployment> --resource-group <ResourceGroupName> --template-file ./infrastructure/azure_train_resource.json`
 9. Create Service Principal to access Azure resources remotely
@@ -46,5 +47,5 @@ Steps to deploy ARM template to create Azure resources for training:
     - `az login --service-principal -u <ServicePrincipalID> -p <ServicePrincipalPassword> --tenant <TenantID>`
     - `az keyvault secret set --vault-name <KeyVaultName> --name ServicePrincipalID --value <ServicePrincipalID>`
     - `az keyvault secret set --vault-name <KeyVaultName> --name ServicePrincipalPassword --value <ServicePrincipalPassword>`
-12. (Optional) Grant permission to specific user to access
-   - `az keyvault set-policy --name <KeyVaultName> --upn <UserPrincipalName> --secret-permissions get list --key-permissions get list --certificate-permissions get list`
+12. (Optional) Grant permissions to access secrets in key vault to specific user
+    - `az keyvault set-policy --name <KeyVaultName> --upn <UserPrincipalName> --secret-permissions get list --key-permissions get list --certificate-permissions get list`

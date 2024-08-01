@@ -161,6 +161,15 @@ datasets:
   valid_set_desc: "diabetes valid set"
   test_set_desc: "diabetes test set"
 
+azure_datasets:
+  preprocessed_data_name: "diabetes-preprocessed-dataset"
+  train_data_name: "diabetes-train-dataset"
+  train_data_version: "latest"
+  validation_data_name: "diabetes-valid-dataset"
+  validation_data_version: "latest"
+  test_data_name: "diabetes-test-dataset"
+  test_data_version: "latest"
+
 modelregistry:
   lr_registered_model_name: "logistic-regression" # Name used to register logistic regression model
   rf_registered_model_name: "random-forest" # Name used to register random forest model

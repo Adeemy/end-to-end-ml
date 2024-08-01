@@ -68,14 +68,12 @@ def main(
     ve_voting_rule = config.params["train"]["voting_rule"]
 
     datastore_name = config.params["datasets"]["datastore_name"]
-    train_set_name = config.params["datasets"]["train_set_name"]
-    valid_set_name = config.params["datasets"]["valid_set_file_name"]
-    test_set_name = config.params["datasets"]["test_set_file_name"]
-    train_set_version = config.params["datasets"]["train_set_version"]
-    valid_set_version = config.params["datasets"]["valid_set_version"]
-    test_set_version = config.params["datasets"]["test_set_version"]
-    train_set_desc = config.params["datasets"]["train_set_desc"]
-    valid_set_desc = config.params["datasets"]["valid_set_desc"]
+    train_set_name = config.params["azure_datasets"]["train_data_name"]
+    valid_set_name = config.params["azure_datasets"]["validation_data_name"]
+    test_set_name = config.params["azure_datasets"]["test_data_name"]
+    train_set_version = config.params["azure_datasets"]["train_data_version"]
+    valid_set_version = config.params["azure_datasets"]["validation_data_version"]
+    test_set_version = config.params["azure_datasets"]["test_data_version"]
 
     lr_registered_model_name = config.params["modelregistry"][
         "lr_registered_model_name"
@@ -160,30 +158,6 @@ def main(
     # optimization to avoid applying data transformation in each iteration.
     train_features_preprocessed = data_prep.train_features_preprocessed
     valid_features_preprocessed = data_prep.valid_features_preprocessed
-
-    # Save data splits with encoded class to be used in models evaluation
-    # TODO: an integration test should be added to check if the saved files.
-    # Register the train set
-    train_set = train_features
-    train_set[class_column_name] = train_class
-    _ = Dataset.Tabular.register_pandas_dataframe(
-        dataframe=train_set,
-        target=ws.get_default_datastore(),
-        name=f"transformed_{train_set_name}",
-        description=f"transformed {train_set_desc}",
-        show_progress=True,
-    )
-
-    # Register the validation set
-    valid_set = valid_features
-    valid_set[class_column_name] = valid_class
-    _ = Dataset.Tabular.register_pandas_dataframe(
-        dataframe=valid_set,
-        target=ws.get_default_datastore(),
-        name=f"transformed_{valid_set_name}",
-        description=f"transformed {valid_set_desc}",
-        show_progress=True,
-    )
 
     # Create training input parameters
     training_input_params = {

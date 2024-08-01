@@ -1,5 +1,5 @@
 """
-Define paths to data and training artifacts directories and creates
+Defines paths to data and training artifacts directories and creates
 them if they do not exist.
 """
 
