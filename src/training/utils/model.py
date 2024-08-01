@@ -256,10 +256,10 @@ class ModelOptimizer:
             if previous_best_value != study.best_value:
                 study.set_user_attr("previous_best_value", study.best_value)
                 logger.info(
-                    f"""\n
-                    Trial {int(frozen_trial.number)} finished,
-                    best value: {frozen_trial.value}
-                    hyperparameters: {frozen_trial.params}."""
+                    "Trial %d finished, best value: %s hyperparameters: %s",
+                    int(frozen_trial.number),
+                    frozen_trial.value,
+                    frozen_trial.params,
                 )
 
         sampler = optuna.samplers.TPESampler(
@@ -271,10 +271,7 @@ class ModelOptimizer:
         study = optuna.create_study(sampler=sampler)
 
         logger.info(
-            f"""\n
-        ----------------------------------------------------------------
-        --- Hyperparameter Optimization of {self.classifier_name} Starts ...
-        ----------------------------------------------------------------\n"""
+            "Hyperparameter Optimization of %s Starts ...\n", self.classifier_name
         )
 
         study.optimize(
@@ -480,7 +477,7 @@ class ModelEvaluator(ModelOptimizer):
             plt.show()
 
         except ValueError as e:
-            logger.info(f"Error plotting feature importance --> {e}")
+            logger.info("Error plotting feature importance --> %s", e)
 
         return figure_obj
 
@@ -554,7 +551,7 @@ class ModelEvaluator(ModelOptimizer):
                     )
 
                 else:
-                    raise ValueError(f"Numerical or categorical must be provided.")
+                    raise ValueError("Numerical or categorical must be provided.")
 
                 # Extract transformed feature names after feature selection
                 col_names = [
@@ -578,7 +575,7 @@ class ModelEvaluator(ModelOptimizer):
                 )
 
         except Exception as e:  # pylint: disable=W0718
-            logger.info(f"Feature importance extraction error --> {e}")
+            logger.info("Feature importance extraction error --> %s", e)
             col_names = None
 
     def _log_feature_importance_fig(
@@ -806,10 +803,11 @@ class ModelEvaluator(ModelOptimizer):
         of each model and predicated class labels using the provided threshold value.
 
         Args:
-            serialized_model (pkl file): the imported pickle file with pipeline transformer.
-            dataset (pandas dataframe): dataset to predict its class label.
+            serialized_model (Pipeline): the imported pickle file with pipeline transformer.
+            dataset (pd.DataFrame): dataset to predict its class label.
             true_labels (np.ndarray): encoded actual class labels.
             model_name (str): full model name as it will appear in the final dataframe.
+            model_version (str): model version.
             pos_class_threshold (float): threshold value for positive class label.
             pos_class_label (str): positive class label.
             neg_class_label (str): negative class label.
@@ -959,26 +957,26 @@ class ModelEvaluator(ModelOptimizer):
             pred_probs=pred_valid_probs,
             true_class=self.valid_class,
             encoded_pos_class_label=self.encoded_pos_class_label,
-            fig_name=f"roc_curve.png",
+            fig_name="roc_curve.png",
         )
         logger.info("ROC curve logged successfully.")
         self._log_precision_recall_curve(
             pred_probs=pred_valid_probs,
             true_class=self.valid_class,
             encoded_pos_class_label=self.encoded_pos_class_label,
-            fig_name=f"precision_recall_curve.png",
+            fig_name="precision_recall_curve.png",
         )
         logger.info("Precision-recall curve logged successfully.")
         self._log_cumulative_gains(
             pred_probs=pred_valid_probs,
             true_class=self.valid_class,
-            fig_name=f"cumulative_gains.png",
+            fig_name="cumulative_gains.png",
         )
         logger.info("Cumulative gains curve logged successfully.")
         self._log_lift_curve(
             pred_probs=pred_valid_probs,
             true_class=self.valid_class,
-            fig_name=f"lift_curve.png",
+            fig_name="lift_curve.png",
         )
         logger.info("Lift curve logged successfully.")
 
@@ -1440,6 +1438,7 @@ class ModelManager:
         )
 
         logger.info(
-            "Model {registered_model_name} was registered on %s"
-            % datetime.now().strftime("%Y-%d-%m %H:%M:%S")
+            "Model %s was registered on %s",
+            registered_model_name,
+            datetime.now().strftime("%Y-%d-%m %H:%M:%S"),
         )

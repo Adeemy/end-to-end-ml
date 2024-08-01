@@ -7,7 +7,7 @@ Steps to deploy ARM template to create Azure resources for training:
 3. Log in to Azure subscription
    - `az login`
 4. Set the active subscription
-   - `az account set --subscription "YourSubscriptionID"`
+   - `az account set --subscription <YourSubscriptionID>`
 5. Create Azure resource group
    - `az group create --name <ResourceGroupName> --location <ResourceGroupLocation>`
 6. Create ARM template using Quick Start as illustrated in Azure [Docs](https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/quickstart-create-templates-use-the-portal)
@@ -46,3 +46,5 @@ Steps to deploy ARM template to create Azure resources for training:
     - `az login --service-principal -u <ServicePrincipalID> -p <ServicePrincipalPassword> --tenant <TenantID>`
     - `az keyvault secret set --vault-name <KeyVaultName> --name ServicePrincipalID --value <ServicePrincipalID>`
     - `az keyvault secret set --vault-name <KeyVaultName> --name ServicePrincipalPassword --value <ServicePrincipalPassword>`
+12. (Optional) Grant permission to specific user to access
+   - `az keyvault set-policy --name <KeyVaultName> --upn <UserPrincipalName> --secret-permissions get list --key-permissions get list --certificate-permissions get list`

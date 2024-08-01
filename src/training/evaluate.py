@@ -69,14 +69,12 @@ def select_best_model(
         comet_project_name=project_name,
         comet_workspace_name=workspace_name,
         comparison_metric=f"valid_{comparison_metric_name}",
-        comet_exp_keys=successful_exp_keys,
     )
 
     return best_model_name
 
 
 def evaluate_best_model(
-    best_model_exp_obj: ExistingExperiment,
     best_model_pipeline: ModelEvaluator,
     train_set: pd.DataFrame,
     test_set: pd.DataFrame,
@@ -88,7 +86,6 @@ def evaluate_best_model(
     """Evaluate the best model on testing set to assess its generalization capability.
 
     Args:
-        best_model_exp_obj (ExistingExperiment): ExistingExperiment object.
         best_model_pipeline (ModelEvaluator): ModelEvaluator object.
         train_set (pd.DataFrame): training set.
         test_set (pd.DataFrame): testing set.
@@ -102,7 +99,6 @@ def evaluate_best_model(
     """
 
     best_model_evaluator = ModelEvaluator(
-        comet_exp=best_model_exp_obj,
         pipeline=best_model_pipeline,
         train_features=train_set.drop(class_col_name, axis=1),
         train_class=np.array(train_set[class_col_name]),
@@ -222,7 +218,6 @@ def main(
     # evaluation to ensure all models are independent of the test set.
     best_model_pipeline = joblib.load(f"{ARTIFACTS_DIR}/{best_model_name}.pkl")
     test_scores = evaluate_best_model(
-        best_model_exp_obj=best_model_exp_obj,
         best_model_pipeline=best_model_pipeline,
         train_set=train_set,
         test_set=test_set,

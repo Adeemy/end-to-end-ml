@@ -590,10 +590,10 @@ class ModelTrainer:
                 tags=model_tags,
             )
 
-            logger.info(f"{classifier_name} model registered successfully!")
+            logger.info("Model %s registered successfully!", classifier_name)
 
         except Exception as e:  # pylint: disable=W0718
-            logger.info(f"\n\nModel training error --> {e}\n\n")
+            logger.info("Model training error --> %s", str(e))
             pipeline = None
 
         return pipeline
@@ -870,7 +870,7 @@ class VotingEnsembleCreator(ModelTrainer):
             logger.info("Voting ensemble model metrics registered successfully!")
 
         except Exception as e:  # pylint: disable=W0718
-            logger.info(f"\nVoting ensemble error --> {e}\n\n")
+            logger.exception("Voting ensemble error: %s", str(e))
             ve_pipeline = None
 
         return ve_pipeline
@@ -909,7 +909,9 @@ class EnvCreator:
             aml_compute_clust = ComputeTarget(
                 workspace=self.workspace, name=aml_clust_name
             )
-            logger.info(f"Compute cluster {aml_clust_name} exists and it will be used.")
+            logger.info(
+                "Compute cluster %s exists and it will be used.", aml_clust_name
+            )
 
         except ComputeTargetException:
             compute_config = AmlCompute.provisioning_configuration(
@@ -953,7 +955,9 @@ class EnvCreator:
             )
 
         except Exception as e:  # pylint: disable=W0718
-            logger.error(f"Local conda file {conda_yml_path} does not exist! --> {e}")
+            logger.error(
+                "Local conda file %s does not exist! --> %s", conda_yml_path, str(e)
+            )
 
         try:
             # Get latest version of training environment conda file
@@ -962,7 +966,7 @@ class EnvCreator:
             )
 
         except UnboundLocalError:
-            logger.error(f"Registered env {env_name} does not exist!")
+            logger.error("Registered env %s does not exist!", env_name)
 
         # Extract dependencies from imported yaml files
         local_env_depends = (
@@ -996,9 +1000,10 @@ class EnvCreator:
             dep.replace(" ", "").replace("- ", "") for dep in registered_env_depends
         ]
 
-        logger.info(f"Required dependencies for model training: {local_env_depends}\n")
+        logger.info("Required dependencies for model training: %s", local_env_depends)
         logger.info(
-            f"Dependencies in latest version of registered training environment: {registered_env_depends}\n"
+            "Dependencies in latest version of registered training environment: %s",
+            registered_env_depends,
         )
 
         # Compare dependencies
@@ -1007,10 +1012,11 @@ class EnvCreator:
         )
         only_in_local_env = set(local_env_depends) - set(registered_env_depends)
         only_in_registered_env = set(registered_env_depends) - set(local_env_depends)
-        logger.info(f"Common dependencies: {common_depends_in_both_envs}")
-        logger.info(f"Dependencies only in data update env: {only_in_local_env}")
+        logger.info("Common dependencies: %s", common_depends_in_both_envs)
+        logger.info("Dependencies only in data update env: %s", only_in_local_env)
         logger.info(
-            f"Dependencies only in the latest version of registered data update env: {only_in_registered_env}"
+            "Dependencies only in the latest version of registered data update env: %s",
+            only_in_registered_env,
         )
 
         local_and_remote_env_mismatch = False
@@ -1087,7 +1093,8 @@ class EnvCreator:
                 "azure-cli",
                 "azure-mgmt-resource",
                 "azure-core",
-            ]
+            ],
+            check=True,
         )
 
         # Login to Azure Container Registry and build image and push to ACR

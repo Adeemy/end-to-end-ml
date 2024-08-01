@@ -96,3 +96,35 @@ files:
   inference_set_file_name: "inference.parquet"
   preprocessed_data_features_file_name: "preprocessed_dataset_features.parquet" # For feature store
   preprocessed_data_target_file_name: "preprocessed_dataset_target.parquet" # For feature store
+
+azure_datasets:
+  raw_dataset_name: "diabetes-raw-dataset"
+  raw_dataset_desc: "Raw dataset for diabetes prediction"
+  raw_dataset_tags:
+    "Type": "raw data"
+    "Source": "UCI"
+  inference_set_name: "diabetes-inference-dataset"
+  inference_set_desc: "Inference dataset for diabetes prediction"
+  inference_set_tags:
+    "Type": "inference data"
+    "Source": "UCI"
+  preprocessed_data_name: "diabetes-preprocessed-dataset"
+  preprocessed_data_desc: "Preprocessed dataset for diabetes prediction"
+  preprocessed_data_tags:
+    "Type": "preprocessed data"
+    "Source": "UCI"
+  train_data_name: "diabetes-train-dataset"
+  train_data_desc: "Train dataset for diabetes prediction"
+  train_data_tags:
+    "Type": "train data"
+    "Source": "UCI"
+  validation_data_name: "diabetes-valid-dataset"
+  validation_data_desc: "Validation dataset for diabetes prediction"
+  validation_data_tags:
+    "Type": "validation data"
+    "Source": "UCI"
+  test_data_name: "diabetes-test-dataset"
+  test_data_desc: "Test dataset for diabetes prediction"
+  test_data_tags:
+    "Type": "test data"
+    "Source": "UCI"

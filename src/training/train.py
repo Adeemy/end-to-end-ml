@@ -10,22 +10,14 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path, PosixPath
-from typing import List, Tuple
 
 import mlflow
-import pandas as pd
 from azureml.core import Dataset, Workspace
 from azureml.core.authentication import ServicePrincipalAuthentication
 from dotenv import load_dotenv
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import (
-    LabelEncoder,
-    MinMaxScaler,
-    RobustScaler,
-    StandardScaler,
-)
 from xgboost import XGBClassifier
 
 # To import modules from the parent directory in Azure compute cluster
@@ -34,7 +26,7 @@ if str(root_dir) not in sys.path:
     sys.path.append(str(root_dir))
 
 from src.training.utils.config import Config
-from src.training.utils.data import TrainingDataPrep
+from src.training.utils.helpers import prepare_training_data
 from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR
@@ -42,137 +34,12 @@ from src.utils.path import ARTIFACTS_DIR
 load_dotenv()
 
 
-def prepare_data(
-    config_yaml_path: str,
-    training_set: pd.DataFrame,
-    validation_set: pd.DataFrame,
-    testing_set: pd.DataFrame,
-) -> Tuple[
-    TrainingDataPrep,
-    pd.DataFrame,
-    pd.DataFrame,
-    pd.DataFrame,
-    pd.Series,
-    pd.Series,
-    pd.Series,
-    List[str],
-    List[str],
-    LabelEncoder,
-    int,
-]:
-    """Prepares data for training by preprocessing training and validation sets.
-
-    Args:
-        config_yaml_path (str): path to config yaml file.
-        training_set (pd.DataFrame): training set.
-        validation_set (pd.DataFrame): validation set.
-        testing_set (pd.DataFrame): testing set.
-
-    Returns:
-        data_prep (TrainingDataPrep): data preparation object.
-        data_transformation_pipeline (Pipeline): data transformation pipeline.
-        train_features (pd.DataFrame): preprocessed training features.
-        valid_features (pd.DataFrame): preprocessed validation features.
-        test_features (pd.DataFrame): preprocessed testing features.
-        train_class (pd.Series): training class labels.
-        valid_class (pd.Series): validation class labels.
-        test_class (pd.Series): testing class labels.
-        num_feature_names (List[str]): numerical feature names.
-        cat_feature_names (List[str]): categorical feature names.
-        class_encoder (LabelEncoder): class label encoder.
-        encoded_positive_class_label (int): encoded positive class label.
-    """
-
-    config = Config(config_path=config_yaml_path)
-    pk_col_name = config.params["data"]["pk_col_name"]
-    class_column_name = config.params["data"]["class_col_name"]
-    num_col_names = config.params["data"]["num_col_names"]
-    cat_col_names = config.params["data"]["cat_col_names"]
-    pos_class = config.params["data"]["pos_class"]
-
-    num_features_imputer = config.params["preprocessing"]["num_features_imputer"]
-    num_features_scaler = config.params["preprocessing"]["num_features_scaler"]
-    scaler_params = config.params["preprocessing"].get("scaler_params", {})
-    cat_features_imputer = config.params["preprocessing"]["cat_features_imputer"]
-    cat_features_ohe_handle_unknown = config.params["preprocessing"][
-        "cat_features_ohe_handle_unknown"
-    ]
-    cat_features_nans_replacement = config.params["preprocessing"][
-        "cat_features_nans_replacement"
-    ]
-    var_thresh_val = config.params["preprocessing"]["var_thresh_val"]
-
-    # Prepare data for training
-    data_prep = TrainingDataPrep(
-        train_set=training_set,
-        test_set=testing_set,
-        primary_key=pk_col_name,
-        class_col_name=class_column_name,
-        numerical_feature_names=num_col_names,
-        categorical_feature_names=cat_col_names,
-    )
-    data_prep.extract_features(valid_set=validation_set)
-    data_prep.enforce_data_types()
-
-    # Encode class labels
-    # Note: class encoder is fitted on train class labels and will be used
-    # to transform validation and test class labels.
-    (
-        train_class,
-        valid_class,
-        encoded_positive_class_label,
-        class_encoder,
-    ) = data_prep.encode_class_labels(
-        pos_class_label=pos_class,
-    )
-
-    # Return features
-    train_features = data_prep.training_features
-    valid_features = data_prep.validation_features
-
-    # Define the mapping from strings to scaler classes
-    scaler_mapping = {
-        "robust": RobustScaler,
-        "standard": StandardScaler,
-        "minmax": MinMaxScaler,
-        "none": None,
-    }
-    scaler_class = scaler_mapping[num_features_scaler]
-    scaler_params = {k: v for d in scaler_params for k, v in d.items()}
-
-    # Create data transformation pipeline
-    data_transformation_pipeline = data_prep.create_data_transformation_pipeline(
-        num_features_imputer=num_features_imputer,
-        num_features_scaler=scaler_class(**scaler_params),
-        cat_features_imputer=cat_features_imputer,
-        cat_features_ohe_handle_unknown=cat_features_ohe_handle_unknown,
-        cat_features_nans_replacement=cat_features_nans_replacement,
-        var_thresh_val=var_thresh_val,
-    )
-    data_prep.clean_up_feature_names()
-    num_feature_names, cat_feature_names = data_prep.get_feature_names()
-
-    return (
-        data_prep,
-        data_transformation_pipeline,
-        train_features,
-        valid_features,
-        train_class,
-        valid_class,
-        num_feature_names,
-        cat_feature_names,
-        class_encoder,
-        encoded_positive_class_label,
-    )
-
-
 def main(
     config_yaml_path: str,
     artifacts_dir: PosixPath,
     logger: logging.Logger,
 ) -> None:
-    """
-    Takes a config file as input and submits experiments to perform
+    """Takes a config file as input and submits experiments to perform
     hyperparameters optimization for multiple models.
 
     Args:
@@ -188,7 +55,7 @@ def main(
 
     # Get configuration parameters
     config = Config(config_path=config_yaml_path)
-    project_name = config.params["train"]["comet_project_name"]
+    project_name = config.params["logger"]["project"]
     class_column_name = config.params["data"]["class_col_name"]
     num_col_names = config.params["data"]["num_col_names"]
     cat_col_names = config.params["data"]["cat_col_names"]
@@ -244,8 +111,8 @@ def main(
     )
     ws = Workspace(
         os.environ["SUBSCRIPTION_ID"],
-        os.environ["RESOURCE_GROUP"],
-        os.environ["WORKSPACE_NAME"],
+        os.environ["RESOURCE_GROUP_NAME"],
+        os.environ["AML_WORKSPACE_NAME"],
         auth=sp_authentication,
     )
 
@@ -282,7 +149,7 @@ def main(
         cat_feature_names,
         class_encoder,
         encoded_positive_class_label,
-    ) = prepare_data(
+    ) = prepare_training_data(
         config_yaml_path=config_yaml_path,
         training_set=training_set,
         validation_set=validation_set,

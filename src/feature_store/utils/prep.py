@@ -14,7 +14,7 @@ from src.utils.logger import get_console_logger
 
 ##########################################################
 # Get the logger objects by name
-logger = get_console_logger("data_logger")
+logger = get_console_logger("prep_logger")
 
 
 class DataSplitter:

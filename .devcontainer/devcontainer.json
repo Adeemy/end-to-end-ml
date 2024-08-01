@@ -28,7 +28,7 @@
       "extensions": [
         "ms-python.python",
         "ms-azuretools.vscode-docker",
-        "GitHub.copilot",
+        "github.vscode-github-actions",
         "ms-vscode.makefile-tools",
         "mhutchie.git-graph",
         "ms-python.pylint",
@@ -55,7 +55,7 @@
     8080
   ],
   // Use 'postCreateCommand' to run commands after the container is created.
-  // Adds project root path to sys.path 
+  // Adds project root path to sys.path
   "postCreateCommand": "bash ./.devcontainer/setup_env.sh"
   // Configure tool-specific properties.
   // "customizations": {},
