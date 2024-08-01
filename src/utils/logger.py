@@ -1,39 +1,35 @@
 """
-Defines a class that redirects printed messages in addition to some select events that
-need to be logged to logger objects.
+This module defines a function to create a console logger.
 """
 
 import logging
 
 
-def get_console_logger(name: str) -> logging.Logger:
-    """Creates a console logger. It can be used when only select
-    events only needs to be logged but not print messages.
+def create_console_logger(logger_name: str) -> logging.Logger:
+    """Creates a console logger with a specified name.
 
     Args:
-        name (str): name of logger.
+        logger_name (str): The name of the logger.
 
     Returns:
-        logger (logging.logger): console logger object.
+        logger (logging.Logger): The console logger object.
     """
 
     # Create logger object
-    logger = logging.getLogger(name)
+    logger = logging.getLogger(logger_name)
 
-    # Ensure the logger has only one handler
+    # Configure logger if it doesn't have any handlers
     if not logger.handlers:
-        # Set logger level
         logger.setLevel(logging.DEBUG)
 
-        # Create console handler with formatting
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.DEBUG)
+
         formatter = logging.Formatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
         console_handler.setFormatter(formatter)
 
-        # Add console handler to the logger
         logger.addHandler(console_handler)
 
     return logger

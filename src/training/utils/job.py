@@ -31,11 +31,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
 from src.training.utils.model import ModelEvaluator, ModelOptimizer
-from src.utils.logger import get_console_logger
+from src.utils.logger import create_console_logger
 
 ###########################################################
 # Get console logger
-logger = get_console_logger("job_logger")
+logger = create_console_logger("job_logger")
 
 
 class ModelTrainer:
@@ -453,7 +453,7 @@ class ModelTrainer:
 
         # Calibrate the newly fitted model using the validation set
         calibrator = CalibratedClassifierCV(
-            base_estimator=model,
+            estimator=model,
             method=("isotonic" if len(y_valid) > 1000 else "sigmoid"),
             cv=cv_folds,  # Indicate that the model is already fitted
         )

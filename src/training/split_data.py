@@ -25,7 +25,7 @@ from src.training.utils.helpers import (
     prepare_data_splits,
     split_data,
 )
-from src.utils.logger import get_console_logger
+from src.utils.logger import create_console_logger
 
 load_dotenv()
 
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Get the logger objects by name
-    console_logger = get_console_logger("split_data_logger")
+    console_logger = create_console_logger("split_data_logger")
 
     console_logger.info(
         "Splitting Preprocessed Data into Train and Test Sets Starts ..."

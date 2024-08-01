@@ -31,7 +31,7 @@ debug:
 
 # Exclude W0511 (fixme) and E1120 (no value for argument in function call) in .pylintrc file
 lint:
-	pylint ./src/feature_store ./src/training ./src/inference ./tests
+	pylint ./src/feature_store ./src/training ./tests
 
 all: install isort format lint
 

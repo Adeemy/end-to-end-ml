@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from src.utils import path
-from src.utils.logger import get_console_logger
+from src.utils.logger import create_console_logger
 
 
 def test_paths_exist():
@@ -25,8 +25,8 @@ def test_paths_are_directories():
     assert Path(path.ARTIFACTS_DIR).is_dir()
 
 
-def test_get_console_logger(mocker):
-    """Tests if the get_console_logger function returns a logger with the
+def test_create_console_logger(mocker):
+    """Tests if the create_console_logger function returns a logger with the
     correct properties."""
 
     # Mock the logging.getLogger, logging.StreamHandler, and logging.Formatter functions
@@ -39,8 +39,8 @@ def test_get_console_logger(mocker):
     )
     mock_formatter = mocker.patch("logging.Formatter", return_value=logging.Formatter())
 
-    # Call the get_console_logger function
-    logger = get_console_logger("test")
+    # Call the create_console_logger function
+    logger = create_console_logger("test")
 
     # Check that the logger has the correct name
     assert logger.name == "test"

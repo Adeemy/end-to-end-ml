@@ -28,7 +28,7 @@ if str(root_dir) not in sys.path:
 from src.training.utils.config import Config
 from src.training.utils.helpers import prepare_training_data
 from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
-from src.utils.logger import get_console_logger
+from src.utils.logger import create_console_logger
 from src.utils.path import ARTIFACTS_DIR
 
 load_dotenv()
@@ -218,91 +218,100 @@ def main(
         if config.params["includedmodels"]["include_logistic_regression"]:
             with mlflow.start_run(
                 nested=True, run_name="logistic_regression"
-            ) as child_run:
+            ) as child_run_lr:
                 mlflow.set_tags(training_input_params)
 
-            #############################################
-            # Train Logistic Regression model
-            if config.params["includedmodels"]["include_logistic_regression"]:
+                # Train Logistic Regression model
                 lr_pipeline = model_trainer.submit_train_exp(
                     parent_run_id=parent_run.info.run_id,
-                    child_run_id=child_run.info.run_id,
+                    child_run_id=child_run_lr.info.run_id,
                     model=LogisticRegression(**lr_params),
                     search_space_params=lr_search_space_params,
                     registered_model_name=lr_registered_model_name,
                 )
-            else:
-                lr_pipeline = None
+        else:
+            lr_pipeline = None
 
             #############################################
             # Train Random Forest model
             if config.params["includedmodels"]["include_random_forest"]:
-                rf_pipeline = model_trainer.submit_train_exp(
-                    parent_run_id=parent_run.info.run_id,
-                    child_run_id=child_run.info.run_id,
-                    model=RandomForestClassifier(**rf_params),
-                    search_space_params=rf_search_space_params,
-                    registered_model_name=rf_registered_model_name,
-                )
+                with mlflow.start_run(
+                    nested=True, run_name="random_forest"
+                ) as child_run_rf:
+                    mlflow.set_tags(training_input_params)
+                    rf_pipeline = model_trainer.submit_train_exp(
+                        parent_run_id=parent_run.info.run_id,
+                        child_run_id=child_run_rf.info.run_id,
+                        model=RandomForestClassifier(**rf_params),
+                        search_space_params=rf_search_space_params,
+                        registered_model_name=rf_registered_model_name,
+                    )
             else:
                 rf_pipeline = None
 
             #############################################
             # Train LightGBM model
             if config.params["includedmodels"]["include_lightgbm"]:
-                lgbm_pipeline = model_trainer.submit_train_exp(
-                    parent_run_id=parent_run.info.run_id,
-                    child_run_id=child_run.info.run_id,
-                    model=LGBMClassifier(**lgbm_params),
-                    search_space_params=lgbm_search_space_params,
-                    registered_model_name=lgbm_registered_model_name,
-                )
+                with mlflow.start_run(
+                    nested=True, run_name="lightgbm"
+                ) as child_run_lgbm:
+                    mlflow.set_tags(training_input_params)
+                    lgbm_pipeline = model_trainer.submit_train_exp(
+                        parent_run_id=parent_run.info.run_id,
+                        child_run_id=child_run_lgbm.info.run_id,
+                        model=LGBMClassifier(**lgbm_params),
+                        search_space_params=lgbm_search_space_params,
+                        registered_model_name=lgbm_registered_model_name,
+                    )
             else:
                 lgbm_pipeline = None
 
             #############################################
             # Train XGBoost model
             if config.params["includedmodels"]["include_xgboost"]:
-                xgb_pipeline = model_trainer.submit_train_exp(
-                    parent_run_id=parent_run.info.run_id,
-                    child_run_id=child_run.info.run_id,
-                    model=XGBClassifier(
-                        scale_pos_weight=sum(train_class == 0) / sum(train_class == 1),
-                        **xgb_params,
-                    ),
-                    search_space_params=xgb_search_space_params,
-                    registered_model_name=xgb_registered_model_name,
-                )
+                with mlflow.start_run(nested=True, run_name="xgboost") as child_run_xgb:
+                    xgb_pipeline = model_trainer.submit_train_exp(
+                        parent_run_id=parent_run.info.run_id,
+                        child_run_id=child_run_xgb.info.run_id,
+                        model=XGBClassifier(
+                            scale_pos_weight=sum(train_class == 0)
+                            / sum(train_class == 1),
+                            **xgb_params,
+                        ),
+                        search_space_params=xgb_search_space_params,
+                        registered_model_name=xgb_registered_model_name,
+                    )
             else:
                 xgb_pipeline = None
 
             #############################################
             # Create a voting ensmble model with LR, RF, LightGBM, and XGBoost as base estimators
             if config.params["includedmodels"]["include_voting_ensemble"]:
-                ve_creator = VotingEnsembleCreator(
-                    parent_run_id=parent_run.info.run_id,
-                    child_run_id=child_run.info.run_id,
-                    train_features=data_prep.training_features,
-                    valid_features=data_prep.validation_features,
-                    train_class=train_class,
-                    valid_class=valid_class,
-                    class_encoder=model_trainer.class_encoder,
-                    artifacts_path=model_trainer.artifacts_path,
-                    registered_train_set=model_trainer.registered_train_set,
-                    registered_test_set=model_trainer.registered_test_set,
-                    lr_pipeline=lr_pipeline,
-                    rf_pipeline=rf_pipeline,
-                    lgbm_pipeline=lgbm_pipeline,
-                    xgb_pipeline=xgb_pipeline,
-                    voting_rule=ve_voting_rule,
-                    encoded_pos_class_label=model_trainer.encoded_pos_class_label,
-                    fbeta_score_beta=model_trainer.fbeta_score_beta,
-                    registered_model_name=ve_registered_model_name,
-                    conf_score_threshold_val=model_trainer.conf_score_threshold_val,
-                    cv_folds=cross_val_folds,
-                )
+                with mlflow.start_run(nested=True, run_name="xgboost") as child_run_ve:
+                    ve_creator = VotingEnsembleCreator(
+                        parent_run_id=parent_run.info.run_id,
+                        child_run_id=child_run_ve.info.run_id,
+                        train_features=data_prep.training_features,
+                        valid_features=data_prep.validation_features,
+                        train_class=train_class,
+                        valid_class=valid_class,
+                        class_encoder=model_trainer.class_encoder,
+                        artifacts_path=model_trainer.artifacts_path,
+                        registered_train_set=model_trainer.registered_train_set,
+                        registered_test_set=model_trainer.registered_test_set,
+                        lr_pipeline=lr_pipeline,
+                        rf_pipeline=rf_pipeline,
+                        lgbm_pipeline=lgbm_pipeline,
+                        xgb_pipeline=xgb_pipeline,
+                        voting_rule=ve_voting_rule,
+                        encoded_pos_class_label=model_trainer.encoded_pos_class_label,
+                        fbeta_score_beta=model_trainer.fbeta_score_beta,
+                        registered_model_name=ve_registered_model_name,
+                        conf_score_threshold_val=model_trainer.conf_score_threshold_val,
+                        cv_folds=cross_val_folds,
+                    )
 
-                _ = ve_creator.create_voting_ensemble()
+                    _ = ve_creator.create_voting_ensemble()
 
     # Terminate current active run
     mlflow.end_run()
@@ -335,7 +344,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Get the logger objects by name
-    console_logger = get_console_logger("train_logger")
+    console_logger = create_console_logger("train_logger")
 
     console_logger.info("Hyperparameters Optimization Experiments Starts ...")
 

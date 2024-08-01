@@ -7,7 +7,6 @@ from pathlib import PosixPath
 
 import joblib
 import pandas as pd
-from comet_ml import API
 from fastapi import Body
 from sklearn.pipeline import Pipeline
 
@@ -22,14 +21,6 @@ class ModelLoader:
         comet_api (comet_ml.API): Comet API instance needed to download models.
     """
 
-    def __init__(self, comet_api_key: str = None) -> None:
-        # Create Comet API instance if comet_api is not provided
-        # Note: comet_api_key was made an attribute to make easier to mock
-        # it during unit testing download_model method compared to creating
-        # it inside the method.
-        if comet_api_key is not None:
-            self.comet_api = API(api_key=comet_api_key)
-
     def get_config_params(self, config_yaml_abs_path: str) -> tuple:
         """Extracts training and model configurations, like workspace info
         and registered model name.
@@ -39,7 +30,6 @@ class ModelLoader:
 
         Returns:
             tuple: Tuple containing:
-                - comet_workspace_name (str): Comet workspace name.
                 - model_name (str): registered model name.
                 - num_col_names (list): list of numerical column names.
                 - cat_col_names (list): list of categorical column names.
@@ -49,7 +39,6 @@ class ModelLoader:
 
         # Get config params
         config = Config(config_path=config_yaml_abs_path)
-        comet_workspace_name = config.params["train"]["comet_workspace_name"]
         model_name = config.params["modelregistry"]["champion_model_name"]
         hf_data_source = config.params["data"]["raw_dataset_source"]
 
@@ -57,7 +46,6 @@ class ModelLoader:
         cat_col_names = config.params["data"]["cat_col_names"]
 
         return (
-            comet_workspace_name,
             model_name,
             num_col_names,
             cat_col_names,

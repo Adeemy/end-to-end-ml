@@ -11,7 +11,7 @@ import os
 from dotenv import load_dotenv
 
 from src.inference.utils.model import ModelLoader, predict
-from src.utils.logger import get_console_logger
+from src.utils.logger import create_console_logger
 from src.utils.path import ARTIFACTS_DIR
 
 load_dotenv()
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Get the logger objects by name
-    console_logger = get_console_logger("data_logger")
+    console_logger = create_console_logger("data_logger")
 
     main(
         config_yaml_path=args.config_yaml_path,

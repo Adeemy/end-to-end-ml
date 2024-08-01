@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 
 from src.feature_store.utils.config import Config
 from src.feature_store.utils.helpers import import_uci_data, split_uci_data
-from src.utils.logger import get_console_logger
+from src.utils.logger import create_console_logger
 
 # import sys
 # sys.path.append("/workspaces/end-to-end-ml/")
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Get the logger objects by name
-    console_logger = get_console_logger("gen_initial_data_logger")
+    console_logger = create_console_logger("gen_initial_data_logger")
 
     console_logger.info("Generating Raw Dataset Starts ...")
 

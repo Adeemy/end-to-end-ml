@@ -37,12 +37,12 @@ from sklearn.metrics import (
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
-from src.utils.logger import get_console_logger
+from src.utils.logger import create_console_logger
 
 ##########################################################
 
 # Get console logger
-logger = get_console_logger("model_logger")
+logger = create_console_logger("model_logger")
 
 
 class ModelOptimizer:

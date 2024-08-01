@@ -22,11 +22,11 @@ from sklearn.preprocessing import (
 )
 
 from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
-from src.utils.logger import get_console_logger
+from src.utils.logger import create_console_logger
 
 ##########################################################
 # Get the logger objects by name
-logger = get_console_logger("data_logger")
+logger = create_console_logger("data_logger")
 
 
 class DataPipelineCreator:

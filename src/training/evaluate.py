@@ -11,12 +11,15 @@ import logging
 import logging.config
 import os
 import sys
-from pathlib import Path, PosixPath
+from pathlib import Path
 
 import joblib
+
+# import mlflow
 import numpy as np
 import pandas as pd
-from comet_ml import ExistingExperiment
+from azureml.core import Workspace
+from azureml.core.authentication import ServicePrincipalAuthentication
 from dotenv import load_dotenv
 
 # To import modules from the parent directory in Azure compute cluster
@@ -25,9 +28,9 @@ if str(root_dir) not in sys.path:
     sys.path.append(str(root_dir))
 
 from src.training.utils.config import Config
-from src.training.utils.model import ModelChampionManager, ModelEvaluator
-from src.utils.logger import get_console_logger
-from src.utils.path import ARTIFACTS_DIR, DATA_DIR
+from src.training.utils.model import ModelEvaluator, ModelManager
+from src.utils.logger import create_console_logger
+from src.utils.path import ARTIFACTS_DIR
 
 load_dotenv()
 
@@ -35,7 +38,7 @@ load_dotenv()
 def select_best_model(
     config_yaml_path: str,
     successful_exp_keys: pd.DataFrame,
-    champ_model_manager: ModelChampionManager,
+    model_manager: ModelManager,
     comparison_metric_name: str,
     project_name: str,
     workspace_name: str,
@@ -45,7 +48,7 @@ def select_best_model(
     Args:
         config_yaml_path (str): path to the config yaml file.
         successful_exp_keys (pd.DataFrame): dataframe containing successful experiments keys.
-        champ_model_manager (ModelChampionManager): ModelChampionManager object.
+        model_manager (ModelManager): ModelManager object.
         comparison_metric_name (str): name of the comparison metric.
         project_name (str): name of the Comet project.
         workspace_name (str): name of the Comet workspace.
@@ -65,7 +68,7 @@ def select_best_model(
         )
 
     # Select the best performing model
-    best_model_name = champ_model_manager.select_best_performer(
+    best_model_name = model_manager.select_best_performer(
         comet_project_name=project_name,
         comet_workspace_name=workspace_name,
         comparison_metric=f"valid_{comparison_metric_name}",
@@ -127,18 +130,12 @@ def evaluate_best_model(
 
 def main(
     config_yaml_path: str,
-    comet_api_key: str,
-    data_dir: PosixPath,
-    artifacts_dir: PosixPath,
     logger: logging.Logger,
 ) -> None:
     """Selects the best model based on performance on validation set and evaluates it on testing set.
 
     Args:
         config_yaml_path (str): path to the config yaml file.
-        comet_api_key (str): Comet API key.
-        data_dir (PosixPath): path to the data directory.
-        artifacts_dir (PosixPath): path to the artifacts directory.
         logger (logging.Logger): logger object.
 
     Raises:
@@ -154,17 +151,30 @@ def main(
     workspace_name = config.params["train"]["comet_workspace_name"]
     class_col_name = config.params["data"]["class_col_name"]
     fbeta_score_beta_val = float(config.params["train"]["fbeta_score_beta_val"])
-    calib_cv_folds = config.params["train"]["cross_val_folds"]
+    # calib_cv_folds = config.params["train"]["cross_val_folds"]
     comparison_metric_name = config.params["train"]["comparison_metric"]
     exp_keys_file_name = config.params["files"]["experiments_keys_file_name"]
     train_set_file_name = config.params["files"]["train_set_file_name"]
-    valid_set_file_name = config.params["files"]["valid_set_file_name"]
+    # valid_set_file_name = config.params["files"]["valid_set_file_name"]
     test_set_file_name = config.params["files"]["test_set_file_name"]
     ve_registered_model_name = config.params["modelregistry"][
         "voting_ensemble_registered_model_name"
     ]
     champ_model_name = config.params["modelregistry"]["champion_model_name"]
     deployment_score_thresh = config.params["train"]["deployment_score_thresh"]
+
+    # Connect to the training workspace
+    sp_authentication = ServicePrincipalAuthentication(
+        tenant_id=os.environ["TENANT_ID"],
+        service_principal_id=os.environ["APP_REGISTRATION_ID"],
+        service_principal_password=os.environ["SP_PWD"],
+    )
+    ws = Workspace(
+        os.environ["SUBSCRIPTION_ID"],
+        os.environ["RESOURCE_GROUP_NAME"],
+        os.environ["AML_WORKSPACE_NAME"],
+        auth=sp_authentication,
+    )
 
     # Rename comparison metric if it's fbeta_score to include beta value
     if comparison_metric_name == "fbeta_score":
@@ -174,15 +184,11 @@ def main(
     # Note: it requires class labels to be encoded. An integration
     # test should be added to ensure the class labels are encoded.
     train_set = pd.read_parquet(
-        data_dir / train_set_file_name,
-    )
-
-    valid_set = pd.read_parquet(
-        data_dir / valid_set_file_name,
+        train_set_file_name,
     )
 
     test_set = pd.read_parquet(
-        data_dir / test_set_file_name,
+        test_set_file_name,
     )
 
     logger.info("Imported train and test sets.")
@@ -192,11 +198,11 @@ def main(
     successful_exp_keys = pd.read_csv(
         f"{ARTIFACTS_DIR}/{exp_keys_file_name}.csv",
     )
-    champ_model_manager = ModelChampionManager(champ_model_name=champ_model_name)
+    model_manager = ModelManager(registered_model_workspace=ws)
     best_model_name = select_best_model(
         config_yaml_path=config_yaml_path,
         successful_exp_keys=successful_exp_keys,
-        champ_model_manager=champ_model_manager,
+        model_manager=model_manager,
         comparison_metric_name=comparison_metric_name,
         project_name=project_name,
         workspace_name=workspace_name,
@@ -204,13 +210,10 @@ def main(
 
     logger.info("Best candidate model is %s.", best_model_name)
 
-    # Create ExistingExperiment object to allow appending logging new metrics
-    best_model_exp_key = successful_exp_keys.loc[
-        successful_exp_keys["0"] == best_model_name, "1"
-    ].iloc[0]
-    best_model_exp_obj = ExistingExperiment(
-        api_key=comet_api_key, experiment_key=best_model_exp_key
-    )
+    # # Create ExistingExperiment object to allow appending logging new metrics
+    # best_model_exp_key = successful_exp_keys.loc[
+    #     successful_exp_keys["0"] == best_model_name, "1"
+    # ].iloc[0]
 
     #############################################
     # Assess generalization capability of the best performer on test set
@@ -226,17 +229,10 @@ def main(
         best_model_name=best_model_name,
         ve_registered_model_name=ve_registered_model_name,
     )
-    best_model_exp_obj.log_metrics(test_scores)
 
-    # Calibrate champ model before deployment
-    valid_features = valid_set.drop(class_col_name, axis=1)
-    valid_class = np.array(valid_set[class_col_name])
-    calib_pipeline = champ_model_manager.calibrate_pipeline(
-        valid_features=valid_features,
-        valid_class=valid_class,
-        fitted_pipeline=best_model_pipeline,
-        cv_folds=calib_cv_folds,
-    )
+    # # Calibrate champ model before deployment
+    # valid_features = valid_set.drop(class_col_name, axis=1)
+    # valid_class = np.array(valid_set[class_col_name])
 
     logger.info("Champion model %s was calibrated.", best_model_name)
 
@@ -246,11 +242,10 @@ def main(
     # the model by raising error preventing build job.
     best_model_test_score = test_scores.get(f"test_{comparison_metric_name}")
     if best_model_test_score >= deployment_score_thresh:
-        champ_model_manager.log_and_register_champ_model(
-            local_path=artifacts_dir,
-            pipeline=calib_pipeline,
-            exp_obj=best_model_exp_obj,
-        )
+        # model_manager.log_and_register_champ_model(
+        #     pipeline=calib_pipeline,
+        #     exp_obj=best_model_exp_obj,
+        # )
 
         logger.info("Champion model was registered in %s workspace.", workspace_name)
 
@@ -283,14 +278,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Get the logger objects by name
-    console_logger = get_console_logger("evaluate_logger")
+    console_logger = create_console_logger("evaluate_logger")
 
     console_logger.info("Models Evaluation Starts ...")
 
     main(
         config_yaml_path=args.config_yaml_path,
-        comet_api_key=os.environ["COMET_API_KEY"],
-        data_dir=DATA_DIR,
-        artifacts_dir=ARTIFACTS_DIR,
         logger=console_logger,
     )
