@@ -1,11 +1,15 @@
 #!/bin/bash
 
 # Setup default virtual environment and install requirements
-echo -e 'export PYTHONPATH=$PYTHONPATH:~/' >> ~/.bashrc
-python3 -m venv .venv
-echo 'source .venv/bin/activate' >> ~/.bashrc
-pip install --upgrade pip
-pip install -r requirements.txt
+# echo -e 'export PYTHONPATH=$PYTHONPATH:~/' >> ~/.bashrc
+# python3 -m venv .venv
+# echo 'source .venv/bin/activate' >> ~/.bashrc
+# pip install --upgrade pip
+# pip install -r requirements.txt
+
+# # Install conda and create the environment
+# conda env create -f train-conda.yml
+# conda activate train-env
 
 # To remove the deprecation warning from jupyter_client when running tests
 touch pytest.ini

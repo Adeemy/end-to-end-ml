@@ -28,7 +28,6 @@
       "extensions": [
         "ms-python.python",
         "ms-azuretools.vscode-docker",
-        "github.vscode-github-actions",
         "ms-vscode.makefile-tools",
         "mhutchie.git-graph",
         "ms-python.pylint",
@@ -37,7 +36,8 @@
         "GitHub.vscode-github-actions",
         "eamodio.gitlens",
         "timonwong.shellcheck",
-        "redhat.vscode-yaml"
+        "redhat.vscode-yaml",
+        "Codeium.codeium"
       ]
     }
   },
