@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set up the default conda environment and install dependencies
-conda env create -f src/training/train-env.yml
+conda env create -f src/training/train-conda.yml
 echo -e 'conda activate train-env' >> ~/.bashrc
 
 # Remove deprecation warning from jupyter_client when running tests

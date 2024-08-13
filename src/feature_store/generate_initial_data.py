@@ -24,7 +24,8 @@ from src.feature_store.utils.helpers import import_uci_data, split_uci_data
 from src.utils.logger import create_console_logger
 
 # import sys
-# sys.path.append("/workspaces/end-to-end-ml/")
+# sys.path.append("/workspaces/end-to-end-ml")
+# config_yaml_path = '/workspaces/end-to-end-ml/src/config/feature-store-config.yml'
 
 
 load_dotenv()
