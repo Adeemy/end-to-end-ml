@@ -1,5 +1,5 @@
-# Train model, evaluate and test champion model, build containerized model, and deploy model
-name: Eval-Build
+# Test champion model, build containerized model, and deploy model
+name: Test and Build Containerized Model
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
     #   - cron: '00 4 * * *' # Runs at 4:00 AM UTC every day
 
 jobs:
-  evaluate:
+  test_champ_model:
     runs-on: ubuntu-latest
 
     steps:
@@ -41,16 +41,6 @@ jobs:
         run: |
           echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
 
-      # The latest version of the champion model is pulled from model registry
-      # and evaluated in this step. If the model performance meets the deployment
-      # criteria, the model is then packaged in the build job to deployed in the
-      # production environment.
-      - name: Evaluate models
-        env:
-          COMET_API_KEY: ${{ secrets.COMET_API_KEY }}
-        run: |
-          make evaluate
-
       - name: Test champion model
         env:
           COMET_API_KEY: ${{ secrets.COMET_API_KEY }}
@@ -59,7 +49,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: evaluate
+    needs: test_champ_model
 
     steps:
       # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
