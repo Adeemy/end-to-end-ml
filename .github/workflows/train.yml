@@ -116,7 +116,11 @@ jobs:
           echo "Submitting training script to Azure ML Compute..."
           az ml job create --file ./src/training/train.yml \
           --resource-group ${{ vars.RESOURCE_GROUP_NAME }} \
-          --workspace-name ${{ vars.AML_WORKSPACE_NAME }}
+          --workspace-name ${{ vars.AML_WORKSPACE_NAME }} \
+          --set TENANT_ID=$TENANT_ID \
+          --set APP_REGISTRATION_ID=$APP_REGISTRATION_ID \
+          --set SP_PWD=$SP_PWD \
+          --set SUBSCRIPTION_ID=$SUBSCRIPTION_ID
         env:
           TENANT_ID: ${{ secrets.TENANT_ID }}
           APP_REGISTRATION_ID: ${{ secrets.APP_REGISTRATION_ID }}
