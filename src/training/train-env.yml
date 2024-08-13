@@ -1,4 +1,4 @@
-# conda env create -f train-conda.yml
+# conda env create -f ./scr/training/train-conda.yml
 # conda remove -n train-env --all -y
 name: train-env
 channels:
@@ -8,8 +8,9 @@ dependencies:
   - pip:
       - mlflow==2.15.0
       - azureml-core
-      - azureml-dataprep
-      - azureml-dataset-runtime
+      # - azureml-dataprep
+      # - azureml-dataset-runtime
+      - azure-ai-ml==1.18.0
       - dask==2023.12.1
       - fastapi<0.100
       - feast==0.34.1

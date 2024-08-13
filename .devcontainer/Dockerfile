@@ -1,4 +1,4 @@
-FROM python:3.10-bullseye
+FROM python:3.10
 
 # Set environment variables
 ENV CONDA_DIR=/opt/conda
@@ -6,6 +6,7 @@ ENV PATH=$CONDA_DIR/bin:$PATH
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
+    sudo \
     wget \
     bzip2 \
     && apt-get clean \
@@ -25,6 +26,7 @@ RUN ARCH=$(uname -m) && \
 
 # Activate conda
 RUN echo ". $CONDA_DIR/etc/profile.d/conda.sh" >> ~/.bashrc
+RUN conda init --all --quiet
 
 # Set the default command to run when starting the container
 CMD ["conda", "run", "--no-capture-output", "-n", "/bin/bash"]
