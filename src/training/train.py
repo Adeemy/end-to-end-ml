@@ -102,18 +102,17 @@ def main(
     xgb_search_space_params = config.params["xgboost"]["search_space_params"]
 
     # Connect to the training workspace
-    # sp_authentication = ServicePrincipalAuthentication(
-    #     tenant_id=os.environ["TENANT_ID"],
-    #     service_principal_id=os.environ["APP_REGISTRATION_ID"],
-    #     service_principal_password=os.environ["SP_PWD"],
-    # )
-    # ws = Workspace(
-    #     os.environ["SUBSCRIPTION_ID"],
-    #     os.environ["RESOURCE_GROUP_NAME"],
-    #     os.environ["AML_WORKSPACE_NAME"],
-    #     auth=sp_authentication,
-    # )
-    ws = Workspace.from_config()
+    sp_authentication = ServicePrincipalAuthentication(
+        tenant_id=os.environ["TENANT_ID"],
+        service_principal_id=os.environ["APP_REGISTRATION_ID"],
+        service_principal_password=os.environ["SP_PWD"],
+    )
+    ws = Workspace(
+        os.environ["SUBSCRIPTION_ID"],
+        os.environ["RESOURCE_GROUP_NAME"],
+        os.environ["AML_WORKSPACE_NAME"],
+        auth=sp_authentication,
+    )
 
     #################################
     # Import data splits
