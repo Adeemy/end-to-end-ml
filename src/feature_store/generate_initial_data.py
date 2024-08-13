@@ -63,18 +63,20 @@ def main(
     raw_dataset_tags = config.params["azure_datasets"]["raw_dataset_tags"]
     inference_set_tags = config.params["azure_datasets"]["inference_set_tags"]
 
-    # Connect to the training workspace
-    sp_authentication = ServicePrincipalAuthentication(
-        tenant_id=os.environ["TENANT_ID"],
-        service_principal_id=os.environ["APP_REGISTRATION_ID"],
-        service_principal_password=os.environ["SP_PWD"],
-    )
-    ws = Workspace(
-        os.environ["SUBSCRIPTION_ID"],
-        os.environ["RESOURCE_GROUP_NAME"],
-        os.environ["AML_WORKSPACE_NAME"],
-        auth=sp_authentication,
-    )
+    # # Connect to the training workspace
+    # sp_authentication = ServicePrincipalAuthentication(
+    #     tenant_id=os.environ["TENANT_ID"],
+    #     service_principal_id=os.environ["APP_REGISTRATION_ID"],
+    #     service_principal_password=os.environ["SP_PWD"],
+    # )
+    # ws = Workspace(
+    #     os.environ["SUBSCRIPTION_ID"],
+    #     os.environ["RESOURCE_GROUP_NAME"],
+    #     os.environ["AML_WORKSPACE_NAME"],
+    #     auth=sp_authentication,
+    # )
+
+    ws = Workspace.from_config()
 
     #################################
     # Import raw dataset, split it and register it in Azure ML workspace

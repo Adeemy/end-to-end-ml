@@ -48,17 +48,18 @@ def main(config_yaml_path: str, logger: logging.Logger) -> None:
     preprocessed_data_tags = config.params["azure_datasets"]["preprocessed_data_tags"]
 
     # Connect to the training workspace
-    sp_authentication = ServicePrincipalAuthentication(
-        tenant_id=os.environ["TENANT_ID"],
-        service_principal_id=os.environ["APP_REGISTRATION_ID"],
-        service_principal_password=os.environ["SP_PWD"],
-    )
-    ws = Workspace(
-        os.environ["SUBSCRIPTION_ID"],
-        os.environ["RESOURCE_GROUP_NAME"],
-        os.environ["AML_WORKSPACE_NAME"],
-        auth=sp_authentication,
-    )
+    # sp_authentication = ServicePrincipalAuthentication(
+    #     tenant_id=os.environ["TENANT_ID"],
+    #     service_principal_id=os.environ["APP_REGISTRATION_ID"],
+    #     service_principal_password=os.environ["SP_PWD"],
+    # )
+    # ws = Workspace(
+    #     os.environ["SUBSCRIPTION_ID"],
+    #     os.environ["RESOURCE_GROUP_NAME"],
+    #     os.environ["AML_WORKSPACE_NAME"],
+    #     auth=sp_authentication,
+    # )
+    ws = Workspace.from_config()
 
     #################################
     raw_dataset = import_raw_data(config_yaml_path=config_yaml_path, ws=ws)
