@@ -1,0 +1,15 @@
+feast==0.34.1
+joblib==1.3.2
+matplotlib==3.8.2
+kds==0.1.3
+numpy==1.24.4
+pandas==1.5.3
+plotly==5.18.0
+polars==0.20.10
+pytest==7.4.4
+python-dotenv==1.0.1
+PyYAML==6.0.1
+scikit-learn==1.3.2
+scipy==1.11.4
+seaborn==0.13.2
+ucimlrepo==0.0.3
