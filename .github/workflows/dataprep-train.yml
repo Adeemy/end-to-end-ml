@@ -97,23 +97,39 @@ jobs:
 
       - name: Add project path to sys.path
         run: |
-          echo "PYTHONPATH=${{github.workspace}}" >> $GITHUB_ENV
+          echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
       - name: Generate initial data
         run: |
           make get_init_data
+        env:
+          TENANT_ID: ${{ secrets.TENANT_ID }}
+          APP_REGISTRATION_ID: ${{ secrets.APP_REGISTRATION_ID }}
+          SP_PWD: ${{ secrets.SP_PWD }}
 
       - name: Prepare data
         run: |
           make prep_data
+        env:
+          TENANT_ID: ${{ secrets.TENANT_ID }}
+          APP_REGISTRATION_ID: ${{ secrets.APP_REGISTRATION_ID }}
+          SP_PWD: ${{ secrets.SP_PWD }}
 
       - name: Setup Feast
         run: |
           make setup_feast
+        env:
+          TENANT_ID: ${{ secrets.TENANT_ID }}
+          APP_REGISTRATION_ID: ${{ secrets.APP_REGISTRATION_ID }}
+          SP_PWD: ${{ secrets.SP_PWD }}
 
       - name: Split data
         run: |
           make split_data
+        env:
+          TENANT_ID: ${{ secrets.TENANT_ID }}
+          APP_REGISTRATION_ID: ${{ secrets.APP_REGISTRATION_ID }}
+          SP_PWD: ${{ secrets.SP_PWD }}
 
   # train:
   #   runs-on: ubuntu-latest
