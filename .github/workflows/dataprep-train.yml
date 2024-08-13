@@ -94,6 +94,9 @@ jobs:
       - name: Install dependencies
         run: |
           make install
+          sudo apt-get update
+          sudo apt-get install -y dotnet-runtime-3.1
+          sudo apt-get install -y liblttng-ust0
 
       - name: Add project path to sys.path
         run: |
