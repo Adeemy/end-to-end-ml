@@ -6,9 +6,10 @@ tags:  # Add your tags here
   Classes_No: "Two"
 code: ../../
 command: >-
-  sh -c "make setup_feast &&
+  sh -c "make get_init_data &&
+         make prep_data &&
          make split_data &&
          make train &&
          make evaluate"
-environment: azureml:train-env:11
+environment: azureml:train-env:63
 compute: azureml:trainComputeCluster
