@@ -6,7 +6,8 @@ tags:  # Add your tags here
   Classes_No: "Two"
 code: ../../
 command: >-
-  sh -c "make get_init_data &&
+  sh -c "export PYTHONPATH=$PYTHONPATH:../../src &&
+         make get_init_data &&
          make prep_data &&
          make split_data &&
          make train &&
