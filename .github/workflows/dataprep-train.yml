@@ -106,6 +106,9 @@ jobs:
           TENANT_ID: ${{ secrets.TENANT_ID }}
           APP_REGISTRATION_ID: ${{ secrets.APP_REGISTRATION_ID }}
           SP_PWD: ${{ secrets.SP_PWD }}
+          SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+          RESOURCE_GROUP_NAME: ${{ vars.RESOURCE_GROUP_NAME }}
+          AML_WORKSPACE_NAME: ${{ vars.AML_WORKSPACE_NAME }}
 
       - name: Prepare data
         run: |
@@ -114,6 +117,9 @@ jobs:
           TENANT_ID: ${{ secrets.TENANT_ID }}
           APP_REGISTRATION_ID: ${{ secrets.APP_REGISTRATION_ID }}
           SP_PWD: ${{ secrets.SP_PWD }}
+          SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+          RESOURCE_GROUP_NAME: ${{ vars.RESOURCE_GROUP_NAME }}
+          AML_WORKSPACE_NAME: ${{ vars.AML_WORKSPACE_NAME }}
 
       - name: Setup Feast
         run: |
@@ -122,6 +128,9 @@ jobs:
           TENANT_ID: ${{ secrets.TENANT_ID }}
           APP_REGISTRATION_ID: ${{ secrets.APP_REGISTRATION_ID }}
           SP_PWD: ${{ secrets.SP_PWD }}
+          SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+          RESOURCE_GROUP_NAME: ${{ vars.RESOURCE_GROUP_NAME }}
+          AML_WORKSPACE_NAME: ${{ vars.AML_WORKSPACE_NAME }}
 
       - name: Split data
         run: |
@@ -130,6 +139,9 @@ jobs:
           TENANT_ID: ${{ secrets.TENANT_ID }}
           APP_REGISTRATION_ID: ${{ secrets.APP_REGISTRATION_ID }}
           SP_PWD: ${{ secrets.SP_PWD }}
+          SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+          RESOURCE_GROUP_NAME: ${{ vars.RESOURCE_GROUP_NAME }}
+          AML_WORKSPACE_NAME: ${{ vars.AML_WORKSPACE_NAME }}
 
   # train:
   #   runs-on: ubuntu-latest
