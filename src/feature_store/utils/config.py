@@ -42,10 +42,13 @@ class Config:
 
         Raises:
             FileNotFoundError: if config file doesn't exist.
+            ValueError: if config file is not a .yml file.
         """
 
-        assert config_path.endswith(".yml")
-        self.config_path = config_path
+        if not config_path.endswith(".yml"):
+            raise ValueError("Config file must be a .yml file")
+        else:
+            self.config_path = config_path
 
         try:
             with open(self.config_path, "r", encoding="UTF-8") as f:
@@ -53,33 +56,38 @@ class Config:
         except FileNotFoundError as exc:
             raise FileNotFoundError(f"{config_path} doesn't exist.") from exc
 
-    @staticmethod
-    def _check_params(params: dict) -> None:
+    def check_params(self) -> None:
         """Checks all required values exist.
-
-        Args:
-            params (dict): dictionary of parameters loaded from config file.
 
         Raises:
             AssertionError: if any required value is missing.
+            ValueError: if any required description is missing.
+            ValueError: if any required data parameter is missing.
+            ValueError: if raw_dataset_source is not specified.
+            ValueError: if pk_col_name is not specified.
+            ValueError: if neither categorical nor numerical columns are specified.
+            ValueError: if uci_raw_data_num is not an integer.
         """
 
-        assert "description" in params, "description is not included in config file"
-        assert "data" in params, "data is not included in config file"
+        if "description" not in self.params:
+            raise ValueError("description is not included in config file")
+
+        if "data" not in self.params:
+            raise ValueError("data is not included in config file")
 
         # Check beta value (primarily used to compare models)
-        if params["data"]["params"]["raw_dataset_source"] == "none":
+        if self.params["data"]["raw_dataset_source"] == "none":
             raise ValueError("raw_dataset_source must be specified!")
 
-        if params["data"]["params"]["pk_col_name"] == "none":
+        if self.params["data"]["pk_col_name"] == "none":
             raise ValueError("pk_col_name must be specified!")
 
-        if (params["data"]["params"]["num_col_names"] == "none") and (
-            params["data"]["params"]["cat_col_names"] == "none"
+        if (self.params["data"]["num_col_names"] == "none") and (
+            self.params["data"]["cat_col_names"] == "none"
         ):
             raise ValueError("Neither categorical nor numerical are specified!")
 
-        if not isinstance(params["data"]["params"]["uci_raw_data_num"], int):
+        if not isinstance(self.params["data"]["uci_raw_data_num"], int):
             raise ValueError(
-                f"uci_dataset_id must be integer type. Got {params['data']['params']['uci_raw_data_num']}"
+                f"uci_dataset_id must be integer type. Got {self.params['data']['params']['uci_raw_data_num']}"
             )

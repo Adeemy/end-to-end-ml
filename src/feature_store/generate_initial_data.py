@@ -1,163 +1,169 @@
 """
-Imports original dataset from UCI data repository and stores it local path.
-Also, 5% of the original dataset is reserved as inference set, which simulates 
-production data that will be scored by the deployed model in inference pipeline.
+Imports original dataset from UCI data repository and stores it locally.
+Also, 5% of the original dataset is reserved as an inference set, which simulates
+production data that will be scored by the deployed model in the inference pipeline.
 
-The raw dataset was released by the CDC and it was imported from the following 
+The raw dataset was released by the CDC and imported from the following
 UCI repo: https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators.
 
-Note: this script is only used in the beginning of this project just to generate
-data for the project and it isn't part of feature or inference pipelines.
+Note: This script is only used at the beginning of this project to generate
+data for the project and is not part of feature or inference pipelines.
 """
 
 import argparse
 import logging
-import logging.config
 from pathlib import PosixPath
+from typing import Any, Tuple
 
 import pandas as pd
 from ucimlrepo import fetch_ucirepo
 
-from src.feature_store.utils.config import Config
 from src.feature_store.utils.prep import DataSplitter
+from src.utils.config_loader import (
+    ClassMappingsConfig,
+    DataConfig,
+    FilesConfig,
+    load_config,
+)
 from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR
 
 
-def import_data(config_yaml_path: str) -> pd.DataFrame:
-    """Imports raw data from UCI data repository.
+def get_config_params(config_yaml_path: str) -> Tuple[Any, Any, Any]:
+    """Load and return configuration parameters.
 
     Args:
-        config_yaml_path (str): path to the config yaml file.
+        config_yaml_path: Path to the configuration YAML file.
+    Returns:
+        tuple: Data, class mappings, and file configuration parameters.
+    """
+    config = load_config(config_yaml_path)
+    return config.data, config.class_mappings, config.files
+
+
+def import_data(
+    data_config: DataConfig, class_mappings: ClassMappingsConfig
+) -> pd.DataFrame:
+    """Imports raw data from the UCI data repository.
+
+    Args:
+        data_config: Data configuration parameters.
+        class_mappings: Class mappings configuration.
 
     Returns:
-        raw_dataset (pd.DataFrame): raw dataset.
+        pd.DataFrame: Raw dataset.
     """
-
-    # Get configuration parameters
-    config = Config(config_path=config_yaml_path)
-    uci_dataset_id = config.params["data"]["uci_raw_data_num"]
-    pk_col_name = config.params["data"]["pk_col_name"]
-    class_column_name = config.params["data"]["class_col_name"]
-    date_col_names = config.params["data"]["date_col_names"]
-    datetime_col_names = config.params["data"]["datetime_col_names"]
-    num_col_names = config.params["data"]["num_col_names"]
-    cat_col_names = config.params["data"]["cat_col_names"]
-
-    # Import raw data
-    raw_data = fetch_ucirepo(id=uci_dataset_id)
+    raw_data = fetch_ucirepo(id=data_config.uci_raw_data_num)
     raw_dataset = raw_data.data.features.copy()
-    raw_dataset[pk_col_name] = raw_data.data.ids.loc[:, [pk_col_name]]
-    raw_dataset[class_column_name] = raw_data.data.targets.loc[:, [class_column_name]]
+    raw_dataset[data_config.pk_col_name] = raw_data.data.ids.loc[
+        :, [data_config.pk_col_name]
+    ]
+    raw_dataset[class_mappings.class_column] = raw_data.data.targets.loc[
+        :, [class_mappings.class_column]
+    ]
 
     # Select relevant columns
-    required_input_col_names = (
-        [pk_col_name]
-        + date_col_names
-        + datetime_col_names
-        + num_col_names
-        + cat_col_names
-        + [class_column_name]
+    required_columns = (
+        [data_config.pk_col_name]
+        + data_config.date_col_names
+        + data_config.datetime_col_names
+        + data_config.num_col_names
+        + data_config.cat_col_names
+        + [class_mappings.class_column]
     )
-    raw_dataset = raw_dataset[required_input_col_names]
-
-    return raw_dataset
+    return raw_dataset[required_columns]
 
 
 def split_data(
-    raw_dataset: pd.DataFrame, config_yaml_path: str
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+    raw_dataset: pd.DataFrame, data_config: DataConfig
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Splits raw dataset into training and inference sets.
 
     Args:
-        raw_dataset (pd.DataFrame): raw dataset.
-        config_yaml_path (str): path to the config yaml file.
+        raw_dataset: Raw dataset.
+        data_config: Data configuration parameters.
 
     Returns:
-        raw_dataset (pd.DataFrame): raw dataset for model development.
-        inference_set (pd.DataFrame): inference set for production data simulation.
+        tuple[pd.DataFrame, pd.DataFrame]: Training and inference datasets.
     """
-
-    # Get configuration parameters
-    config = Config(config_path=config_yaml_path)
-    inference_set_ratio = float(config.params["data"]["inference_set_ratio"])
-    random_seed = int(config.params["data"]["random_seed"])
-    original_split_type = config.params["data"]["original_split_type"]
-    pk_col_name = config.params["data"]["pk_col_name"]
-    class_column_name = config.params["data"]["class_col_name"]
-
-    # Create inference set from raw dataset to simulate production data
-    train_valid_splitter = DataSplitter(
+    splitter = DataSplitter(
         dataset=raw_dataset,
-        primary_key_col_name=pk_col_name,
-        class_col_name=class_column_name,
+        primary_key_col_name=data_config.pk_col_name,
+        class_col_name=data_config.class_col_name,
+    )
+    return splitter.split_dataset(
+        split_type=data_config.original_split_type,
+        train_set_size=1 - data_config.inference_set_ratio,
+        split_random_seed=data_config.random_seed,
     )
 
-    raw_dataset, inference_set = train_valid_splitter.split_dataset(
-        split_type=original_split_type,
-        train_set_size=1 - inference_set_ratio,
-        split_random_seed=random_seed,
-    )
 
-    return raw_dataset, inference_set
-
-
-def main(
-    config_yaml_path: str,
+def save_datasets(
+    raw_dataset: pd.DataFrame,
+    inference_set: pd.DataFrame,
+    files_config: FilesConfig,
     data_dir: PosixPath,
-    logger: logging.Logger,
-) -> None:
-    """Imports raw dataset from UCI data repository and creates training data and
-    inference set.
+):
+    """Saves the raw dataset and inference set to disk.
 
     Args:
-        config_yaml_path (str): path to the config yaml file.
-        data_dir (PosixPath): path to the data directory.
-        logger (logging.Logger): logger object.
+        raw_dataset: Raw dataset.
+        inference_set: Inference dataset.
+        files_config: File configuration parameters.
+        data_dir: Directory to save the datasets.
     """
-
-    logger.info(
-        "Directory of data perprocessing and transformation config file: %s",
-        config_yaml_path,
-    )
-
-    # Get configuration parameters
-    config = Config(config_path=config_yaml_path)
-    inference_set_ratio = float(config.params["data"]["inference_set_ratio"])
-    raw_dataset_file_name = config.params["files"]["raw_dataset_file_name"]
-    inference_set_file_name = config.params["files"]["inference_set_file_name"]
-
-    #################################
-    # Import raw dataset
-    raw_dataset = import_data(config_yaml_path=config_yaml_path)
-
-    # Split raw dataset into training and inference sets
-    raw_dataset, inference_set = split_data(
-        raw_dataset=raw_dataset, config_yaml_path=config_yaml_path
-    )
-
-    # Save data splits in feature_repo before uploading
-    # them to Hugging Face (Bena345/cdc-diabetes-health-indicators)
-    raw_dataset.to_parquet(data_dir / raw_dataset_file_name, index=False)
+    raw_dataset.to_parquet(data_dir / files_config.raw_dataset_file_name, index=False)
     inference_set.to_parquet(
-        data_dir / inference_set_file_name,
-        index=False,
+        data_dir / files_config.inference_set_file_name, index=False
     )
 
+
+def log_dataset_info(
+    logger: logging.Logger,
+    raw_dataset: pd.DataFrame,
+    inference_set: pd.DataFrame,
+    inference_set_ratio: float,
+):
+    """Logs information about the datasets.
+
+    Args:
+        logger: Logger object.
+        raw_dataset: Raw dataset.
+        inference_set: Inference dataset.
+        inference_set_ratio: Ratio of the inference set.
+    """
     logger.info("Inference and raw dataset (for model development) generated.")
     logger.info(
-        "Ratio of raw dataset out of original dataset: " + "%.1f%% (%d rows).",
+        "Ratio of raw dataset out of original dataset: %.1f%% (%d rows).",
         100 * (1 - inference_set_ratio),
         raw_dataset.shape[0],
     )
     logger.info(
-        "Ratio of inference set out of original dataset: " + "%.1f%% (%d rows).",
+        "Ratio of inference set out of original dataset: %.1f%% (%d rows).",
         100 * inference_set_ratio,
         inference_set.shape[0],
     )
 
 
-###########################################################
+def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> None:
+    """Main function to import raw dataset and create training and inference sets.
+
+    Args:
+        config_yaml_path: Path to the configuration YAML file.
+        data_dir: Path to the data directory.
+        logger: Logger object.
+    """
+
+    data_config, class_mappings, files_config = get_config_params(config_yaml_path)
+    raw_dataset = import_data(data_config, class_mappings)
+    raw_dataset, inference_set = split_data(raw_dataset, data_config)
+    save_datasets(raw_dataset, inference_set, files_config, data_dir)
+
+    log_dataset_info(
+        logger, raw_dataset, inference_set, data_config.inference_set_ratio
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -172,13 +178,11 @@ if __name__ == "__main__":
         default="./logger.conf",
         help="Path to the logger configuration file.",
     )
-
     args = parser.parse_args()
 
-    # Get the logger objects by name
+    # Get the console logger object
     console_logger = get_console_logger("gen_initial_data_logger")
-
-    console_logger.info("Generating Raw Dataset Starts ...")
+    console_logger.info("Generating raw dataset starts ...")
 
     main(
         config_yaml_path=args.config_yaml_path, data_dir=DATA_DIR, logger=console_logger
