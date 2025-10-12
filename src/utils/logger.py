@@ -4,6 +4,15 @@ need to be logged to logger objects.
 """
 
 import logging
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class LoggerConfig:
+    """Configuration for logging."""
+
+    entity: str
+    project: str
 
 
 def get_console_logger(name: str) -> logging.Logger:

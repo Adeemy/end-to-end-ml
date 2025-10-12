@@ -15,7 +15,7 @@ from src.utils.config_loader import (
     DataConfig,
     FeatureMappingsConfig,
     FilesConfig,
-    load_config,
+    load_data_and_train_config,
 )
 from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR
@@ -32,8 +32,8 @@ def get_config_params(
     Returns:
         Tuple containing data, file, and feature mappings configuration parameters.
     """
-    config = load_config(config_yaml_path)
-    return config.data, config.files, config.feature_mappings
+    data_config, _ = load_data_and_train_config(config_yaml_path)
+    return data_config.data, data_config.files, data_config.feature_mappings
 
 
 def import_data(

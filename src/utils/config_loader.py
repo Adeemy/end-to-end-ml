@@ -1,109 +1,109 @@
 """Utility to load and parse configuration files for the feature store."""
 
-from dataclasses import dataclass, fields
-from typing import Any, Dict, List
+from dataclasses import fields
+from typing import Any, Dict
 
-from src.feature_store.utils.config import Config
-
-
-@dataclass(frozen=True)
-class LoggerConfig:
-    """Configuration for logging."""
-
-    entity: str
-    project: str
-
-
-@dataclass(frozen=True)
-class DataConfig:
-    """Configuration for data handling."""
-
-    uci_raw_data_num: int
-    raw_dataset_source: str
-    pk_col_name: str
-    class_col_name: str
-    pos_class: str
-    date_col_names: List[str]
-    datetime_col_names: List[str]
-    inference_set_ratio: float
-    original_split_type: str
-    random_seed: int
-    event_timestamp_col_name: str
-    num_col_names: List[str]
-    cat_col_names: List[str]
-    entity_name: str
-    entity_description: str
-    feature_view_name: str
-    feature_view_description: str
-    target_view_name: str
-    target_view_description: str
-    view_tags_name_1: str
-    view_tags_value_1: str
-    ttl_duration_in_days: int
+from src.feature_store.utils.config import (
+    ClassMappingsConfig,
+    Config,
+    DataConfig,
+    FeatureMappingsConfig,
+    FeatureStoreConfig,
+    FilesConfig,
+)
+from src.training.utils.config import (
+    IncludedModelsConfig,
+    LGBMConfig,
+    LogisticRegressionConfig,
+    ModelRegistryConfig,
+    RandomForestConfig,
+    TrainFeaturesConfig,
+    TrainFilesConfig,
+    TrainingConfig,
+    TrainParams,
+    TrainPreprocessingConfig,
+    XGBoostConfig,
+)
+from src.utils.logger import LoggerConfig
 
 
-@dataclass(frozen=True)
-class FeatureMappingsConfig:
-    """Configuration for feature mappings."""
-
-    mappings: Dict[str, Dict[str, str]]
-
-
-@dataclass(frozen=True)
-class ClassMappingsConfig:
-    """Configuration for class mappings."""
-
-    class_column: str
-    class_values: Dict[str, str]
-
-
-@dataclass(frozen=True)
-class FilesConfig:
-    """Configuration for file paths."""
-
-    raw_dataset_file_name: str
-    inference_set_file_name: str
-    preprocessed_data_features_file_name: str
-    preprocessed_data_target_file_name: str
-
-
-@dataclass(frozen=True)
-class FeatureStoreConfig:
-    """Main configuration for the feature store."""
-
-    description: str
-    logger: LoggerConfig
-    data: DataConfig
-    feature_mappings: FeatureMappingsConfig
-    class_mappings: ClassMappingsConfig
-    files: FilesConfig
-
-
-def load_config(config_path: str) -> FeatureStoreConfig:
-    """Load the feature store configuration from a YAML file.
+def load_data_and_train_config(
+    config_path: str,
+) -> tuple[FeatureStoreConfig, TrainingConfig]:
+    """Loads and parses the feature store and training configurations from a YAML file.
 
     Args:
         config_path (str): Path to the configuration YAML file.
 
     Returns:
-        FeatureStoreConfig: The loaded configuration as a dataclass instance.
+        tuple[FeatureStoreConfig, TrainingConfig]: A tuple containing the feature store configuration
+        and the training configuration as dataclass instances.
     """
-
     # Load and validate the configuration using the Config class
     config = Config(config_path=config_path)
     config.check_params()  # Validate the parameters
 
+    # Map the configuration to the FeatureStoreConfig and TrainingConfig dataclasses
+    feature_store_config = _build_feature_store_config(config.params)
+    training_config = _build_training_config(config.params)
+
+    return feature_store_config, training_config
+
+
+def _build_feature_store_config(params: Dict[str, Any]) -> FeatureStoreConfig:
+    """Builds the FeatureStoreConfig dataclass from the configuration parameters.
+
+    Args:
+        params (Dict[str, Any]): The configuration parameters.
+
+    Returns:
+        FeatureStoreConfig: The feature store configuration as a dataclass instance.
+    """
     return FeatureStoreConfig(
-        description=config.params["description"],
-        logger=_map_to_dataclass(LoggerConfig, config.params["logger"]),
-        data=_map_to_dataclass(DataConfig, config.params["data"]),
+        description=params["description"],
+        logger=_map_to_dataclass(LoggerConfig, params["logger"]),
+        data=_map_to_dataclass(DataConfig, params["data"]),
         feature_mappings=_map_to_dataclass(
-            FeatureMappingsConfig, {"mappings": config.params["feature_mappings"]}
+            FeatureMappingsConfig, {"mappings": params["feature_mappings"]}
         ),
-        class_mappings=_map_to_dataclass(
-            ClassMappingsConfig, config.params["class_mappings"]
+        class_mappings=_map_to_dataclass(ClassMappingsConfig, params["class_mappings"]),
+        files=_map_to_dataclass(FilesConfig, params["files"]),
+    )
+
+
+def _build_training_config(params: Dict[str, Any]) -> TrainingConfig:
+    """Builds the TrainingConfig dataclass from the configuration parameters.
+
+    Args:
+        params (Dict[str, Any]): The configuration parameters.
+
+    Returns:
+        TrainingConfig: The training configuration as a dataclass instance.
+    """
+    included_models_params = params.get(
+        "included_models", {}
+    )  # Fallback to an empty dictionary
+    return TrainingConfig(
+        description=params["description"],
+        logger=_map_to_dataclass(LoggerConfig, params["logger"]),
+        data=_map_to_dataclass(TrainFeaturesConfig, params["data"]),
+        preprocessing=_map_to_dataclass(
+            TrainPreprocessingConfig, params.get("preprocessing", {})
         ),
-        files=_map_to_dataclass(FilesConfig, config.params["files"]),
+        train_params=_map_to_dataclass(TrainParams, params.get("train_params", {})),
+        logistic_regression=_map_to_dataclass(
+            LogisticRegressionConfig, params.get("logistic_regression", {})
+        ),
+        random_forest=_map_to_dataclass(
+            RandomForestConfig, params.get("random_forest", {})
+        ),
+        lightgbm=_map_to_dataclass(LGBMConfig, params.get("lightgbm", {})),
+        xgboost=_map_to_dataclass(XGBoostConfig, params.get("xgboost", {})),
+        files=_map_to_dataclass(TrainFilesConfig, params["files"]),
+        modelregistry=_map_to_dataclass(
+            ModelRegistryConfig, params.get("modelregistry", {})
+        ),
+        included_models=_map_to_dataclass(IncludedModelsConfig, included_models_params),
     )
 
 
@@ -117,8 +117,8 @@ def _map_to_dataclass(dataclass_type: Any, config_dict: Dict[str, Any]) -> Any:
     Returns:
         Any: An instance of the dataclass populated with values from the dictionary.
     """
-    dataclass_fields = {field.name for field in fields(dataclass_type)}
+    dataclass_fields = {field.name: field.default for field in fields(dataclass_type)}
     filtered_dict = {
-        key: value for key, value in config_dict.items() if key in dataclass_fields
+        key: config_dict.get(key, default) for key, default in dataclass_fields.items()
     }
     return dataclass_type(**filtered_dict)

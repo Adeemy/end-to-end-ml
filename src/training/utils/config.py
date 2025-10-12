@@ -1,16 +1,24 @@
-"""Defines a class that loads parameters from config.yml file."""
+"""Defines a class that loads parameters from config.yml file and
+dataclasses for configuration sections.
+"""
+
+from dataclasses import dataclass
+from datetime import date
+from typing import Any, Dict, List, Union
 
 import yaml
 
+from src.utils.logger import LoggerConfig
+
 
 class PrettySafeLoader(yaml.SafeLoader):
-    """Custom loader for reading YAML files.
+    """A YAML loader that loads mappings into ordered dictionaries.
 
     Attributes:
         None.
     """
 
-    def construct_python_tuple(self, node) -> tuple:
+    def construct_python_tuple(self, node: str) -> tuple:
         """Override the default constructor to create tuples instead of lists.
 
         Args:
@@ -19,7 +27,6 @@ class PrettySafeLoader(yaml.SafeLoader):
         Returns:
             tuple: python tuple.
         """
-
         return tuple(self.construct_sequence(node))
 
 
@@ -29,9 +36,9 @@ PrettySafeLoader.add_constructor(
 
 
 class Config:
-    """A class that loads parameters from a yaml file.
+    """Loads parameters from config.yml file.
 
-    Args:
+    Attributes:
         config_path (str): path of the config .yml file.
     """
 
@@ -43,10 +50,13 @@ class Config:
 
         Raises:
             FileNotFoundError: if config file doesn't exist.
+            ValueError: if config file is not a .yml file.
         """
 
-        assert config_path.endswith(".yml")
-        self.config_path = config_path
+        if not config_path.endswith(".yml"):
+            raise ValueError("Config file must be a .yml file")
+        else:
+            self.config_path = config_path
 
         try:
             with open(self.config_path, "r", encoding="UTF-8") as f:
@@ -54,68 +64,220 @@ class Config:
         except FileNotFoundError as exc:
             raise FileNotFoundError(f"{config_path} doesn't exist.") from exc
 
-    @staticmethod
-    def check_params(params: dict) -> None:
-        """Check all training exp values.
-
-        Args:
-            params (dict): dictionary of config parameters.
+    def check_params(self) -> None:
+        """Checks all required values exist.
 
         Raises:
-            AssertionError: if any required parameter is missing.
-            ValueError: if any parameter is of invalid type.
+            KeyError:
+                - if 'description' is not included in config file.
+                - if 'data' is not included in config file.
+                - if 'train' is not included in config file.
+                - if 'modelregistry' is not included in config file.
+            ValueError:
+                - if 'split_rand_seed' is not an integer.
+                - if 'split_type' is not either 'random' or 'time'.
+                - if 'fbeta_score_beta_val' is not a float > 0.
+                - if 'comparison_metric' is not one of 'recall', 'precision', '
+                    'f1', 'roc_auc', 'fbeta_score'.
+                - if 'train_test_split_curoff_date' or 'train_valid_split_curoff_date'
+                    is 'none' when 'split_type' is 'time'.
+                - if 'voting_rule' is not either 'soft' or 'hard'.
         """
 
-        assert "description" in params, "description is not included in config file"
-        assert "data" in params, "data is not included in config file"
-        assert "train" in params, "train is not included in config file"
-        assert "modelregistry" in params, "modelregistry is not included in config file"
+        if "description" not in self.params:
+            raise KeyError("description is not included in config file")
+
+        if "data" not in self.params:
+            raise KeyError("data is not included in config file")
+
+        if "train" not in self.params:
+            raise KeyError("train is not included in config file")
+
+        if "modelregistry" not in self.params:
+            raise KeyError("modelregistry is not included in config file")
 
         # Check data split params are of correct types
-        if not isinstance(int(params["data"]["params"]["split_rand_seed"]), int):
+        if not isinstance(int(self.params["data"]["split_rand_seed"]), int):
             raise ValueError(
-                f"split_rand_seed must be integer type. Got {params['data']['params']['split_rand_seed']}"
+                f"split_rand_seed must be integer type. Got {self.params['data']['params']['split_rand_seed']}"
             )
 
-        if params["data"]["params"]["split_type"] not in ["random", "time"]:
+        if self.params["data"]["split_type"] not in ["random", "time"]:
             raise ValueError(
-                f"split_type must be either 'random' or 'time'. Got {params['data']['params']['split_type']}"
+                f"split_type must be either 'random' or 'time'. Got {self.params['data']['params']['split_type']}"
             )
 
         # Check beta value (primarily used to compare models)
-        if isinstance(float(params["train"]["params"]["fbeta_score_beta_val"]), float):
-            fbeta_score_beta_val = float(
-                params["train"]["params"]["fbeta_score_beta_val"]
-            )
+        if isinstance(float(self.params["train"]["fbeta_score_beta_val"]), float):
+            fbeta_score_beta_val = float(self.params["train"]["fbeta_score_beta_val"])
 
-            assert (
-                fbeta_score_beta_val > 0
-            ), f"fbeta_score_beta_val must be > 0. Got {fbeta_score_beta_val}"
+            if fbeta_score_beta_val <= 0:
+                raise ValueError(
+                    f"fbeta_score_beta_val must be > 0. Got {fbeta_score_beta_val}"
+                )
 
         else:
             raise ValueError(
-                f"fbeta_score_beta_val must be float type. Got {params['train']['params']['fbeta_score_beta_val']}"
+                f"fbeta_score_beta_val must be float type. Got {self.params['train']['params']['fbeta_score_beta_val']}"
             )
 
         # Check if comparison metric is a valid value
-        comparison_metric = params["train"]["params"]["comparison_metric"]
+        comparison_metric = self.params["train"]["comparison_metric"]
         comparison_metrics = ("recall", "precision", "f1", "roc_auc", "fbeta_score")
-        assert (
-            comparison_metric in comparison_metrics
-        ), f"Supported metrics are {comparison_metrics}. Got {comparison_metric}!"
-
-        # Check if input split cutoff date (if split_type == "time") is in proper date format
-        if params["data"]["params"]["split_type"] == "time" and (
-            params["data"]["params"]["train_test_split_curoff_date"] == "none"
-            or params["data"]["params"]["train_valid_split_curoff_date"] == "none"
-        ):
+        if comparison_metric not in comparison_metrics:
             raise ValueError(
-                f"train_test_split_curoff_date and train_valid_split_curoff_date must be a date (format {params['data']['params']['split_date_col_format']}) or None if split type is 'random'."
+                f"Supported metrics are {comparison_metrics}. Got {comparison_metric}!"
             )
 
-        # Check if voting rule a valid value
-        voting_rule = params["train"]["params"]["voting_rule"]
-        assert voting_rule in (
-            "soft",
-            "hard",
-        ), f"Voting rule in Voting Ensemble must be 'soft' or 'hard'. Got {voting_rule}!"
+        # Check if input split cutoff date (if split_type == "time") is in proper date format
+        if self.params["data"]["split_type"] == "time" and (
+            self.params["data"]["train_test_split_curoff_date"] == "none"
+            or self.params["data"]["train_valid_split_curoff_date"] == "none"
+        ):
+            raise ValueError(
+                f"train_test_split_curoff_date and train_valid_split_curoff_date must be a date (format {self.params['data']['params']['split_date_col_format']}) or None if split type is 'random'."
+            )
+
+        # Check if voting rule is a valid value
+        voting_rule = self.params["train"]["voting_rule"]
+        if voting_rule not in ("soft", "hard"):
+            raise ValueError(
+                f"Voting rule in Voting Ensemble must be 'soft' or 'hard'. Got {voting_rule}!"
+            )
+
+
+@dataclass(frozen=True)
+class TrainFeaturesConfig:
+    """Configuration for defining training features."""
+
+    raw_dataset_source: str
+    split_type: str
+    split_rand_seed: str
+    split_date_col_name: str
+    train_test_split_curoff_date: str
+    train_valid_split_curoff_date: date
+    split_date_col_format: str
+    cat_features_nan_replacement: str
+    train_set_size: float
+    pk_col_name: str
+    class_col_name: str
+    pos_class: str
+    num_col_names: List[str]
+    cat_col_names: List[str]
+    historical_features: List[str]
+
+
+@dataclass(frozen=True)
+class TrainPreprocessingConfig:
+    """Configuration for preprocessing training data."""
+
+    num_features_imputer: str = "mean"
+    num_features_scaler: str = "standard"
+    scaler_params: Dict[str, Any] = None
+    cat_features_imputer: str = "most_frequent"
+    cat_features_ohe_handle_unknown: str = "error"
+    cat_features_nans_replacement: str = "Unknown"
+    var_thresh_value: float = 0.0
+
+
+@dataclass(frozen=True)
+class TrainParams:
+    """Main configuration for training parameters."""
+
+    initiate_comet_project: bool = False
+    project_name: str = "default-project"
+    workspace_name: str = "default-workspace"
+    search_max_iters: int = 10
+    parallel_jobs_count: int = 1
+    exp_timout_secs: int = 3600
+    cross_val_folds: int = 5
+    fbeta_score_beta_val: float = 0.5
+    comparison_metric: str = "fbeta_score"
+    voting_rule: str = "soft"
+    deployment_score_thresh: float = 0.8
+
+
+@dataclass(frozen=True)
+class LogisticRegressionConfig:
+    """Configuration for Logistic Regression."""
+
+    params: Dict[str, Union[int, str]] = None
+    search_space_params: Dict[str, List[Union[float, List[str], bool]]] = None
+
+
+@dataclass(frozen=True)
+class RandomForestConfig:
+    """Configuration for Random Forest."""
+
+    params: Dict[str, Union[int, str]] = None
+    search_space_params: Dict[str, List[Union[int, float, List[str], bool]]] = None
+
+
+@dataclass(frozen=True)
+class LGBMConfig:
+    """Configuration for LightGBM."""
+
+    params: Dict[str, Union[int, float, str]] = None
+    search_space_params: Dict[str, List[Union[int, float, bool]]] = None
+
+
+@dataclass(frozen=True)
+class XGBoostConfig:
+    """Configuration for XGBoost."""
+
+    params: Dict[str, str] = None
+    search_space_params: Dict[str, List[Union[int, float, bool]]] = None
+
+
+@dataclass(frozen=True)
+class TrainFilesConfig:
+    """Configuration for file paths."""
+
+    historical_data_file_name: str
+    preprocessed_dataset_target_file_name: str
+    preprocessed_dataset_features_file_name: str
+    train_set_file_name: str
+    valid_set_file_name: str
+    test_set_file_name: str
+    experiments_keys_file_name: str
+
+
+@dataclass(frozen=True)
+class ModelRegistryConfig:
+    """Configuration for model registry."""
+
+    lr_registered_model_name: str = "default-lr-model"
+    rf_registered_model_name: str = "default-rf-model"
+    lgbm_registered_model_name: str = "default-lgbm-model"
+    xgb_registered_model_name: str = "default-xgb-model"
+    voting_ensemble_registered_model_name: str = "default-voting-ensemble-model"
+    champion_model_name: str = "default-champion-model"
+
+
+@dataclass(frozen=True)
+class IncludedModelsConfig:
+    """Configuration for included models."""
+
+    include_logistic_regression: bool = True
+    include_random_forest: bool = True
+    include_lightgbm: bool = True
+    include_xgboost: bool = True
+    include_voting_ensemble: bool = True
+
+
+@dataclass(frozen=True)
+class TrainingConfig:
+    """Main configuration for training experiment."""
+
+    description: str
+    logger: LoggerConfig
+    data: TrainFeaturesConfig
+    preprocessing: TrainPreprocessingConfig
+    train_params: TrainParams
+    logistic_regression: LogisticRegressionConfig
+    random_forest: RandomForestConfig
+    lightgbm: LGBMConfig
+    xgboost: XGBoostConfig
+    files: TrainFilesConfig
+    modelregistry: ModelRegistryConfig
+    included_models: IncludedModelsConfig

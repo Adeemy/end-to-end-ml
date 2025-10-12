@@ -1,6 +1,13 @@
-"""Defines a class that loads parameters from config.yml file."""
+"""Defines a class that loads parameters from config.yml file.
+and dataclasses for configuration sections.
+"""
+
+from dataclasses import dataclass
+from typing import Dict, List
 
 import yaml
+
+from src.utils.logger import LoggerConfig
 
 
 class PrettySafeLoader(yaml.SafeLoader):
@@ -60,27 +67,28 @@ class Config:
         """Checks all required values exist.
 
         Raises:
-            AssertionError: if any required value is missing.
-            ValueError: if any required description is missing.
-            ValueError: if any required data parameter is missing.
-            ValueError: if raw_dataset_source is not specified.
-            ValueError: if pk_col_name is not specified.
-            ValueError: if neither categorical nor numerical columns are specified.
-            ValueError: if uci_raw_data_num is not an integer.
+            KeyError:
+               if 'description' is not included in config file.
+               if 'data' is not included in config file.
+               if 'raw_dataset_source' is not specified.
+               if 'pk_col_name' is not specified.
+            ValueError:
+               if neither categorical nor numerical columns are specified.
+               if 'uci_raw_data_num' is not an integer.
         """
 
         if "description" not in self.params:
-            raise ValueError("description is not included in config file")
+            raise KeyError("description is not included in config file")
 
         if "data" not in self.params:
-            raise ValueError("data is not included in config file")
+            raise KeyError("data is not included in config file")
 
         # Check beta value (primarily used to compare models)
         if self.params["data"]["raw_dataset_source"] == "none":
-            raise ValueError("raw_dataset_source must be specified!")
+            raise KeyError("raw_dataset_source must be specified!")
 
         if self.params["data"]["pk_col_name"] == "none":
-            raise ValueError("pk_col_name must be specified!")
+            raise KeyError("pk_col_name must be specified!")
 
         if (self.params["data"]["num_col_names"] == "none") and (
             self.params["data"]["cat_col_names"] == "none"
@@ -91,3 +99,68 @@ class Config:
             raise ValueError(
                 f"uci_dataset_id must be integer type. Got {self.params['data']['params']['uci_raw_data_num']}"
             )
+
+
+@dataclass(frozen=True)
+class DataConfig:
+    """Configuration for data handling."""
+
+    uci_raw_data_num: int
+    raw_dataset_source: str
+    pk_col_name: str
+    class_col_name: str
+    pos_class: str
+    date_col_names: List[str]
+    datetime_col_names: List[str]
+    inference_set_ratio: float
+    original_split_type: str
+    random_seed: int
+    event_timestamp_col_name: str
+    num_col_names: List[str]
+    cat_col_names: List[str]
+    entity_name: str
+    entity_description: str
+    feature_view_name: str
+    feature_view_description: str
+    target_view_name: str
+    target_view_description: str
+    view_tags_name_1: str
+    view_tags_value_1: str
+    ttl_duration_in_days: int
+
+
+@dataclass(frozen=True)
+class FeatureMappingsConfig:
+    """Configuration for feature mappings."""
+
+    mappings: Dict[str, Dict[str, str]]
+
+
+@dataclass(frozen=True)
+class ClassMappingsConfig:
+    """Configuration for class mappings."""
+
+    class_column: str
+    class_values: Dict[str, str]
+
+
+@dataclass(frozen=True)
+class FilesConfig:
+    """Configuration for file paths."""
+
+    raw_dataset_file_name: str
+    inference_set_file_name: str
+    preprocessed_data_features_file_name: str
+    preprocessed_data_target_file_name: str
+
+
+@dataclass(frozen=True)
+class FeatureStoreConfig:
+    """Main configuration for the feature store."""
+
+    description: str
+    logger: LoggerConfig
+    data: DataConfig
+    feature_mappings: FeatureMappingsConfig
+    class_mappings: ClassMappingsConfig
+    files: FilesConfig
