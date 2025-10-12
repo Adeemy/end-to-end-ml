@@ -1,11 +1,10 @@
 """
-Extracts preprocessed data from feature store,i.e., features and
+Extracts preprocessed data from feature store, i.e., features and
 class labels, and creates data splits for model training.
 """
 
 import argparse
 import logging
-import logging.config
 from datetime import datetime
 from pathlib import PosixPath
 from typing import Tuple
@@ -19,70 +18,82 @@ from src.feature_store.utils.prep import (
     RandomSplitStrategy,
     TimeBasedSplitStrategy,
 )
-from src.training.utils.config import Config
+from src.training.utils.config import (
+    Config,
+    TrainFeaturesConfig,
+    TrainFilesConfig,
+    TrainingConfig,
+    TrainPreprocessingConfig,
+)
 from src.training.utils.data import TrainingDataPrep
 from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR, FEATURE_REPO_DIR
 
 
+def load_training_config(config_yaml_path: str) -> TrainingConfig:
+    """Loads the training configuration from the YAML file.
+
+    Args:
+        config_yaml_path: Path to the configuration YAML file.
+
+    Returns:
+        TrainingConfig: Parsed training configuration.
+    """
+    config = Config(config_path=config_yaml_path)
+    params = config.params
+
+    return TrainingConfig(
+        data=TrainFeaturesConfig(**params["data"]),
+        preprocessing=TrainPreprocessingConfig(**params["preprocessing"]),
+        files=TrainFilesConfig(**params["files"]),
+    )
+
+
 def import_data(
-    config_yaml_path: str, data_dir: PosixPath, feast_repo_dir: PosixPath
+    training_config: TrainingConfig, data_dir: PosixPath, feast_repo_dir: PosixPath
 ) -> pd.DataFrame:
-    """Extracts preprocessed data from feature store,i.e., features and
+    """Extracts preprocessed data from feature store, i.e., features and
     class labels, and creates data splits for model training.
 
     Args:
-        config_yaml_path (str): path to the config yaml file.
-        data_dir (PosixPath): path to the data directory.
-        feast_repo_dir (PosixPath): path to the feature store repo.
+        training_config: Training configuration object.
+        data_dir: Path to the data directory.
+        feast_repo_dir: Path to the feature store repo.
 
     Returns:
-        preprocessed_data (pd.DataFrame): preprocessed data.
+        pd.DataFrame: Preprocessed data.
     """
-
     feat_store = FeatureStore(repo_path=str(feast_repo_dir))
-    config = Config(config_path=config_yaml_path)
-    pk_col_name = config.params["data"]["pk_col_name"]
-    class_column_name = config.params["data"]["class_col_name"]
-    date_col_names = config.params["data"]["date_col_names"]
-    datetime_col_names = config.params["data"]["datetime_col_names"]
-    num_col_names = config.params["data"]["num_col_names"]
-    cat_col_names = config.params["data"]["cat_col_names"]
-    historical_features = config.params["data"]["historical_features"]
-
-    preprocessed_dataset_target_file_name = config.params["files"][
-        "preprocessed_dataset_target_file_name"
-    ]
-    historical_data_file_name = config.params["files"]["historical_data_file_name"]
+    data_config = training_config.data
+    files_config = training_config.files
 
     # Get historical features and join them with target
-    # Note: this join will take into account even_timestamp such that
-    # a target value is joined with the latest feature values prior to
-    # event_timestamp of the target. This ensures that class labels of
-    # an event is attributed to the correct feature values.
-    target_data = pd.read_parquet(path=data_dir / preprocessed_dataset_target_file_name)
+    target_data = pd.read_parquet(
+        data_dir / files_config.preprocessed_dataset_target_file_name
+    )
     historical_data = feat_store.get_historical_features(
         entity_df=target_data,
-        features=historical_features,
+        features=data_config.historical_features,
     )
 
     # Retrieve historical dataset into a dataframe
-    # Note: this saves exact version of data used to train model for reproducibility.
     preprocessed_data = feat_store.create_saved_dataset(
         from_=historical_data,
         name="historical_data",
-        storage=SavedDatasetFileStorage(f"{str(data_dir)}/{historical_data_file_name}"),
+        storage=SavedDatasetFileStorage(
+            f"{data_dir}/{files_config.historical_data_file_name}"
+        ),
         allow_overwrite=True,
     ).to_df()
 
     # Select specified features
     required_input_col_names = (
-        [pk_col_name]
-        + date_col_names
-        + datetime_col_names
-        + num_col_names
-        + cat_col_names
-        + [class_column_name]
+        [data_config.pk_col_name]
+        + data_config.date_col_names
+        + data_config.datetime_col_names
+        + data_config.num_col_names
+        + data_config.cat_col_names
+        + [data_config.class_col_name]
     )
     preprocessed_data = preprocessed_data[required_input_col_names].copy()
 
@@ -90,59 +101,47 @@ def import_data(
 
 
 def split_data(
-    preprocessed_data: pd.DataFrame,
-    config_yaml_path: str,
+    preprocessed_data: pd.DataFrame, training_config: TrainingConfig
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Splits preprocessed data into train and test sets.
 
     Args:
-        preprocessed_data (pd.DataFrame): Preprocessed data.
-        config_yaml_path (str): Path to the config YAML file.
+        preprocessed_data: Preprocessed data.
+        training_config: Training configuration object.
 
     Returns:
         tuple[pd.DataFrame, pd.DataFrame]: Training and testing datasets.
     """
-    # Get configuration parameters
-    config = Config(config_path=config_yaml_path)
-    pk_col_name = config.params["data"]["pk_col_name"]
-    class_column_name = config.params["data"]["class_col_name"]
-    dataset_split_type = config.params["data"]["split_type"]
-    split_rand_seed = int(config.params["data"]["split_rand_seed"])
-    train_set_ratio = config.params["data"]["train_set_size"]
-    dataset_split_date_col_name = config.params["data"]["split_date_col_name"]
-    train_valid_split_cutoff_date = config.params["data"][
-        "train_valid_split_curoff_date"
-    ]
-    dataset_split_date_col_format = config.params["data"]["split_date_col_format"]
+    data_config = training_config.data
 
     # Extract cut-off date for splitting train and test sets
     input_split_cutoff_date = None
-    if dataset_split_type == "time":
+    if data_config.split_type == "time":
         input_split_cutoff_date = datetime.strptime(
-            train_valid_split_cutoff_date, dataset_split_date_col_format
+            data_config.train_valid_split_curoff_date, data_config.split_date_col_format
         ).date()
 
     data_splitter = DataSplitter(
         dataset=preprocessed_data,
-        primary_key_col_name=pk_col_name,
-        class_col_name=class_column_name,
+        primary_key_col_name=data_config.pk_col_name,
+        class_col_name=data_config.class_col_name,
     )
 
     # Select the appropriate split strategy
-    if dataset_split_type == "random":
+    if data_config.split_type == "random":
         split_strategy = RandomSplitStrategy(
-            class_col_name=class_column_name,
-            train_set_size=train_set_ratio,
-            random_seed=split_rand_seed,
+            class_col_name=data_config.class_col_name,
+            train_set_size=data_config.train_set_size,
+            random_seed=int(data_config.split_rand_seed),
         )
-    elif dataset_split_type == "time":
+    elif data_config.split_type == "time":
         split_strategy = TimeBasedSplitStrategy(
-            date_col_name=dataset_split_date_col_name,
+            date_col_name=data_config.split_date_col_name,
             cutoff_date=input_split_cutoff_date,
-            date_format=dataset_split_date_col_format,
+            date_format=data_config.split_date_col_format,
         )
     else:
-        raise ValueError(f"Unsupported split type: {dataset_split_type}")
+        raise ValueError(f"Unsupported split type: {data_config.split_type}")
 
     training_set, testing_set = data_splitter.split_dataset(split_strategy)
     return training_set, testing_set
@@ -151,63 +150,43 @@ def split_data(
 def prepare_data(
     training_set: pd.DataFrame,
     testing_set: pd.DataFrame,
-    config_yaml_path: str,
+    training_config: TrainingConfig,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Prepares training, validation, and testing sets.
 
     Args:
-        training_set (pd.DataFrame): training set.
-        testing_set (pd.DataFrame): testing set.
-        config_yaml_path (str): path to the config yaml file.
+        training_set (pd.DataFrame): Training set.
+        testing_set (pd.DataFrame): Testing set.
+        training_config (TrainingConfig): Training configuration object.
 
     Returns:
-        training_set (pd.DataFrame): training set.
-        validation_set (pd.DataFrame): validation set.
-        testing_set (pd.DataFrame): testing set.
+        tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: Training, validation, and testing sets.
     """
-
-    # Get configuration parameters
-    config = Config(config_path=config_yaml_path)
-    pk_col_name = config.params["data"]["pk_col_name"]
-    class_column_name = config.params["data"]["class_col_name"]
-    num_col_names = config.params["data"]["num_col_names"]
-    cat_col_names = config.params["data"]["cat_col_names"]
-    dataset_split_type = config.params["data"]["split_type"]
-    split_rand_seed = int(config.params["data"]["split_rand_seed"])
-    train_set_ratio = config.params["data"]["train_set_size"]
-    dataset_split_date_col_name = config.params["data"]["split_date_col_name"]
-    train_valid_split_curoff_date = config.params["data"][
-        "train_valid_split_curoff_date"
-    ]
-    dataset_split_date_col_format = config.params["data"]["split_date_col_format"]
+    data_config = training_config.data
 
     # Prepare data for training
     data_prep = TrainingDataPrep(
         train_set=training_set,
         test_set=testing_set,
-        primary_key=pk_col_name,
-        class_col_name=class_column_name,
-        numerical_feature_names=num_col_names,
-        categorical_feature_names=cat_col_names,
+        primary_key=data_config.pk_col_name,
+        class_col_name=data_config.class_col_name,
+        numerical_feature_names=data_config.num_col_names,
+        categorical_feature_names=data_config.cat_col_names,
     )
 
-    # Preprocess train and test sets by enforcing data types of numerical and categorical features
+    # Preprocess train and test sets
     data_prep.select_relevant_columns()
     data_prep.enforce_data_types()
     data_prep.create_validation_set(
-        split_type=dataset_split_type,
-        train_set_size=train_set_ratio,
-        split_random_seed=split_rand_seed,
-        split_date_col_name=dataset_split_date_col_name,
-        split_cutoff_date=train_valid_split_curoff_date,
-        split_date_col_format=dataset_split_date_col_format,
+        split_type=data_config.split_type,
+        train_set_size=data_config.train_set_size,
+        split_random_seed=int(data_config.split_rand_seed),
+        split_date_col_name=data_config.split_date_col_name,
+        split_cutoff_date=data_config.train_valid_split_curoff_date,
+        split_date_col_format=data_config.split_date_col_format,
     )
 
-    train_set = data_prep.train_set
-    valid_set = data_prep.valid_set
-    test_set = data_prep.test_set
-
-    return train_set, valid_set, test_set
+    return data_prep.train_set, data_prep.valid_set, data_prep.test_set
 
 
 def main(
@@ -219,57 +198,37 @@ def main(
     """Splits dataset into train and test sets.
 
     Args:
-        feast_repo_dir (str): path to the feature store repo.
-        config_yaml_path (str): path to the config yaml file.
-        data_dir (PosixPath): path to the data directory.
-        logger (logging.Logger): logger object.
+        feast_repo_dir (str): Path to the feature store repo.
+        config_yaml_path (str): Path to the config YAML file.
+        data_dir (PosixPath): Path to the data directory.
+        logger (logging.Logger): Logger object.
     """
+    logger.info("Loading training configuration...")
+    training_config = load_training_config(config_yaml_path)
 
-    logger.info("Directory of training config file: %s", config_yaml_path)
+    logger.info("Extracting preprocessed data...")
+    preprocessed_data = import_data(training_config, data_dir, feast_repo_dir)
 
-    config = Config(config_path=config_yaml_path)
-    train_set_file_name = config.params["files"]["train_set_file_name"]
-    valid_set_file_name = config.params["files"]["valid_set_file_name"]
-    test_set_file_name = config.params["files"]["test_set_file_name"]
+    logger.info("Splitting data into training and testing sets...")
+    training_set, testing_set = split_data(preprocessed_data, training_config)
 
-    # Extract preprocessed data from feature store
-    preprocessed_data = import_data(
-        config_yaml_path=config_yaml_path,
-        data_dir=data_dir,
-        feast_repo_dir=feast_repo_dir,
-    )
-
-    # Split preprocessed data into train and test sets
-    training_set, testing_set = split_data(
-        preprocessed_data=preprocessed_data,
-        config_yaml_path=config_yaml_path,
-    )
-
-    # Prepare training and testing sets
+    logger.info("Preparing training, validation, and testing sets...")
     train_set, valid_set, test_set = prepare_data(
-        training_set=training_set,
-        testing_set=testing_set,
-        config_yaml_path=config_yaml_path,
+        training_set, testing_set, training_config
     )
 
-    # Store train, validation, and test sets locally
-    # Note: should be registered and tagged for reproducibility.
+    logger.info("Saving datasets locally...")
     train_set.to_parquet(
-        data_dir / train_set_file_name,
-        index=False,
+        data_dir / training_config.files.train_set_file_name, index=False
     )
-
     valid_set.to_parquet(
-        data_dir / valid_set_file_name,
-        index=False,
+        data_dir / training_config.files.valid_set_file_name, index=False
     )
-
     test_set.to_parquet(
-        data_dir / test_set_file_name,
-        index=False,
+        data_dir / training_config.files.test_set_file_name, index=False
     )
 
-    logger.info("Train, validation, and test sets created.")
+    logger.info("Train, validation, and test sets created successfully.")
 
 
 ###########################################################
@@ -287,14 +246,12 @@ if __name__ == "__main__":
         default="./logger.conf",
         help="Path to the logger configuration file.",
     )
-
     args = parser.parse_args()
 
-    # Get the logger objects by name
-    console_logger = get_console_logger("split_data_logger")
-
+    module_name: str = PosixPath(__file__).stem
+    console_logger = get_console_logger(module_name)
     console_logger.info(
-        "Splitting Preprocessed Data into Train and Test Sets Starts ..."
+        "Splitting Preprocessed Data into Train and Test Sets Starts..."
     )
 
     main(

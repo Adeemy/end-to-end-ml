@@ -162,6 +162,8 @@ class TrainFeaturesConfig:
     pk_col_name: str
     class_col_name: str
     pos_class: str
+    date_col_names: List[str]
+    datetime_col_names: List[str]
     num_col_names: List[str]
     cat_col_names: List[str]
     historical_features: List[str]
@@ -177,7 +179,7 @@ class TrainPreprocessingConfig:
     cat_features_imputer: str = "most_frequent"
     cat_features_ohe_handle_unknown: str = "error"
     cat_features_nans_replacement: str = "Unknown"
-    var_thresh_value: float = 0.0
+    var_thresh_val: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -269,15 +271,15 @@ class IncludedModelsConfig:
 class TrainingConfig:
     """Main configuration for training experiment."""
 
-    description: str
-    logger: LoggerConfig
-    data: TrainFeaturesConfig
-    preprocessing: TrainPreprocessingConfig
-    train_params: TrainParams
-    logistic_regression: LogisticRegressionConfig
-    random_forest: RandomForestConfig
-    lightgbm: LGBMConfig
-    xgboost: XGBoostConfig
-    files: TrainFilesConfig
-    modelregistry: ModelRegistryConfig
-    included_models: IncludedModelsConfig
+    description: str = "Default training experiment"
+    logger: LoggerConfig = None
+    data: TrainFeaturesConfig = None
+    preprocessing: TrainPreprocessingConfig = None
+    train_params: TrainParams = None
+    logistic_regression: LogisticRegressionConfig = None
+    random_forest: RandomForestConfig = None
+    lightgbm: LGBMConfig = None
+    xgboost: XGBoostConfig = None
+    files: TrainFilesConfig = None
+    modelregistry: ModelRegistryConfig = None
+    included_models: IncludedModelsConfig = None
