@@ -3,6 +3,7 @@ Includes functions for model optimization and evaluation.
 """
 
 import os
+from pathlib import PosixPath
 from typing import Callable, Optional, Union
 
 import joblib
@@ -36,9 +37,8 @@ from sklearn.preprocessing import LabelEncoder
 
 from src.utils.logger import get_console_logger
 
-##########################################################
-# Get the logger objects by name
-logger = get_console_logger("model_logger")
+module_name: str = PosixPath(__file__).stem
+logger = get_console_logger(module_name)
 
 
 class ModelOptimizer:
@@ -1147,8 +1147,8 @@ class ModelChampionManager:
 
     def select_best_performer(
         self,
-        comet_project_name: str,
-        comet_workspace_name: str,
+        project_name: str,
+        workspace_name: str,
         comparison_metric: str,
         comet_exp_keys: dict,
         comet_api: API = None,
@@ -1158,8 +1158,8 @@ class ModelChampionManager:
         objects as values. It returns the name of the best challenger model.
 
         Args:
-            comet_project_name (str): comet project name.
-            comet_workspace_name (str): comet workspace name.
+            project_name (str): comet project name.
+            workspace_name (str): comet workspace name.
             comparison_metric (str): metric name to compare models.
             comet_exp_keys (dict): dictionary of model names as keys and their
                                    corresponding experiment objects as values.
@@ -1175,8 +1175,8 @@ class ModelChampionManager:
         exp_scores = {}
         for i in range(comet_exp_keys.shape[0]):
             experiment = comet_api.get_experiment(
-                project_name=comet_project_name,
-                workspace=comet_workspace_name,
+                project_name=project_name,
+                workspace=workspace_name,
                 experiment=comet_exp_keys.iloc[i, 1],
             )
             exp_metric_score = float(

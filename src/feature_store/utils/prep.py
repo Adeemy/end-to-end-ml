@@ -4,6 +4,7 @@ Data preprocessing and transformation classes.
 
 import warnings
 from datetime import datetime
+from pathlib import PosixPath
 from typing import Optional, Tuple
 
 import numpy as np
@@ -12,7 +13,8 @@ from sklearn.model_selection import train_test_split
 
 from src.utils.logger import get_console_logger
 
-logger = get_console_logger("data_logger")
+module_name: str = PosixPath(__file__).stem
+logger = get_console_logger(module_name)
 
 
 class SplitStrategy:

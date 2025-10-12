@@ -39,7 +39,7 @@ class ModelLoader:
 
         Returns:
             tuple: Tuple containing:
-                - comet_workspace_name (str): Comet workspace name.
+                - workspace_name (str): Comet workspace name.
                 - model_name (str): registered model name.
                 - num_col_names (list): list of numerical column names.
                 - cat_col_names (list): list of categorical column names.
@@ -49,7 +49,7 @@ class ModelLoader:
 
         # Get config params
         config = Config(config_path=config_yaml_abs_path)
-        comet_workspace_name = config.params["train"]["comet_workspace_name"]
+        workspace_name = config.params["train"]["workspace_name"]
         model_name = config.params["modelregistry"]["champion_model_name"]
         hf_data_source = config.params["data"]["raw_dataset_source"]
 
@@ -57,7 +57,7 @@ class ModelLoader:
         cat_col_names = config.params["data"]["cat_col_names"]
 
         return (
-            comet_workspace_name,
+            workspace_name,
             model_name,
             num_col_names,
             cat_col_names,

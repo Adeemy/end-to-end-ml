@@ -2,7 +2,7 @@
 Evaluates trained models and selects the best model based on
 performance on validation set. The best model is then evaluated
 on testing set to assess its generalization capability and it
-will be registered as champion model only if its score on the 
+will be registered as champion model only if its score on the
 test set is better than a required threshold value.
 """
 
@@ -50,8 +50,8 @@ def select_best_model(
 
     # Get configuration parameters
     config = Config(config_path=config_yaml_path)
-    project_name = config.params["train"]["comet_project_name"]
-    workspace_name = config.params["train"]["comet_workspace_name"]
+    project_name = config.params["train"]["project_name"]
+    workspace_name = config.params["train"]["workspace_name"]
 
     if successful_exp_keys.shape[0] == 0:
         raise ValueError(
@@ -60,8 +60,8 @@ def select_best_model(
 
     # Select the best performing model
     best_model_name = champ_model_manager.select_best_performer(
-        comet_project_name=project_name,
-        comet_workspace_name=workspace_name,
+        project_name=project_name,
+        workspace_name=workspace_name,
         comparison_metric=f"valid_{comparison_metric_name}",
         comet_exp_keys=successful_exp_keys,
     )
@@ -148,8 +148,8 @@ def main(
 
     # Get configuration parameters
     config = Config(config_path=config_yaml_path)
-    project_name = config.params["train"]["comet_project_name"]
-    workspace_name = config.params["train"]["comet_workspace_name"]
+    project_name = config.params["train"]["project_name"]
+    workspace_name = config.params["train"]["workspace_name"]
     class_col_name = config.params["data"]["class_col_name"]
     fbeta_score_beta_val = config.params["train"]["fbeta_score_beta_val"]
     calib_cv_folds = config.params["train"]["cross_val_folds"]
@@ -258,7 +258,7 @@ def main(
 
     else:
         raise ValueError(
-            f"""Best model score is {best_model_test_score}, which is lower than 
+            f"""Best model score is {best_model_test_score}, which is lower than
                          deployment threshold {deployment_score_thresh}."""
         )
 
@@ -282,8 +282,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Get the logger objects by name
-    console_logger = get_console_logger("evaluate_logger")
-
+    module_name: str = PosixPath(__file__).stem
+    console_logger = get_console_logger(module_name)
     console_logger.info("Models Evaluation Starts ...")
 
     main(

@@ -1,12 +1,13 @@
 """
 Includes functions to submit training job, where the model is trained and evaluated
 using ModelOptimizer and ModelEvaluator classes. It also includes a class to create
-a voting ensemble classifier using the base models and evaluate the model using 
+a voting ensemble classifier using the base models and evaluate the model using
 ModelEvaluator.
 """
 
 import re
 from copy import deepcopy
+from pathlib import PosixPath
 from typing import Callable, Literal, Optional, Union
 
 import joblib
@@ -23,9 +24,8 @@ from sklearn.preprocessing import LabelEncoder
 from src.training.utils.model import ModelEvaluator, ModelOptimizer
 from src.utils.logger import get_console_logger
 
-##########################################################
-# Get the logger objects by name
-logger = get_console_logger("job_logger")
+module_name: str = PosixPath(__file__).stem
+logger = get_console_logger(module_name)
 
 
 class ModelTrainer:
@@ -90,13 +90,13 @@ class ModelTrainer:
 
     @staticmethod
     def _create_comet_experiment(
-        comet_api_key: str, comet_project_name: str, comet_exp_name: str
+        comet_api_key: str, project_name: str, comet_exp_name: str
     ) -> Experiment:
         """Creates a Comet experiment object.
 
         Args:
             comet_api_key (str): Comet API key,
-            comet_project_name (str): Comet project name,
+            project_name (str): Comet project name,
             comet_exp_name (str)L Comet experiment name,
 
         Returns:
@@ -107,9 +107,7 @@ class ModelTrainer:
         """
 
         try:
-            comet_exp = Experiment(
-                api_key=comet_api_key, project_name=comet_project_name
-            )
+            comet_exp = Experiment(api_key=comet_api_key, project_name=project_name)
             comet_exp.log_code(folder=".")
             comet_exp.set_name(comet_exp_name)
         except ValueError as e:
@@ -352,7 +350,7 @@ class ModelTrainer:
     def submit_train_exp(
         self,
         comet_api_key: str,
-        comet_project_name: str,
+        project_name: str,
         comet_exp_name: str,
         model: Callable,
         search_space_params: dict,
@@ -373,7 +371,7 @@ class ModelTrainer:
 
         Args:
             comet_api_key (str): Comet API key,
-            comet_project_name (str): Comet project name,
+            project_name (str): Comet project name,
             comet_exp_name (str): Comet experiment name,
             model (Callable): model object that implements the fit and predict methods.
             search_space_params (dict): hyperparameter search space for the model.
@@ -407,7 +405,7 @@ class ModelTrainer:
         # Create Comet experiment
         comet_exp = self._create_comet_experiment(
             comet_api_key=comet_api_key,
-            comet_project_name=comet_project_name,
+            project_name=project_name,
             comet_exp_name=comet_exp_name,
         )
 
@@ -486,7 +484,7 @@ class VotingEnsembleCreator(ModelTrainer):
 
     Attributes:
         comet_api_key (str): Comet API key,
-        comet_project_name (str): Comet project name,
+        project_name (str): Comet project name,
         comet_exp_name (str)L Comet experiment name,
         train_features (pd.DataFrame): features of training set before encoding and
         feature selection for ModelEvaluator class.
@@ -513,7 +511,7 @@ class VotingEnsembleCreator(ModelTrainer):
     def __init__(
         self,
         comet_api_key: str,
-        comet_project_name: str,
+        project_name: str,
         comet_exp_name: str,
         train_features: pd.DataFrame,
         valid_features: pd.DataFrame,
@@ -550,7 +548,7 @@ class VotingEnsembleCreator(ModelTrainer):
         )
 
         self.comet_api_key = comet_api_key
-        self.comet_project_name = comet_project_name
+        self.project_name = project_name
         self.comet_exp_name = comet_exp_name
         self.lr_calib_pipeline = lr_calib_pipeline
         self.rf_calib_pipeline = rf_calib_pipeline
@@ -687,7 +685,7 @@ class VotingEnsembleCreator(ModelTrainer):
         # Create Comet experiment
         comet_exp = self._create_comet_experiment(
             comet_api_key=self.comet_api_key,
-            comet_project_name=self.comet_project_name,
+            project_name=self.project_name,
             comet_exp_name=self.comet_exp_name,
         )
 

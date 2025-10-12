@@ -198,7 +198,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Get the console logger object
-    console_logger = get_console_logger("gen_initial_data_logger")
+    module_name: str = PosixPath(__file__).stem
+
+    console_logger = get_console_logger(module_name)
     console_logger.info("Generating raw dataset starts ...")
 
     main(

@@ -1,11 +1,10 @@
 """
-Runs training experiments to perform hyperparameters optimization 
+Runs training experiments to perform hyperparameters optimization
 for multiple models. It tracks the experiments using Comet.ml.
 """
 
 import argparse
 import logging
-import logging.config
 import os
 from datetime import datetime
 from pathlib import PosixPath
@@ -189,8 +188,8 @@ def main(
     # Get configuration parameters
     config = Config(config_path=config_yaml_path)
     initiate_comet_project = bool(config.params["train"]["initiate_comet_project"])
-    project_name = config.params["train"]["comet_project_name"]
-    workspace_name = config.params["train"]["comet_workspace_name"]
+    project_name = config.params["train"]["project_name"]
+    workspace_name = config.params["train"]["workspace_name"]
     class_column_name = config.params["data"]["class_col_name"]
     num_col_names = config.params["data"]["num_col_names"]
     cat_col_names = config.params["data"]["cat_col_names"]
@@ -328,7 +327,7 @@ def main(
     if config.params["includedmodels"]["include_logistic_regression"]:
         lr_calibrated_pipeline, lr_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
-            comet_project_name=project_name,
+            project_name=project_name,
             comet_exp_name=f"logistic_regression_{datetime.now()}",
             model=LogisticRegression(**lr_params),
             search_space_params=lr_search_space_params,
@@ -347,7 +346,7 @@ def main(
     if config.params["includedmodels"]["include_random_forest"]:
         rf_calibrated_pipeline, rf_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
-            comet_project_name=project_name,
+            project_name=project_name,
             comet_exp_name=f"random_forest_{datetime.now()}",
             model=RandomForestClassifier(**rf_params),
             search_space_params=rf_search_space_params,
@@ -366,7 +365,7 @@ def main(
     if config.params["includedmodels"]["include_lightgbm"]:
         lgbm_calibrated_pipeline, lgbm_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
-            comet_project_name=project_name,
+            project_name=project_name,
             comet_exp_name=f"random_forest_{datetime.now()}",
             model=LGBMClassifier(**lgbm_params),
             search_space_params=lgbm_search_space_params,
@@ -385,7 +384,7 @@ def main(
     if config.params["includedmodels"]["include_xgboost"]:
         xgb_calibrated_pipeline, xgb_experiment = model_trainer.submit_train_exp(
             comet_api_key=api_key,
-            comet_project_name=project_name,
+            project_name=project_name,
             comet_exp_name=f"random_forest_{datetime.now()}",
             model=XGBClassifier(
                 scale_pos_weight=sum(train_class == 0) / sum(train_class == 1),
@@ -407,7 +406,7 @@ def main(
     if config.params["includedmodels"]["include_voting_ensemble"]:
         ve_creator = VotingEnsembleCreator(
             comet_api_key=api_key,
-            comet_project_name=project_name,
+            project_name=project_name,
             comet_exp_name=f"voting_ensemble_{datetime.now()}",
             train_features=train_features,
             valid_features=valid_features,
@@ -480,9 +479,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Get the logger objects by name
-    console_logger = get_console_logger("train_logger")
-
+    module_name: str = PosixPath(__file__).stem
+    console_logger = get_console_logger(module_name)
     console_logger.info("Hyperparameters Optimization Experiments Starts ...")
 
     main(

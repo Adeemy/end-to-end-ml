@@ -4,6 +4,7 @@ in the training script (train.py)
 """
 
 import re
+from pathlib import PosixPath
 from typing import Callable, Literal, Optional, Union
 
 import numpy as np
@@ -29,7 +30,8 @@ from src.feature_store.utils.prep import (
 )
 from src.utils.logger import get_console_logger
 
-logger = get_console_logger("data_logger")
+module_name: str = PosixPath(__file__).stem
+logger = get_console_logger(module_name)
 
 
 class DataPipelineCreator:

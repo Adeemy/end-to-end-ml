@@ -218,7 +218,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Get the logger object
-    console_logger = get_console_logger("preprocess_data_logger")
+    module_name: str = PosixPath(__file__).stem
+    console_logger = get_console_logger(module_name)
     console_logger.info("Starting preprocessing for the feature store...")
 
     main(
