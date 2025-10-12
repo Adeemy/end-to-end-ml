@@ -21,11 +21,14 @@ from sklearn.preprocessing import (
     StandardScaler,
 )
 
-from src.feature_store.utils.prep import DataPreprocessor, DataSplitter
+from src.feature_store.utils.prep import (
+    DataPreprocessor,
+    DataSplitter,
+    RandomSplitStrategy,
+    TimeBasedSplitStrategy,
+)
 from src.utils.logger import get_console_logger
 
-##########################################################
-# Get the logger objects by name
 logger = get_console_logger("data_logger")
 
 
@@ -394,26 +397,24 @@ class TrainingDataPrep:
         split_cutoff_date: Optional[str] = None,
         split_date_col_format: str = "%Y-%m-%d %H:%M:%S",
     ) -> None:
-        """Creates a validation set by splitting training set into training and
+        """Creates a validation set by splitting the training set into training and
         validation sets randomly or based on time.
 
-        Note: validation set will be used to select the best model. An error should be
-        raised if this method is called when validation set is already provided to
-        prevent overwritting the provided validation set unintentionally.
+        Note: Validation set will be used to select the best model. An error should be
+        raised if this method is called when a validation set is already provided to
+        prevent overwriting the provided validation set unintentionally.
 
         Args:
-            split_type (Literal["time", "random"], optional): type of split. Defaults to "random".
-            train_set_size (float, optional): size of training set. Defaults to 0.8.
-            split_random_seed (Optional[int], optional): random seed for reproducibility. Defaults to None.
-            split_date_col_name (Optional[str], optional): name of date column. Defaults to None.
-            split_cutoff_date (Optional[str], optional): date to split on. Defaults to None.
-            split_date_col_format (str, optional): date column format. Defaults to "%Y-%m-%d %H:%M:%S".
-
+            split_type (Literal["time", "random"], optional): Type of split. Defaults to "random".
+            train_set_size (float, optional): Size of the training set. Defaults to 0.8.
+            split_random_seed (Optional[int], optional): Random seed for reproducibility. Defaults to None.
+            split_date_col_name (Optional[str], optional): Name of the date column. Defaults to None.
+            split_cutoff_date (Optional[str], optional): Date to split on. Defaults to None.
+            split_date_col_format (str, optional): Date column format. Defaults to "%Y-%m-%d %H:%M:%S".
 
         Raises:
-            ValueError: if validation set already exists.
+            ValueError: If the validation set already exists.
         """
-
         if self.valid_set is not None:
             raise ValueError("Validation set already exists!")
 
@@ -423,14 +424,28 @@ class TrainingDataPrep:
             class_col_name=self.class_col_name,
         )
 
-        self.train_set, self.valid_set = data_splitter.split_dataset(
-            split_type=split_type,
-            train_set_size=train_set_size,
-            split_random_seed=split_random_seed,
-            split_date_col_name=split_date_col_name,
-            split_cutoff_date=split_cutoff_date,
-            split_date_col_format=split_date_col_format,
-        )
+        # Select the appropriate split strategy
+        if split_type == "random":
+            split_strategy = RandomSplitStrategy(
+                class_col_name=self.class_col_name,
+                train_set_size=train_set_size,
+                random_seed=split_random_seed
+                or 123,  # Default random seed if not provided
+            )
+        elif split_type == "time":
+            if not split_date_col_name or not split_cutoff_date:
+                raise ValueError(
+                    "Both split_date_col_name and split_cutoff_date must be provided for time-based splitting."
+                )
+            split_strategy = TimeBasedSplitStrategy(
+                date_col_name=split_date_col_name,
+                cutoff_date=split_cutoff_date,
+                date_format=split_date_col_format,
+            )
+        else:
+            raise ValueError(f"Unsupported split type: {split_type}")
+
+        self.train_set, self.valid_set = data_splitter.split_dataset(split_strategy)
 
     def extract_features(self, valid_set: Optional[pd.DataFrame] = None) -> None:
         """Separates features and class column of testing set. The validation

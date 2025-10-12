@@ -1,10 +1,10 @@
-""" 
+"""
 Data preprocessing and transformation classes.
 """
 
 import warnings
 from datetime import datetime
-from typing import Literal, Optional, Union
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -12,9 +12,26 @@ from sklearn.model_selection import train_test_split
 
 from src.utils.logger import get_console_logger
 
-##########################################################
-# Get the logger objects by name
 logger = get_console_logger("data_logger")
+
+
+class SplitStrategy:
+    """Abstract base class for dataset splitting strategies. Subclasses must implement
+    the split method."""
+
+    def split(
+        self,
+        dataset: pd.DataFrame,  # pylint: disable=unused-argument
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Splits the dataset into train and test sets.
+
+        Args:
+            dataset: The dataset to split.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: Train and test datasets.
+        """
+        raise NotImplementedError("Subclasses must implement the split method.")
 
 
 class DataSplitter:
@@ -25,6 +42,28 @@ class DataSplitter:
         dataset (pd.DataFrame): input dataset.
         primary_key_col_name (str): name of the primary key column(s).
         class_col_name (str): name of the class column.
+
+    Usages:
+        data_splitter = DataSplitter(
+            dataset=raw_dataset,
+            primary_key_col_name=data_config.pk_col_name,
+            class_col_name=data_config.class_col_name,
+        )
+
+        # Random split
+        split_strategy = RandomSplitStrategy(
+            train_set_size=0.8,
+            random_seed=data_config.random_seed,
+        )
+
+        # Time-based split
+        split_strategy = TimeBasedSplitStrategy(
+            date_col_name=data_config.event_timestamp_col_name,
+            cutoff_date=datetime.date(2020, 1, 1),
+            date_format="%Y-%m-%d %H:%M:%S",
+        )
+
+        train_set, test_set = data_splitter.split_dataset(split_strategy)
     """
 
     def __init__(
@@ -39,144 +78,215 @@ class DataSplitter:
 
     def split_dataset(
         self,
-        split_type: Literal["time", "random"] = "random",
-        train_set_size: float = 0.8,
-        split_random_seed: int = 123,
-        split_date_col_name: Optional[str] = None,
-        split_cutoff_date: Optional[datetime.date] = None,
-        split_date_col_format: str = "%Y-%m-%d %H:%M:%S",
-    ) -> Union[pd.DataFrame, pd.DataFrame]:
-        """Splits dataset into two disjoint sets, train and test sets, either randomly
-        or based on time (a cut-off date must be provided).
+        split_strategy: SplitStrategy,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Splits dataset into two disjoint sets using the provided strategy.
 
         Args:
-            split_type (str): type of split, either 'random' or 'time'.
-            train_set_size (float): % of the training set (default: 0.8).
-            split_random_seed (int): seed for random number generator for random split (default: 123).
-            split_date_col_name (str): name of date column to split dataset based on time.
-            split_cutoff_date (date): cut-off date (data after this date are test set). For example,
-                if split_date_col_name is 'date' and split_cutoff_date is '2020-01-01', then all
-                samples with date >= '2020-01-01' are test set.
-            split_date_col_format (str): date column format.
+            split_strategy: Strategy to use for splitting the dataset.
 
         Returns:
-            train_set (pd.Dataframe): train set with class column.
-            test_set (pd.Dataframe): test set with class column.
+            Tuple[pd.DataFrame, pd.DataFrame]: Train and test datasets.
         """
-
-        if split_type == "random":
-            (
-                training_features,
-                testing_features,
-                training_class,
-                testing_class,
-            ) = train_test_split(
-                self._dataset.drop([self.class_col_name], axis=1),
-                self._dataset[[self.class_col_name]],
-                train_size=train_set_size,
-                stratify=self._dataset[self.class_col_name],
-                random_state=split_random_seed,
-            )
-
-            # Add class labels to train and test sets
-            train_set = pd.concat([training_features, training_class], axis=1)
-            test_set = pd.concat([testing_features, testing_class], axis=1)
-
-            logger.info(
-                "Dataset was split randomly using %s as train set size.", train_set_size
-            )
-
-        elif split_type == "time":
-            train_set = self._dataset[
-                pd.to_datetime(
-                    self._dataset[split_date_col_name],
-                    errors="coerce",
-                    format=split_date_col_format,
-                )
-                < pd.to_datetime(split_cutoff_date, format=split_date_col_format)
-            ]
-            test_set = self._dataset[
-                pd.to_datetime(
-                    self._dataset[split_date_col_name],
-                    errors="coerce",
-                    format=split_date_col_format,
-                )
-                >= pd.to_datetime(split_cutoff_date, format=split_date_col_format)
-            ]
-
-            logger.info(
-                "Dataset was split based on time using %s as cut-off date.",
-                split_cutoff_date,
-            )
-
-        else:
-            raise ValueError(
-                f"split_type must be 'random' or 'time'. Got {split_type} instead!"
-            )
-
-        self.check_datasets_overlap(train_set, test_set)
-        self.print_class_dist()
-
+        train_set, test_set = split_strategy.split(self._dataset)
+        self._check_datasets_overlap(train_set, test_set)
+        self._log_class_distribution()
         return train_set, test_set
 
-    def check_datasets_overlap(
+    def _check_datasets_overlap(
         self, first_dataset: pd.DataFrame, second_dataset: pd.DataFrame
     ) -> None:
         """Raises an error if there are overlapping samples in two sets using
         primary key column, i.e., two sets are not disjoint causing data leakage.
 
         Args:
-            first_dataset (dataframe): it can be either training or testing set.
-            second_dataset (dataframe): it can be either training or testing set.
+            first_dataset: Training or testing set.
+            second_dataset: Training or testing set.
 
         Raises:
-            ValueError: if there are overlapping samples in both sets.
+            ValueError: If there are overlapping samples in both sets.
         """
+        left_dataset = first_dataset.set_index(self.primary_key_col_name)
+        right_dataset = second_dataset.set_index(self.primary_key_col_name)
+        overlap_samples = left_dataset.index.intersection(right_dataset.index)
 
-        left_dataset = first_dataset.copy()
-        right_dataset = second_dataset.copy()
-
-        if left_dataset.shape[0] == 0 or right_dataset.shape[0] == 0:
-            raise ValueError("\nEither dataset has a sample size of zero!\n")
-
-        # Join datasets (inner join) on primary key to get overlapping samples
-        left_dataset.set_index([self.primary_key_col_name], inplace=True)
-        right_dataset.set_index([self.primary_key_col_name], inplace=True)
-        overlap_samples = left_dataset.join(
-            right_dataset, how="inner", lsuffix="_left", rsuffix="_right"
-        )
-
-        if len(overlap_samples) > 0:
+        if not overlap_samples.empty:
             raise ValueError(
-                f"\n{len(overlap_samples)} overlapping samples in both sets.\n"
+                f"{len(overlap_samples)} overlapping samples found in both sets."
             )
-        else:
-            logger.info("\nThe provided datasets are disjoint.\n")
+        logger.info("The provided datasets are disjoint.")
 
-    def print_class_dist(
-        self,
-    ) -> Union[pd.Series, pd.Series]:
-        """Prints class distribution (counts and percentages) of a given dataset.
-
-        Returns:
-            n_class_labels (pd.Series): class labels counts.
-            class_labels_proportions (pd.Series): class labels proportions.
-        """
-
-        # Calculate class labels counts and percentages
+    def _log_class_distribution(self) -> None:
+        """Logs class distribution (counts and percentages) of the dataset."""
         n_class_labels = self._dataset[self.class_col_name].value_counts()
         class_labels_proportions = round(
             100 * n_class_labels / self._dataset.shape[0], 2
         )
 
-        # Print class proportions as dictionaries
-        n_classes = n_class_labels.to_dict()
-        class_proportions = class_labels_proportions.to_dict()
+        logger.info("Class label counts: %s", n_class_labels.to_dict())
+        logger.info(
+            "Class label proportions (%%): %s", class_labels_proportions.to_dict()
+        )
 
-        logger.info("Class label counts: %s \n", n_classes)
-        logger.info("Class label proportions (%%): %s \n", class_proportions)
 
-        return n_class_labels, class_labels_proportions
+class RandomSplitStrategy(SplitStrategy):
+    """Random splitting strategy. It splits the dataset randomly into train and test sets.
+    It uses stratified sampling to ensure that the class distribution is preserved
+    in both sets.
+
+    Attributes:
+        train_set_size (float): proportion of the dataset to include in the train set.
+        random_seed (int): random seed for reproducibility.
+    """
+
+    def __init__(
+        self, class_col_name: str, train_set_size: float = 0.8, random_seed: int = 123
+    ):
+        self.class_col_name = class_col_name
+        self.train_set_size = train_set_size
+        self.random_seed = random_seed
+
+    def validate_inputs(self, dataset: pd.DataFrame) -> None:
+        """Validates the inputs for the random split strategy.
+
+        Args:
+            dataset: The dataset to validate.
+
+        Raises:
+            ValueError: if class_col_name doesn't exist in dataset.
+            ValueError: if class_col_name has only one class label.
+            ValueError: if class_col_name contains missing values.
+            ValueError: if train_set_size is not between 0 and 1.
+            ValueError: if random_seed is not an integer.
+        """
+
+        if self.class_col_name not in dataset.columns:
+            raise ValueError(f"{self.class_col_name} doesn't exist in dataset.")
+
+        if dataset[self.class_col_name].nunique() < 2:
+            raise ValueError(f"{self.class_col_name} must have at least two classes.")
+
+        if dataset[self.class_col_name].isna().sum() > 0:
+            raise ValueError(f"{self.class_col_name} contains missing values.")
+
+        if not (0 < self.train_set_size < 1):
+            raise ValueError("train_set_size must be between 0 and 1.")
+
+        if not isinstance(self.random_seed, int):
+            raise ValueError("random_seed must be an integer.")
+
+    def split(
+        self,
+        dataset: pd.DataFrame,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Splits the dataset randomly into train and test sets. It validates the inputs before
+        splitting the dataset.
+
+        Args:
+            dataset: The dataset to split.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: Train and test datasets.
+        """
+
+        # Validate inputs
+        self.validate_inputs(dataset)
+
+        train_features, test_features, train_labels, test_labels = train_test_split(
+            dataset.drop(columns=[self.class_col_name]),
+            dataset[[self.class_col_name]],
+            train_size=self.train_set_size,
+            stratify=dataset[self.class_col_name],
+            random_state=self.random_seed,
+        )
+        train_set = pd.concat([train_features, train_labels], axis=1)
+        test_set = pd.concat([test_features, test_labels], axis=1)
+
+        logger.info(
+            "Dataset split randomly with train set size: %.2f", self.train_set_size
+        )
+        return train_set, test_set
+
+
+class TimeBasedSplitStrategy(SplitStrategy):
+    """Time-based splitting strategy. It splits the dataset into train and test sets
+    based on a cut-off date. All samples with a date before the cut-off date are
+    assigned to the train set, and all samples with a date on or after the cut-off
+    date are assigned to the test set.
+
+    Attributes:
+        date_col_name: name of the date column.
+        cutoff_date: cut-off date for splitting the dataset.
+        date_format: format of the date column.
+    """
+
+    def __init__(
+        self,
+        date_col_name: str,
+        cutoff_date: datetime.date,
+        date_format: str = "%Y-%m-%d %H:%M:%S",
+    ):
+        self.date_col_name = date_col_name
+        self.cutoff_date = cutoff_date
+        self.date_format = date_format
+
+    def _validate_inputs(self, dataset: pd.DataFrame) -> None:
+        """Validates the inputs for the time-based split strategy.
+
+        Args:
+            dataset: The dataset to validate.
+
+        Raises:
+            ValueError: if date_col_name doesn't exist in dataset.
+            ValueError: if date_col_name is not in datetime format.
+            ValueError: if cutoff_date is not in the range of date_col_name.
+            ValueError: if date_col_name contains missing values.
+        """
+        if self.date_col_name not in dataset.columns:
+            raise ValueError(f"{self.date_col_name} doesn't exist in dataset.")
+
+        if not np.issubdtype(dataset[self.date_col_name].dtype, np.datetime64):
+            raise ValueError(f"{self.date_col_name} must be in datetime format.")
+
+        if dataset[self.date_col_name].isna().sum() > 0:
+            raise ValueError(f"{self.date_col_name} contains missing values.")
+
+        min_date = dataset[self.date_col_name].min()
+        max_date = dataset[self.date_col_name].max()
+
+        if not (min_date <= pd.to_datetime(self.cutoff_date) <= max_date):
+            raise ValueError(f"cutoff_date must be between {min_date} and {max_date}.")
+
+    def split(
+        self,
+        dataset: pd.DataFrame,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Splits the dataset based on a cutoff date. It validates the inputs before
+        splitting the dataset.
+
+        Args:
+            dataset: The dataset to split based on date column.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: Train and test datasets.
+        """
+
+        # Validate inputs
+        self._validate_inputs(dataset)
+
+        train_set = dataset[
+            pd.to_datetime(dataset[self.date_col_name], format=self.date_format)
+            < pd.to_datetime(self.cutoff_date, format=self.date_format)
+        ]
+        test_set = dataset[
+            pd.to_datetime(dataset[self.date_col_name], format=self.date_format)
+            >= pd.to_datetime(self.cutoff_date, format=self.date_format)
+        ]
+
+        logger.info(
+            "Dataset split based on time with cutoff date: %s", self.cutoff_date
+        )
+        return train_set, test_set
 
 
 class DataPreprocessor:
@@ -274,7 +384,7 @@ class DataPreprocessor:
             ).sum()
             if duplicates_by_id_count > 0:
                 logger.info(
-                    """\n{duplicates_by_id_count} rows with the non-unique 
+                    """\n{duplicates_by_id_count} rows with the non-unique
                     %s in input data.""",
                     self.primary_key_names,
                 )
@@ -361,7 +471,7 @@ class DataPreprocessor:
 
         if len(self.cat_feature_names) > 0:
             logger.info(
-                """The following categorical columns will be converted to 'string' 
+                """The following categorical columns will be converted to 'string'
                 type.\n %s""",
                 self.cat_feature_names,
             )

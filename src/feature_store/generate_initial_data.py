@@ -18,7 +18,11 @@ from typing import Any, Tuple
 import pandas as pd
 from ucimlrepo import fetch_ucirepo
 
-from src.feature_store.utils.prep import DataSplitter
+from src.feature_store.utils.prep import (
+    DataSplitter,
+    RandomSplitStrategy,
+    TimeBasedSplitStrategy,
+)
 from src.utils.config_loader import (
     ClassMappingsConfig,
     DataConfig,
@@ -91,11 +95,24 @@ def split_data(
         primary_key_col_name=data_config.pk_col_name,
         class_col_name=data_config.class_col_name,
     )
-    return splitter.split_dataset(
-        split_type=data_config.original_split_type,
-        train_set_size=1 - data_config.inference_set_ratio,
-        split_random_seed=data_config.random_seed,
-    )
+
+    # Select split strategy
+    if data_config.original_split_type == "random":
+        split_strategy = RandomSplitStrategy(
+            class_col_name=data_config.class_col_name,
+            train_set_size=1 - data_config.inference_set_ratio,
+            random_seed=data_config.random_seed,
+        )
+    elif data_config.original_split_type == "time":
+        split_strategy = TimeBasedSplitStrategy(
+            date_col_name=data_config.event_timestamp_col_name,
+            cutoff_date=data_config.split_cutoff_date,
+            date_format=data_config.split_date_col_format,
+        )
+    else:
+        raise ValueError(f"Unsupported split type: {data_config.original_split_type}")
+
+    return splitter.split_dataset(split_strategy)
 
 
 def save_datasets(
@@ -139,7 +156,7 @@ def log_dataset_info(
         raw_dataset.shape[0],
     )
     logger.info(
-        "Ratio of inference set out of original dataset: %.1f%% (%d rows).",
+        "Ratio of inference set out of original raw dataset: %.1f%% (%d rows).",
         100 * inference_set_ratio,
         inference_set.shape[0],
     )

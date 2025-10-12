@@ -1,6 +1,6 @@
 """
 Extracts preprocessed data from feature store,i.e., features and
-class labels, and creates data splits for model training. 
+class labels, and creates data splits for model training.
 """
 
 import argparse
@@ -14,7 +14,11 @@ import pandas as pd
 from feast import FeatureStore
 from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 
-from src.feature_store.utils.prep import DataSplitter
+from src.feature_store.utils.prep import (
+    DataSplitter,
+    RandomSplitStrategy,
+    TimeBasedSplitStrategy,
+)
 from src.training.utils.config import Config
 from src.training.utils.data import TrainingDataPrep
 from src.utils.logger import get_console_logger
@@ -88,18 +92,16 @@ def import_data(
 def split_data(
     preprocessed_data: pd.DataFrame,
     config_yaml_path: str,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Splits preprocessed data into train and test sets.
 
     Args:
-        preprocessed_data (pd.DataFrame): preprocessed data.
-        config_yaml_path (str): path to the config yaml file.
+        preprocessed_data (pd.DataFrame): Preprocessed data.
+        config_yaml_path (str): Path to the config YAML file.
 
     Returns:
-        training_set (pd.DataFrame): training set.
-        testing_set (pd.DataFrame): testing set.
+        tuple[pd.DataFrame, pd.DataFrame]: Training and testing datasets.
     """
-
     # Get configuration parameters
     config = Config(config_path=config_yaml_path)
     pk_col_name = config.params["data"]["pk_col_name"]
@@ -108,7 +110,7 @@ def split_data(
     split_rand_seed = int(config.params["data"]["split_rand_seed"])
     train_set_ratio = config.params["data"]["train_set_size"]
     dataset_split_date_col_name = config.params["data"]["split_date_col_name"]
-    train_valid_split_curoff_date = config.params["data"][
+    train_valid_split_cutoff_date = config.params["data"][
         "train_valid_split_curoff_date"
     ]
     dataset_split_date_col_format = config.params["data"]["split_date_col_format"]
@@ -117,32 +119,32 @@ def split_data(
     input_split_cutoff_date = None
     if dataset_split_type == "time":
         input_split_cutoff_date = datetime.strptime(
-            train_valid_split_curoff_date, dataset_split_date_col_format
+            train_valid_split_cutoff_date, dataset_split_date_col_format
         ).date()
 
-    # Extract cut-off date for splitting train and test sets
-    input_split_cutoff_date = None
-    if dataset_split_type == "time":
-        input_split_cutoff_date = datetime.strptime(
-            train_valid_split_curoff_date, dataset_split_date_col_format
-        ).date()
-
-    # Split data into train and test sets
     data_splitter = DataSplitter(
         dataset=preprocessed_data,
         primary_key_col_name=pk_col_name,
         class_col_name=class_column_name,
     )
 
-    training_set, testing_set = data_splitter.split_dataset(
-        split_type=dataset_split_type,
-        train_set_size=train_set_ratio,
-        split_random_seed=split_rand_seed,
-        split_date_col_name=dataset_split_date_col_name,
-        split_cutoff_date=input_split_cutoff_date,
-        split_date_col_format=dataset_split_date_col_format,
-    )
+    # Select the appropriate split strategy
+    if dataset_split_type == "random":
+        split_strategy = RandomSplitStrategy(
+            class_col_name=class_column_name,
+            train_set_size=train_set_ratio,
+            random_seed=split_rand_seed,
+        )
+    elif dataset_split_type == "time":
+        split_strategy = TimeBasedSplitStrategy(
+            date_col_name=dataset_split_date_col_name,
+            cutoff_date=input_split_cutoff_date,
+            date_format=dataset_split_date_col_format,
+        )
+    else:
+        raise ValueError(f"Unsupported split type: {dataset_split_type}")
 
+    training_set, testing_set = data_splitter.split_dataset(split_strategy)
     return training_set, testing_set
 
 

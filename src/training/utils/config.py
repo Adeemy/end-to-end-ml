@@ -55,7 +55,7 @@ class Config:
             raise FileNotFoundError(f"{config_path} doesn't exist.") from exc
 
     @staticmethod
-    def _check_params(params: dict) -> None:
+    def check_params(params: dict) -> None:
         """Check all training exp values.
 
         Args:
