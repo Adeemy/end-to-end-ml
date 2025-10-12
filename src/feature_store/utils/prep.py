@@ -54,6 +54,7 @@ class DataSplitter:
 
         # Random split
         split_strategy = RandomSplitStrategy(
+            class_col_name="class",
             train_set_size=0.8,
             random_seed=data_config.random_seed,
         )
