@@ -3,10 +3,11 @@ and dataclasses for configuration sections.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import yaml
 
+from src.utils.config_loader import map_to_dataclass
 from src.utils.logger import LoggerConfig
 
 
@@ -164,3 +165,25 @@ class FeatureStoreConfig:
     feature_mappings: FeatureMappingsConfig
     class_mappings: ClassMappingsConfig
     files: FilesConfig
+
+
+def build_feature_store_config(params: Dict[str, Any]) -> FeatureStoreConfig:
+    """Builds the FeatureStoreConfig dataclass from the configuration parameters.
+
+    Args:
+        params (Dict[str, Any]): The configuration parameters.
+
+    Returns:
+        FeatureStoreConfig: The feature store configuration as a dataclass instance.
+    """
+
+    return FeatureStoreConfig(
+        description=params["description"],
+        logger=map_to_dataclass(LoggerConfig, params["logger"]),
+        data=map_to_dataclass(DataConfig, params["data"]),
+        feature_mappings=map_to_dataclass(
+            FeatureMappingsConfig, {"mappings": params["feature_mappings"]}
+        ),
+        class_mappings=map_to_dataclass(ClassMappingsConfig, params["class_mappings"]),
+        files=map_to_dataclass(FilesConfig, params["files"]),
+    )

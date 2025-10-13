@@ -10,30 +10,17 @@ from typing import Tuple
 
 import pandas as pd
 
-from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
-from src.utils.config_loader import (
+from src.feature_store.utils.config import (
+    Config,
     DataConfig,
     FeatureMappingsConfig,
     FilesConfig,
-    load_data_and_train_config,
+    build_feature_store_config,
 )
+from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
+from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR
-
-
-def get_config_params(
-    config_yaml_path: str,
-) -> Tuple[DataConfig, FilesConfig, FeatureMappingsConfig]:
-    """Load and return configuration parameters.
-
-    Args:
-        config_yaml_path: Path to the configuration YAML file.
-
-    Returns:
-        Tuple containing data, file, and feature mappings configuration parameters.
-    """
-    data_config, _ = load_data_and_train_config(config_yaml_path)
-    return data_config.data, data_config.files, data_config.feature_mappings
 
 
 def import_data(
@@ -180,7 +167,15 @@ def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> 
     logger.info("Starting data preprocessing and transformation...")
 
     # Load configuration parameters
-    data_config, files_config, feature_mappings = get_config_params(config_yaml_path)
+    config = load_config(
+        config_class=Config,
+        builder_func=build_feature_store_config,
+        config_path=config_yaml_path,
+    )
+
+    data_config = config.data
+    files_config = config.files
+    feature_mappings = config.feature_mappings
 
     # Import raw dataset
     raw_dataset = import_data(data_config, files_config, data_dir)

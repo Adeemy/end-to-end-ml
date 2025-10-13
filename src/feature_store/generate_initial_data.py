@@ -13,51 +13,43 @@ data for the project and is not part of feature or inference pipelines.
 import argparse
 import logging
 from pathlib import PosixPath
-from typing import Any, Tuple
+from typing import Tuple
 
 import pandas as pd
 from ucimlrepo import fetch_ucirepo
 
+from src.feature_store.utils.config import (
+    ClassMappingsConfig,
+    Config,
+    DataConfig,
+    FilesConfig,
+    build_feature_store_config,
+)
 from src.feature_store.utils.prep import (
     DataSplitter,
     RandomSplitStrategy,
     TimeBasedSplitStrategy,
 )
-from src.utils.config_loader import (
-    ClassMappingsConfig,
-    DataConfig,
-    FilesConfig,
-    load_data_and_train_config,
-)
+from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR
-
-
-def get_config_params(config_yaml_path: str) -> Tuple[Any, Any, Any]:
-    """Load and return configuration parameters.
-
-    Args:
-        config_yaml_path: Path to the configuration YAML file.
-    Returns:
-        tuple: Data, class mappings, and file configuration parameters.
-    """
-    data_config, _ = load_data_and_train_config(config_yaml_path)
-    return data_config.data, data_config.class_mappings, data_config.files
 
 
 def import_data(
     data_config: DataConfig, class_mappings: ClassMappingsConfig
 ) -> pd.DataFrame:
-    """Imports raw data from the UCI data repository.
+    """Import data from UCI repository.
 
     Args:
         data_config: Data configuration parameters.
-        class_mappings: Class mappings configuration.
+        class_mappings: Class mappings configuration parameters.
 
     Returns:
         pd.DataFrame: Raw dataset.
     """
     raw_data = fetch_ucirepo(id=data_config.uci_raw_data_num)
+
+    # Extract features, ids, and targets
     raw_dataset = raw_data.data.features.copy()
     raw_dataset[data_config.pk_col_name] = raw_data.data.ids.loc[
         :, [data_config.pk_col_name]
@@ -66,7 +58,7 @@ def import_data(
         :, [class_mappings.class_column]
     ]
 
-    # Select relevant columns
+    # Select required columns
     required_columns = (
         [data_config.pk_col_name]
         + data_config.date_col_names
@@ -75,6 +67,7 @@ def import_data(
         + data_config.cat_col_names
         + [class_mappings.class_column]
     )
+
     return raw_dataset[required_columns]
 
 
@@ -89,6 +82,9 @@ def split_data(
 
     Returns:
         tuple[pd.DataFrame, pd.DataFrame]: Training and inference datasets.
+
+    Raises:
+        ValueError: If an unsupported split type is provided.
     """
     splitter = DataSplitter(
         dataset=raw_dataset,
@@ -120,14 +116,14 @@ def save_datasets(
     inference_set: pd.DataFrame,
     files_config: FilesConfig,
     data_dir: PosixPath,
-):
-    """Saves the raw dataset and inference set to disk.
+) -> None:
+    """Save datasets to disk.
 
     Args:
-        raw_dataset: Raw dataset.
+        raw_dataset: Raw dataset for model development.
         inference_set: Inference dataset.
         files_config: File configuration parameters.
-        data_dir: Directory to save the datasets.
+        data_dir: Path to the data directory.
     """
     raw_dataset.to_parquet(data_dir / files_config.raw_dataset_file_name, index=False)
     inference_set.to_parquet(
@@ -140,8 +136,8 @@ def log_dataset_info(
     raw_dataset: pd.DataFrame,
     inference_set: pd.DataFrame,
     inference_set_ratio: float,
-):
-    """Logs information about the datasets.
+) -> None:
+    """Log information about the datasets.
 
     Args:
         logger: Logger object.
@@ -171,13 +167,23 @@ def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> 
         logger: Logger object.
     """
 
-    data_config, class_mappings, files_config = get_config_params(config_yaml_path)
-    raw_dataset = import_data(data_config, class_mappings)
-    raw_dataset, inference_set = split_data(raw_dataset, data_config)
-    save_datasets(raw_dataset, inference_set, files_config, data_dir)
+    config = load_config(
+        config_class=Config,
+        builder_func=build_feature_store_config,
+        config_path=config_yaml_path,
+    )
+
+    raw_dataset = import_data(config.data, config.class_mappings)
+    logger.info("Raw dataset imported from UCI repository.")
+
+    raw_dataset, inference_set = split_data(raw_dataset, config.data)
+    logger.info("Raw dataset was split into training and inference sets.")
+
+    save_datasets(raw_dataset, inference_set, config.files, data_dir)
+    logger.info("Datasets saved to disk.")
 
     log_dataset_info(
-        logger, raw_dataset, inference_set, data_config.inference_set_ratio
+        logger, raw_dataset, inference_set, config.data.inference_set_ratio
     )
 
 

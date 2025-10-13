@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Union
 
 import yaml
 
+from src.utils.config_loader import map_to_dataclass
 from src.utils.logger import LoggerConfig
 
 
@@ -283,3 +284,39 @@ class TrainingConfig:
     files: TrainFilesConfig = None
     modelregistry: ModelRegistryConfig = None
     included_models: IncludedModelsConfig = None
+
+
+def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
+    """Builds the TrainingConfig dataclass from the configuration parameters.
+
+    Args:
+        params (Dict[str, Any]): The configuration parameters.
+
+    Returns:
+        TrainingConfig: The training configuration as a dataclass instance.
+    """
+    included_models_params = params.get(
+        "included_models", {}
+    )  # Fallback to an empty dictionary
+    return TrainingConfig(
+        description=params["description"],
+        logger=map_to_dataclass(LoggerConfig, params["logger"]),
+        data=map_to_dataclass(TrainFeaturesConfig, params["data"]),
+        preprocessing=map_to_dataclass(
+            TrainPreprocessingConfig, params.get("preprocessing", {})
+        ),
+        train_params=map_to_dataclass(TrainParams, params.get("train_params", {})),
+        logistic_regression=map_to_dataclass(
+            LogisticRegressionConfig, params.get("logistic_regression", {})
+        ),
+        random_forest=map_to_dataclass(
+            RandomForestConfig, params.get("random_forest", {})
+        ),
+        lightgbm=map_to_dataclass(LGBMConfig, params.get("lightgbm", {})),
+        xgboost=map_to_dataclass(XGBoostConfig, params.get("xgboost", {})),
+        files=map_to_dataclass(TrainFilesConfig, params["files"]),
+        modelregistry=map_to_dataclass(
+            ModelRegistryConfig, params.get("modelregistry", {})
+        ),
+        included_models=map_to_dataclass(IncludedModelsConfig, included_models_params),
+    )
