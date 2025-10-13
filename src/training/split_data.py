@@ -24,8 +24,10 @@ from src.training.utils.config import (
     TrainFilesConfig,
     TrainingConfig,
     TrainPreprocessingConfig,
+    build_training_config,
 )
 from src.training.utils.data import TrainingDataPrep
+from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR, FEATURE_REPO_DIR
 
@@ -50,22 +52,24 @@ def load_training_config(config_yaml_path: str) -> TrainingConfig:
 
 
 def import_data(
-    training_config: TrainingConfig, data_dir: PosixPath, feast_repo_dir: PosixPath
+    training_config: TrainFeaturesConfig,
+    files_config: TrainFilesConfig,
+    data_dir: PosixPath,
+    feast_repo_dir: PosixPath,
 ) -> pd.DataFrame:
     """Extracts preprocessed data from feature store, i.e., features and
     class labels, and creates data splits for model training.
 
     Args:
-        training_config: Training configuration object.
+        training_config: Data configuration parameters.
+        files_config: File configuration parameters.
         data_dir: Path to the data directory.
-        feast_repo_dir: Path to the feature store repo.
+        feast_repo_dir: Path to the feature store repo directory.
 
     Returns:
         pd.DataFrame: Preprocessed data.
     """
     feat_store = FeatureStore(repo_path=str(feast_repo_dir))
-    data_config = training_config.data
-    files_config = training_config.files
 
     # Get historical features and join them with target
     target_data = pd.read_parquet(
@@ -73,7 +77,7 @@ def import_data(
     )
     historical_data = feat_store.get_historical_features(
         entity_df=target_data,
-        features=data_config.historical_features,
+        features=training_config.historical_features,
     )
 
     # Retrieve historical dataset into a dataframe
@@ -88,12 +92,12 @@ def import_data(
 
     # Select specified features
     required_input_col_names = (
-        [data_config.pk_col_name]
-        + data_config.date_col_names
-        + data_config.datetime_col_names
-        + data_config.num_col_names
-        + data_config.cat_col_names
-        + [data_config.class_col_name]
+        [training_config.pk_col_name]
+        + training_config.date_col_names
+        + training_config.datetime_col_names
+        + training_config.num_col_names
+        + training_config.cat_col_names
+        + [training_config.class_col_name]
     )
     preprocessed_data = preprocessed_data[required_input_col_names].copy()
 
@@ -107,41 +111,41 @@ def split_data(
 
     Args:
         preprocessed_data: Preprocessed data.
-        training_config: Training configuration object.
+        training_config: Data configuration parameters.
 
     Returns:
         tuple[pd.DataFrame, pd.DataFrame]: Training and testing datasets.
     """
-    data_config = training_config.data
 
     # Extract cut-off date for splitting train and test sets
     input_split_cutoff_date = None
-    if data_config.split_type == "time":
+    if training_config.split_type == "time":
         input_split_cutoff_date = datetime.strptime(
-            data_config.train_valid_split_curoff_date, data_config.split_date_col_format
+            training_config.train_valid_split_curoff_date,
+            training_config.split_date_col_format,
         ).date()
 
     data_splitter = DataSplitter(
         dataset=preprocessed_data,
-        primary_key_col_name=data_config.pk_col_name,
-        class_col_name=data_config.class_col_name,
+        primary_key_col_name=training_config.pk_col_name,
+        class_col_name=training_config.class_col_name,
     )
 
     # Select the appropriate split strategy
-    if data_config.split_type == "random":
+    if training_config.split_type == "random":
         split_strategy = RandomSplitStrategy(
-            class_col_name=data_config.class_col_name,
-            train_set_size=data_config.train_set_size,
-            random_seed=int(data_config.split_rand_seed),
+            class_col_name=training_config.class_col_name,
+            train_set_size=training_config.train_set_size,
+            random_seed=int(training_config.split_rand_seed),
         )
-    elif data_config.split_type == "time":
+    elif training_config.split_type == "time":
         split_strategy = TimeBasedSplitStrategy(
-            date_col_name=data_config.split_date_col_name,
+            date_col_name=training_config.split_date_col_name,
             cutoff_date=input_split_cutoff_date,
-            date_format=data_config.split_date_col_format,
+            date_format=training_config.split_date_col_format,
         )
     else:
-        raise ValueError(f"Unsupported split type: {data_config.split_type}")
+        raise ValueError(f"Unsupported split type: {training_config.split_type}")
 
     training_set, testing_set = data_splitter.split_dataset(split_strategy)
     return training_set, testing_set
@@ -162,28 +166,27 @@ def prepare_data(
     Returns:
         tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: Training, validation, and testing sets.
     """
-    data_config = training_config.data
 
     # Prepare data for training
     data_prep = TrainingDataPrep(
         train_set=training_set,
         test_set=testing_set,
-        primary_key=data_config.pk_col_name,
-        class_col_name=data_config.class_col_name,
-        numerical_feature_names=data_config.num_col_names,
-        categorical_feature_names=data_config.cat_col_names,
+        primary_key=training_config.pk_col_name,
+        class_col_name=training_config.class_col_name,
+        numerical_feature_names=training_config.num_col_names,
+        categorical_feature_names=training_config.cat_col_names,
     )
 
     # Preprocess train and test sets
     data_prep.select_relevant_columns()
     data_prep.enforce_data_types()
     data_prep.create_validation_set(
-        split_type=data_config.split_type,
-        train_set_size=data_config.train_set_size,
-        split_random_seed=int(data_config.split_rand_seed),
-        split_date_col_name=data_config.split_date_col_name,
-        split_cutoff_date=data_config.train_valid_split_curoff_date,
-        split_date_col_format=data_config.split_date_col_format,
+        split_type=training_config.split_type,
+        train_set_size=training_config.train_set_size,
+        split_random_seed=int(training_config.split_rand_seed),
+        split_date_col_name=training_config.split_date_col_name,
+        split_cutoff_date=training_config.train_valid_split_curoff_date,
+        split_date_col_format=training_config.split_date_col_format,
     )
 
     return data_prep.train_set, data_prep.valid_set, data_prep.test_set
@@ -204,31 +207,35 @@ def main(
         logger (logging.Logger): Logger object.
     """
     logger.info("Loading training configuration...")
-    training_config = load_training_config(config_yaml_path)
 
-    logger.info("Extracting preprocessed data...")
-    preprocessed_data = import_data(training_config, data_dir, feast_repo_dir)
+    config = load_config(
+        config_class=Config,
+        builder_func=build_training_config,
+        config_path=config_yaml_path,
+    )
+    training_config = config.data
+    files_config = config.files
 
-    logger.info("Splitting data into training and testing sets...")
+    preprocessed_data = import_data(
+        training_config=training_config,
+        files_config=files_config,
+        data_dir=data_dir,
+        feast_repo_dir=feast_repo_dir,
+    )
+    logger.info("Preprocessed data imported from feature store.")
+
     training_set, testing_set = split_data(preprocessed_data, training_config)
+    logger.info("Preprocessed data split into training and testing sets.")
 
-    logger.info("Preparing training, validation, and testing sets...")
     train_set, valid_set, test_set = prepare_data(
         training_set, testing_set, training_config
     )
+    logger.info("Training, validation, and testing sets prepared.")
 
-    logger.info("Saving datasets locally...")
-    train_set.to_parquet(
-        data_dir / training_config.files.train_set_file_name, index=False
-    )
-    valid_set.to_parquet(
-        data_dir / training_config.files.valid_set_file_name, index=False
-    )
-    test_set.to_parquet(
-        data_dir / training_config.files.test_set_file_name, index=False
-    )
-
-    logger.info("Train, validation, and test sets created successfully.")
+    train_set.to_parquet(data_dir / files_config.train_set_file_name, index=False)
+    valid_set.to_parquet(data_dir / files_config.valid_set_file_name, index=False)
+    test_set.to_parquet(data_dir / files_config.test_set_file_name, index=False)
+    logger.info("Train, validation, and test sets saved locally.")
 
 
 ###########################################################
