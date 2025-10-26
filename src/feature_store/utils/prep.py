@@ -318,7 +318,7 @@ class DataPreprocessor:
             num_feature_names=['BMI', 'Age'],
             cat_feature_names=['Sex', 'Smoker'],
         )
-        processed = dp.get_preprocessed_data(raw_df)
+        processed = dp.run_preprocessing_pipeline(raw_df)
 
     2) Explicit pipeline composition (inject steps without modifying class):
         dp = DataPreprocessor(
@@ -338,7 +338,7 @@ class DataPreprocessor:
 
     4) Inspecting metadata produced by steps:
         # identify_cols_with_high_nans stores results in DataFrame attrs
-        processed = dp.get_preprocessed_data(raw_df)
+        processed = dp.run_preprocessing_pipeline(raw_df)
         cols_to_drop = processed.attrs.get('cols_to_drop_due_to_nans')
         updated_cols = processed.attrs.get('updated_column_lists')
 
