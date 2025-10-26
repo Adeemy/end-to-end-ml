@@ -107,16 +107,16 @@ class ModelTrainer:
         """
 
         try:
-            comet_exp = Experiment(api_key=comet_api_key, project_name=project_name)
-            comet_exp.log_code(folder=".")
-            comet_exp.set_name(comet_exp_name)
+            train_exp = Experiment(api_key=comet_api_key, project_name=project_name)
+            train_exp.log_code(folder=".")
+            train_exp.set_name(comet_exp_name)
         except ValueError as e:
             raise ValueError(f"Comet experiment creation error --> {e}") from e
-        return comet_exp
+        return train_exp
 
     def _optimize_model(
         self,
-        comet_exp: Experiment,
+        train_exp: Experiment,
         model: Callable,
         search_space_params: dict,
         max_search_iters: int = 100,
@@ -128,7 +128,7 @@ class ModelTrainer:
         """Optimizes the model using ModelOptimizer class.
 
         Args:
-            comet_exp (Experiment): Comet experiment object,
+            train_exp (Experiment): Comet experiment object,
             model (Callable): model object that implements the fit and predict methods,
             search_space_params (dict): hyperparameter search space for the model,
             max_search_iters (int, optional): maximum number of iterations for the hyperparameter
@@ -148,7 +148,7 @@ class ModelTrainer:
         """
 
         optimizer = ModelOptimizer(
-            comet_exp=comet_exp,
+            train_exp=train_exp,
             train_features_preprocessed=self.train_features_preprocessed,
             train_class=self.train_class,
             valid_features_preprocessed=self.valid_features_preprocessed,
@@ -177,14 +177,14 @@ class ModelTrainer:
 
     def _log_study_trials(
         self,
-        comet_exp: Experiment,
+        train_exp: Experiment,
         study: optuna.study.Study,
         classifier_name: str,
     ) -> None:
         """Logs Optuna study results to Comet experiment.
 
         Args:
-            comet_exp (Experiment): Comet experiment object,
+            train_exp (Experiment): Comet experiment object,
             study (optuna.study.Study): Optuna study object,
             classifier_name (str): name of the classifier.
 
@@ -200,7 +200,7 @@ class ModelTrainer:
         study_results.to_csv(
             f"{self.artifacts_path}/study_{classifier_name}.csv", index=False
         )
-        comet_exp.log_asset(
+        train_exp.log_asset(
             file_data=f"{self.artifacts_path}/study_{classifier_name}.csv",
             file_name=f"study_{classifier_name}",
         )
@@ -233,7 +233,7 @@ class ModelTrainer:
 
     def _evaluate_model(
         self,
-        comet_exp: Experiment,
+        train_exp: Experiment,
         fitted_pipeline: Pipeline,
         is_voting_ensemble: bool = False,
         ece_nbins: int = 5,
@@ -241,7 +241,7 @@ class ModelTrainer:
         """Evaluates the model using ModelEvaluator class.
 
         Args:
-            comet_exp (Experiment): Comet experiment object,
+            train_exp (Experiment): Comet experiment object,
             fitted_pipeline (Pipeline): fitted pipeline object,
             is_voting_ensemble (bool, optional): is it a voting ensemble classifier? Default to False,
             ece_nbins (int, optional): number of bins for expected calibration error. Default to 5.
@@ -254,7 +254,7 @@ class ModelTrainer:
 
         # Evaluate model performance on training and validation sets
         evaluator = ModelEvaluator(
-            comet_exp=comet_exp,
+            train_exp=train_exp,
             pipeline=fitted_pipeline,
             train_features=self.train_features,
             train_class=self.train_class,
@@ -300,7 +300,7 @@ class ModelTrainer:
 
     def _log_model_metrics(
         self,
-        comet_exp: Experiment,
+        train_exp: Experiment,
         train_metric_values: dict,
         valid_metric_values: dict,
         model_ece: float,
@@ -308,7 +308,7 @@ class ModelTrainer:
         """Logs model metrics to Comet experiment.
 
         Args:
-            comet_exp (Experiment): Comet experiment object,
+            train_exp (Experiment): Comet experiment object,
             evaluator (ModelEvaluator): ModelEvaluator object,
             train_metric_values (dict): training scores,
             valid_metric_values (dict): validation scores,
@@ -323,29 +323,29 @@ class ModelTrainer:
         metrics_to_log.update(valid_metric_values)
         metrics_to_log.update({"model_ece": model_ece})
 
-        comet_exp.log_metrics(metrics_to_log)
+        train_exp.log_metrics(metrics_to_log)
 
     def _register_model(
         self,
-        comet_exp: Experiment,
+        train_exp: Experiment,
         pipeline: Pipeline,
         registered_model_name: str,
     ) -> None:
         """Saves and registers the model to Comet experiment.
 
         Args:
-            comet_exp (Experiment): Comet experiment object,
+            train_exp (Experiment): Comet experiment object,
             pipeline (Pipeline): fitted pipeline object,
             registered_model_name (str): name of the registered model.
         """
 
         joblib.dump(pipeline, f"{self.artifacts_path}/{registered_model_name}.pkl")
-        comet_exp.log_model(
+        train_exp.log_model(
             name=registered_model_name,
             file_or_folder=f"{self.artifacts_path}/{registered_model_name}.pkl",
             overwrite=False,
         )
-        comet_exp.register_model(model_name=registered_model_name)
+        train_exp.register_model(model_name=registered_model_name)
 
     def submit_train_exp(
         self,
@@ -391,7 +391,7 @@ class ModelTrainer:
         Returns:
             Pipeline: calibrated pipeline object that contains the model transformation pipeline
                 and calibrated classifier.
-            comet_exp (Experiment): Comet experiment object to be used to access returned model metrics.
+            train_exp (Experiment): Comet experiment object to be used to access returned model metrics.
 
         Raises:
             Exception: if model training fails.
@@ -403,7 +403,7 @@ class ModelTrainer:
             registered_model_name = classifier_name
 
         # Create Comet experiment
-        comet_exp = self._create_comet_experiment(
+        train_exp = self._create_comet_experiment(
             comet_api_key=comet_api_key,
             project_name=project_name,
             comet_exp_name=comet_exp_name,
@@ -412,7 +412,7 @@ class ModelTrainer:
         try:
             # Tune model
             study, optimizer = self._optimize_model(
-                comet_exp=comet_exp,
+                train_exp=train_exp,
                 model=model,
                 search_space_params=search_space_params,
                 max_search_iters=max_search_iters,
@@ -424,7 +424,7 @@ class ModelTrainer:
 
             # Log study trials
             self._log_study_trials(
-                comet_exp=comet_exp,
+                train_exp=train_exp,
                 study=study,
                 classifier_name=classifier_name,
             )
@@ -442,11 +442,11 @@ class ModelTrainer:
                 for k, v in fitted_pipeline.get_params().items()
                 if k.startswith("classifier__")
             }
-            comet_exp.log_parameters(model_params)
+            train_exp.log_parameters(model_params)
 
             # Evaluate best model
             train_metric_values, valid_metric_values, model_ece = self._evaluate_model(
-                comet_exp=comet_exp,
+                train_exp=train_exp,
                 fitted_pipeline=fitted_pipeline,
                 is_voting_ensemble=is_voting_ensemble,
                 ece_nbins=ece_nbins,
@@ -454,7 +454,7 @@ class ModelTrainer:
 
             # Log model metrics
             self._log_model_metrics(
-                comet_exp=comet_exp,
+                train_exp=train_exp,
                 train_metric_values=train_metric_values,
                 valid_metric_values=valid_metric_values,
                 model_ece=model_ece,
@@ -462,7 +462,7 @@ class ModelTrainer:
 
             # Save and register model
             self._register_model(
-                comet_exp=comet_exp,
+                train_exp=train_exp,
                 pipeline=fitted_pipeline,
                 registered_model_name=registered_model_name,
             )
@@ -471,9 +471,9 @@ class ModelTrainer:
             logger.info("\n\nModel training error --> %s\n\n", e)
             fitted_pipeline = None
 
-        comet_exp.end()
+        train_exp.end()
 
-        return fitted_pipeline, comet_exp
+        return fitted_pipeline, train_exp
 
 
 class VotingEnsembleCreator(ModelTrainer):
@@ -683,7 +683,7 @@ class VotingEnsembleCreator(ModelTrainer):
         """
 
         # Create Comet experiment
-        comet_exp = self._create_comet_experiment(
+        train_exp = self._create_comet_experiment(
             comet_api_key=self.comet_api_key,
             project_name=self.project_name,
             comet_exp_name=self.comet_exp_name,
@@ -696,21 +696,21 @@ class VotingEnsembleCreator(ModelTrainer):
 
             # Evaluate voting ensemble classifier
             train_metric_values, valid_metric_values, model_ece = self._evaluate_model(
-                comet_exp=comet_exp,
+                train_exp=train_exp,
                 fitted_pipeline=ve_pipeline,
                 is_voting_ensemble=True,
                 ece_nbins=self.ece_nbins,
             )
 
             self._log_model_metrics(
-                comet_exp=comet_exp,
+                train_exp=train_exp,
                 train_metric_values=train_metric_values,
                 valid_metric_values=valid_metric_values,
                 model_ece=model_ece,
             )
 
             self._register_model(
-                comet_exp=comet_exp,
+                train_exp=train_exp,
                 pipeline=ve_pipeline,
                 registered_model_name=self.registered_model_name,
             )
@@ -719,6 +719,6 @@ class VotingEnsembleCreator(ModelTrainer):
             logger.info("\nVoting ensemble error --> %s\n\n", e)
             ve_pipeline = None
 
-        comet_exp.end()
+        train_exp.end()
 
-        return ve_pipeline, comet_exp
+        return ve_pipeline, train_exp

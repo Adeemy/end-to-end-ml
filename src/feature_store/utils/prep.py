@@ -335,16 +335,18 @@ class DataPreprocessor:
         if self.cat_feature_names is None:
             self.cat_feature_names = []
 
-        # Assert that at least one feature data type was passed
-        assert (
+        if (
             len(
                 self.date_cols_names
                 + self.datetime_cols_names
                 + self.num_feature_names
                 + self.cat_feature_names
             )
-            > 0
-        ), "At least one feature data type must be provided. None was provided!"
+            == 0
+        ):
+            raise ValueError(
+                "At least one feature data type must be provided. None was provided!"
+            )
 
     def replace_blank_values_with_nan(self) -> None:
         """Replaces blank values with np.nan. It is useful when reading data from

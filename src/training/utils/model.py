@@ -47,7 +47,7 @@ class ModelOptimizer:
     in each objective function call during hyperparameters optimization.
 
     Attributes:
-        comet_exp (Experiment): Comet experiment object.
+        train_exp (Experiment): Comet experiment object.
         train_features_preprocessed (pd.DataFrame): preprocessed train features.
         train_class (np.ndarray): train class labels.
         valid_features_preprocessed (pd.DataFrame): preprocessed validation features.
@@ -73,7 +73,7 @@ class ModelOptimizer:
 
     def __init__(
         self,
-        comet_exp: Experiment,
+        train_exp: Experiment,
         train_features_preprocessed: pd.DataFrame,
         train_class: np.ndarray,
         valid_features_preprocessed: pd.DataFrame,
@@ -90,7 +90,7 @@ class ModelOptimizer:
         Raises:
             AssertionError: if the specified model name is not supported.
         """
-        self.comet_exp = comet_exp
+        self.train_exp = train_exp
         self.train_features_preprocessed = train_features_preprocessed
         self.train_class = train_class
         self.valid_features_preprocessed = valid_features_preprocessed
@@ -221,8 +221,8 @@ class ModelOptimizer:
             valid_scores["Metric"] == f"f_{self.fbeta_score_beta}_score", "Score"
         ]
 
-        self.comet_exp.log_metric(name="training_score", value=train_score)
-        self.comet_exp.log_metric(name="validation_score", value=valid_score)
+        self.train_exp.log_metric(name="training_score", value=train_score)
+        self.train_exp.log_metric(name="validation_score", value=valid_score)
 
         # Return the validation score to ensure it's used for model selsection
         return -valid_score
@@ -392,7 +392,7 @@ class ModelEvaluator(ModelOptimizer):
 
     Attributes:
         ModelOptimizer (ModelOptimizer): ModelOptimizer class.
-        comet_exp (Experiment): Comet experiment object.
+        train_exp (Experiment): Comet experiment object.
         pipeline (Pipeline): fitted pipeline.
         train_features (pd.DataFrame): train features.
         train_class (np.ndarray): train class labels.
@@ -404,7 +404,7 @@ class ModelEvaluator(ModelOptimizer):
 
     def __init__(
         self,
-        comet_exp: Experiment,
+        train_exp: Experiment,
         pipeline: Pipeline,
         train_features: pd.DataFrame,
         train_class: np.ndarray,
@@ -429,7 +429,7 @@ class ModelEvaluator(ModelOptimizer):
             is_voting_ensemble=is_voting_ensemble,
         )
 
-        self.comet_exp = comet_exp
+        self.train_exp = train_exp
         self.pipeline = pipeline
         self.train_features = train_features
         self.train_class = train_class
@@ -616,7 +616,7 @@ class ModelEvaluator(ModelOptimizer):
                 font_size=font_size,
                 fig_size=figure_size,
             )
-            self.comet_exp.log_figure(
+            self.train_exp.log_figure(
                 figure_name=fig_name,
                 figure=feature_importance_fig,
                 overwrite=True,
@@ -930,7 +930,7 @@ class ModelEvaluator(ModelOptimizer):
             labels=original_class_labels,
             normalize=None,
         )
-        self.comet_exp.log_confusion_matrix(
+        self.train_exp.log_confusion_matrix(
             matrix=train_cm,
             title="Train Set Confusion Matrix",
             file_name="Train Set Confusion Matrix.json",
@@ -942,7 +942,7 @@ class ModelEvaluator(ModelOptimizer):
             labels=original_class_labels,
             normalize="true",
         )
-        self.comet_exp.log_confusion_matrix(
+        self.train_exp.log_confusion_matrix(
             matrix=train_cm_norm,
             title="Train Set Normalized Confusion Matrix",
             file_name="Train Set Normalized Confusion Matrix.json",
@@ -954,7 +954,7 @@ class ModelEvaluator(ModelOptimizer):
             labels=original_class_labels,
             normalize=None,
         )
-        self.comet_exp.log_confusion_matrix(
+        self.train_exp.log_confusion_matrix(
             matrix=valid_cm,
             title="Validation Set Confusion Matrix",
             file_name="Validation Set Confusion Matrix.json",
@@ -966,7 +966,7 @@ class ModelEvaluator(ModelOptimizer):
             labels=original_class_labels,
             normalize="true",
         )
-        self.comet_exp.log_confusion_matrix(
+        self.train_exp.log_confusion_matrix(
             matrix=valid_cm_norm,
             title="Validation Set Normalized Confusion Matrix",
             file_name="Validation Set Normalized Confusion Matrix.json",
@@ -985,7 +985,7 @@ class ModelEvaluator(ModelOptimizer):
             pred_probs[:, self.encoded_pos_class_label],
             n_bins=10,
         )
-        self.comet_exp.log_figure(
+        self.train_exp.log_figure(
             figure_name="Calibration Curve", figure=calib_curve.figure_, overwrite=True
         )
 
@@ -1004,7 +1004,7 @@ class ModelEvaluator(ModelOptimizer):
             y_pred=pred_probs[:, encoded_pos_class_label],
             fig_size=(6, 6),
         )
-        self.comet_exp.log_figure(
+        self.train_exp.log_figure(
             figure_name="ROC Curve", figure=roc_curve_fig, overwrite=True
         )
 
@@ -1023,7 +1023,7 @@ class ModelEvaluator(ModelOptimizer):
             y_pred=pred_probs[:, encoded_pos_class_label],
             fig_size=(6, 6),
         )
-        self.comet_exp.log_figure(
+        self.train_exp.log_figure(
             figure_name="Precision-Recall Curve", figure=prec_recall_fig, overwrite=True
         )
 
@@ -1042,7 +1042,7 @@ class ModelEvaluator(ModelOptimizer):
             y_pred=pred_probs[:, self.encoded_pos_class_label],
             fig_size=(6, 6),
         )
-        self.comet_exp.log_figure(
+        self.train_exp.log_figure(
             figure_name="Cumulative Gain", figure=cum_gain_fig, overwrite=True
         )
 
@@ -1059,7 +1059,7 @@ class ModelEvaluator(ModelOptimizer):
             y_pred=pred_probs[:, self.encoded_pos_class_label],
             fig_size=(6, 6),
         )
-        self.comet_exp.log_figure(
+        self.train_exp.log_figure(
             figure_name="Lift Curve", figure=lift_curve_fig, overwrite=True
         )
 

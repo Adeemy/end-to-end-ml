@@ -1,5 +1,5 @@
 """
-Test functions for the ModelLoader class and predict function 
+Test functions for the ModelLoader class and predict function
 in the inference module src/inference/utils/model.py.
 """
 
@@ -18,13 +18,13 @@ def model_loader():
     return ModelLoader()
 
 
-def test_get_config_params(model_loader):
+def test_get_config_params(model_loader):  # pylint: disable=redefined-outer-name
     """Tests that get_config_params returns the correct configuration parameters."""
 
     config_yaml_abs_path = f"{str(PARENT_DIR)}/config/training-config.yml"
 
     config = Config(config_path=config_yaml_abs_path)
-    comet_workspace_name = config.params["train"]["comet_workspace_name"]
+    workspace_name = config.params["train"]["workspace_name"]
     model_name = config.params["modelregistry"]["champion_model_name"]
     hf_data_source = config.params["data"]["raw_dataset_source"]
 
@@ -34,7 +34,7 @@ def test_get_config_params(model_loader):
     result = model_loader.get_config_params(config_yaml_abs_path)
 
     assert result == (
-        comet_workspace_name,
+        workspace_name,
         model_name,
         num_col_names,
         cat_col_names,
@@ -42,7 +42,7 @@ def test_get_config_params(model_loader):
     )
 
 
-def test_download_model(mocker, model_loader):
+def test_download_model(mocker, model_loader):  # pylint: disable=redefined-outer-name
     """Tests that download_model returns a registered model."""
 
     # Mock the API class and its methods
@@ -94,7 +94,9 @@ def test_predict():
 
     # Create a mock model
     class MockModel:
-        def predict_proba(self, data_df: pd.DataFrame):
+        def predict_proba(
+            self, data_df: pd.DataFrame
+        ):  # pylint: disable=unused-argument
             return [[0.25, 0.75]]
 
     # Call the predict function

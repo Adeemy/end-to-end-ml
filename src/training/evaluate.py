@@ -96,7 +96,7 @@ def evaluate_best_model(
     """
 
     best_model_evaluator = ModelEvaluator(
-        comet_exp=best_model_exp_obj,
+        train_exp=best_model_exp_obj,
         pipeline=best_model_pipeline,
         train_features=train_set.drop(class_col_name, axis=1),
         train_class=np.array(train_set[class_col_name]),
