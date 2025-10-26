@@ -59,6 +59,42 @@ def remove_duplicates_by_unique_id_data():
     )
 
 
+def test_prepend_and_append_steps_are_applied_in_order():
+    """Verify prepend_steps are placed before and append_steps after the base steps."""
+
+    calls = []
+
+    def pre_step(df: pd.DataFrame) -> pd.DataFrame:
+        calls.append("pre")
+        return df.copy()
+
+    def base_step(df: pd.DataFrame) -> pd.DataFrame:
+        calls.append("base")
+        return df.copy()
+
+    def post_step(df: pd.DataFrame) -> pd.DataFrame:
+        calls.append("post")
+        return df.copy()
+
+    def added_step(df: pd.DataFrame) -> pd.DataFrame:
+        calls.append("added")
+        return df.copy()
+
+    dp = DataPreprocessor(
+        steps=[base_step], prepend_steps=[pre_step], append_steps=[post_step]
+    )
+    dp.add_step(added_step)
+
+    input_df = pd.DataFrame({"x": [1, 2, 3]})
+    out = dp.run_preprocessing_pipeline(input_df)
+
+    assert calls == ["pre", "base", "post", "added"]
+
+    # Ensure pipeline returned a DataFrame and original input was not mutated
+    assert isinstance(out, pd.DataFrame)
+    assert "x" in input_df.columns and input_df.shape == (3, 1)
+
+
 def test_check_duplicate_rows(
     remove_duplicates_by_unique_id_data,  # pylint: disable=redefined-outer-name
 ):
@@ -75,6 +111,26 @@ def test_check_duplicate_rows(
     expected_msg = f"1 rows with duplicate {input_data_id}."
     with pytest.raises(ValueError, match=re.escape(expected_msg)):
         preprocessor_with_pk.check_duplicate_rows(test_data_with_non_unique_id)
+
+
+def test_check_duplicate_rows_returns_df_when_no_duplicates():
+    """Returns the original DataFrame when no duplicates are present."""
+    df = pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "name": ["A", "B", "C"],
+            "value": [10, 20, 30],
+        }
+    )
+
+    pre_no_pk = DataPreprocessor(primary_key_names=None)
+    out = pre_no_pk.check_duplicate_rows(df)
+    assert out is df  # same object returned when no duplicates
+
+    # also when primary key provided and rows are unique by that key
+    pre_with_pk = DataPreprocessor(primary_key_names=["id"])
+    out2 = pre_with_pk.check_duplicate_rows(df)
+    assert out2 is df
 
 
 def test_remove_duplicates_by_primary_key(
@@ -175,6 +231,39 @@ def test_replace_blank_values_with_nan(replace_blank_values_with_nan_data):
     assert sample_data_without_blank_cells[["payment"]].isna().sum().iloc[0] == 2
     assert sample_data_without_blank_cells[["date"]].isna().sum().iloc[0] == 3
     assert sample_data_without_blank_cells[["datetime"]].isna().sum().iloc[0] == 4
+
+
+def test_replace_common_missing_values_replaces_tokens_with_nan_and_is_non_mutating():
+    df = pd.DataFrame(
+        {
+            "col": [
+                "",  # empty string
+                "<NA>",  # literal token
+                "null",  # literal token
+                "?",  # literal token
+                None,  # None
+                "N/A",  # literal token
+                "NAN",  # literal token
+                "nan",  # literal token
+                pd.NA,  # pandas NA
+                "keep",  # value that should remain unchanged
+            ]
+        }
+    )
+
+    pre = DataPreprocessor()
+    out = pre.replace_common_missing_values(df)
+
+    # output: nine tokens should be converted to np.nan, one value unchanged
+    assert isinstance(out, pd.DataFrame)
+
+    assert out["col"].isna().sum() == 9  # pylint: disable=unsubscriptable-object
+    assert out["col"].iloc[-1] == "keep"  # pylint: disable=unsubscriptable-object
+
+    # original DataFrame should not be mutated for string tokens
+    assert df["col"].iloc[0] == ""
+    assert df["col"].iloc[1] == "<NA>"
+    assert df["col"].iloc[-1] == "keep"
 
 
 #################################
@@ -338,6 +427,69 @@ def test_identify_cols_with_high_nans(data, threshold_val, expected):
 
     cols_to_drop = processed.attrs.get("cols_to_drop_due_to_nans", [])
     assert cols_to_drop == expected
+
+
+def test_identify_cols_with_high_nans_respects_cols_to_exclude():
+    # A: 3/4 NaNs => 0.75, B: 2/4 => 0.5, C: 0/4 => 0.0
+    df = pd.DataFrame(
+        {
+            "A": [np.nan, 1, np.nan, np.nan],
+            "B": [np.nan, np.nan, 1, 2],
+            "C": [1, 2, 3, 4],
+        }
+    )
+
+    pre = DataPreprocessor()
+    processed = pre.identify_cols_with_high_nans(
+        df,
+        cols_to_exclude=["A"],
+        high_nans_percent_threshold=0.5,
+        update_cols_types=False,
+    )
+
+    # 'A' would be flagged but is excluded; 'B' remains flagged
+    assert processed.attrs["cols_to_drop_due_to_nans"] == ["B"]
+
+
+def test_identify_cols_with_high_nans_updates_column_lists_when_requested():
+    # Prepare data: num1 -> 3/4 NaNs (0.75), cat1 -> 2/4 NaNs (0.5)
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(
+                ["2021-01-01", "2021-02-01", "2021-03-01", "2021-04-01"]
+            ),
+            "datetime": pd.to_datetime(
+                ["2021-01-01 00:00", "2021-02-01 00:00", None, "2021-04-01 00:00"]
+            ),
+            "num1": [np.nan, np.nan, np.nan, 1.0],
+            "num2": [1.0, 2.0, 3.0, 4.0],
+            "cat1": [None, None, "a", "b"],
+            "cat2": ["x", "y", "z", "w"],
+        }
+    )
+
+    pre = DataPreprocessor(
+        date_cols_names=["date"],
+        datetime_cols_names=["datetime"],
+        num_feature_names=["num1", "num2"],
+        cat_feature_names=None,
+    )
+
+    processed = pre.identify_cols_with_high_nans(
+        df, high_nans_percent_threshold=0.5, update_cols_types=True
+    )
+
+    # cols with high nans (>= 0.5) should be num1 and cat1
+    assert processed.attrs["cols_to_drop_due_to_nans"] == ["num1", "cat1"]
+
+    # updated_column_lists should reflect removal of num1 and cat1
+    expected = {
+        "date_cols": ["date"],
+        "datetime_cols": ["datetime"],
+        "num_cols": ["num2"],
+        "cat_cols": ["cat2"],
+    }
+    assert processed.attrs["updated_column_lists"] == expected
 
 
 def test_run_preprocessing_pipeline_applies_steps_in_order_and_does_not_mutate_input():

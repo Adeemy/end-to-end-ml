@@ -3,6 +3,7 @@ Test functions for the DataSplitter class in the feature store
 module src/feature_store/utils/prep.py.
 """
 
+import re
 from datetime import date
 
 import pandas as pd
@@ -11,6 +12,7 @@ import pytest
 from src.feature_store.utils.prep import (
     DataSplitter,
     RandomSplitStrategy,
+    SplitStrategy,
     TimeBasedSplitStrategy,
 )
 
@@ -52,6 +54,57 @@ def split_dataset_data():
             }
         ),
     )
+
+
+def test_split_on_abstract_base_raises_not_implemented():
+    """Calling SplitStrategy.split on the abstract base should raise NotImplementedError."""
+    df = pd.DataFrame({"x": [1, 2, 3]})
+    base = SplitStrategy()
+    with pytest.raises(
+        NotImplementedError, match="Subclasses must implement the split method."
+    ):
+        base.split(df)
+
+
+def test_validate_inputs_raises_when_class_col_missing():
+    df = pd.DataFrame({"a": [1, 2, 3]})
+    strat = RandomSplitStrategy(class_col_name="label")
+    with pytest.raises(ValueError, match=re.escape("label doesn't exist in dataset.")):
+        strat.validate_inputs(df)
+
+
+def test_validate_inputs_raises_when_single_class():
+    df = pd.DataFrame({"label": [0, 0, 0]})
+    strat = RandomSplitStrategy(class_col_name="label")
+    with pytest.raises(
+        ValueError, match=re.escape("label must have at least two classes.")
+    ):
+        strat.validate_inputs(df)
+
+
+def test_validate_inputs_raises_when_class_contains_missing_values():
+    df = pd.DataFrame({"label": [0, 1, None]})
+    strat = RandomSplitStrategy(class_col_name="label")
+    with pytest.raises(ValueError, match=re.escape("label contains missing values.")):
+        strat.validate_inputs(df)
+
+
+def test_validate_inputs_raises_for_invalid_train_size():
+    df = pd.DataFrame({"label": [0, 1, 0, 1]})
+    strat = RandomSplitStrategy(
+        class_col_name="label", train_set_size=1.0
+    )  # invalid boundary
+    with pytest.raises(
+        ValueError, match=re.escape("train_set_size must be between 0 and 1.")
+    ):
+        strat.validate_inputs(df)
+
+
+def test_validate_inputs_raises_for_non_int_random_seed():
+    df = pd.DataFrame({"label": [0, 1, 0, 1]})
+    strat = RandomSplitStrategy(class_col_name="label", random_seed="not-an-int")
+    with pytest.raises(ValueError, match=re.escape("random_seed must be an integer.")):
+        strat.validate_inputs(df)
 
 
 def test_split_dataset_random(
@@ -109,6 +162,39 @@ def test_split_dataset_random(
             .sort_index(ascending=True)
         )
     )
+
+
+def test_validate_inputs_raises_when_date_column_missing():
+    df = pd.DataFrame({"other": [1, 2, 3]})
+    strat = TimeBasedSplitStrategy(date_col_name="date", cutoff_date=date(2020, 1, 1))
+    with pytest.raises(ValueError, match=re.escape("date doesn't exist in dataset.")):
+        strat._validate_inputs(df)  # pylint: disable=protected-access
+
+
+def test_validate_inputs_raises_when_date_column_not_datetime():
+    df = pd.DataFrame({"date": ["2020-01-01", "2020-02-01"]})  # object / string dtype
+    strat = TimeBasedSplitStrategy(date_col_name="date", cutoff_date=date(2020, 1, 1))
+    with pytest.raises(ValueError, match=re.escape("date must be in datetime format.")):
+        strat._validate_inputs(df)  # pylint: disable=protected-access
+
+
+def test_validate_inputs_raises_when_date_column_contains_missing_values():
+    df = pd.DataFrame(
+        {"date": pd.to_datetime(["2020-01-01", None])}
+    )  # datetime dtype with NaT
+    strat = TimeBasedSplitStrategy(date_col_name="date", cutoff_date=date(2020, 1, 1))
+    with pytest.raises(ValueError, match=re.escape("date contains missing values.")):
+        strat._validate_inputs(df)  # pylint: disable=protected-access
+
+
+def test_validate_inputs_raises_when_cutoff_out_of_range():
+    """Raises if cutoff_date is outside the min/max range of the date column."""
+
+    df = pd.DataFrame({"date": pd.to_datetime(["2021-01-01", "2021-06-01"])})
+    strat = TimeBasedSplitStrategy(date_col_name="date", cutoff_date=date(2020, 1, 1))
+
+    with pytest.raises(ValueError, match="cutoff_date must be between"):
+        strat._validate_inputs(df)  # pylint: disable=protected-access
 
 
 def test_split_dataset_time(split_dataset_data):  # pylint: disable=redefined-outer-name

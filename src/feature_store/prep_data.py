@@ -54,7 +54,8 @@ def preprocess_data(
     """Preprocesses raw data using a stateless DataPreprocessor.
 
     The pipeline steps are specified explicitly and injected into the preprocessor,
-    so new steps can be added without modifying the class.
+    so new steps can be added without modifying the class. The preprocessor instance is
+    returned to allow reuse of fitted parameters during transformation later.
 
     Args:
         raw_dataset: Raw dataset.
