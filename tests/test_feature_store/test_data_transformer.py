@@ -3,6 +3,8 @@ Test functions for the DataTransformer class in the feature store
 module src/feature_store/utils/prep.py.
 """
 
+import logging
+
 import pandas as pd
 import pytest
 
@@ -63,7 +65,9 @@ def data_transformer_input_data():
     )
 
 
-def test_map_categorical_features(data_transformer_input_data):
+def test_map_categorical_features(
+    data_transformer_input_data, caplog  # pylint: disable=redefined-outer-name
+):
     data_transformer = DataTransformer(data_transformer_input_data)
     data_transformer.map_categorical_features(
         col_name="GenHlth",
@@ -154,17 +158,21 @@ def test_map_categorical_features(data_transformer_input_data):
     ]
 
     # Check if raises warning when column name is not found
-    with pytest.warns(UserWarning):
+    with caplog.at_level(logging.WARNING):
         data_transformer.map_categorical_features(
             col_name="NonExistentColumn",
-            mapping_values={
-                "1": "First",
-                "2": "Second",
-            },
+            mapping_values={"1": "First", "2": "Second"},
         )
 
+    assert any(
+        "Column NonExistentColumn doesn't exist in data." in record.getMessage()
+        for record in caplog.records
+    )
 
-def test_map_class_labels(data_transformer_input_data):
+
+def test_map_class_labels(
+    data_transformer_input_data,  # pylint: disable=redefined-outer-name
+):
     data_transformer = DataTransformer(data_transformer_input_data)
     data_transformer.map_class_labels(
         "Class", mapping_values={"0": "Non-Diabetic", "1": "Diabetic"}

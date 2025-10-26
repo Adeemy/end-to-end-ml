@@ -364,31 +364,17 @@ class TrainingDataPrep:
         be considered categorical and will be converted to string.
         """
 
-        train_set_processor = DataPreprocessor(
-            input_data=self.train_set,
+        preprocessor = DataPreprocessor(
             num_feature_names=self.numerical_feature_names,
             cat_feature_names=self.categorical_feature_names,
         )
-        train_set_processor.specify_data_types()
-        self.train_set = train_set_processor.get_preprocessed_data()
+        self.train_set = preprocessor.specify_data_types(self.train_set)
 
         # This allows this method to be independent of create_validation_set method
         if self.valid_set is not None:
-            valid_set_processor = DataPreprocessor(
-                input_data=self.valid_set,
-                num_feature_names=self.numerical_feature_names,
-                cat_feature_names=self.categorical_feature_names,
-            )
-            valid_set_processor.specify_data_types()
-            self.valid_set = valid_set_processor.get_preprocessed_data()
+            self.valid_set = preprocessor.specify_data_types(self.valid_set)
 
-        test_set_processor = DataPreprocessor(
-            input_data=self.test_set,
-            num_feature_names=self.numerical_feature_names,
-            cat_feature_names=self.categorical_feature_names,
-        )
-        test_set_processor.specify_data_types()
-        self.test_set = test_set_processor.get_preprocessed_data()
+        self.test_set = preprocessor.specify_data_types(self.test_set)
 
     def create_validation_set(
         self,

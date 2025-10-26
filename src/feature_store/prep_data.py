@@ -51,30 +51,38 @@ def import_data(
 def preprocess_data(
     raw_dataset: pd.DataFrame, data_config: DataConfig
 ) -> Tuple[pd.DataFrame, DataPreprocessor]:
-    """Preprocesses raw data by handling missing values, duplicates, and data types.
+    """Preprocesses raw data using a stateless DataPreprocessor.
+
+    The pipeline steps are specified explicitly and injected into the preprocessor,
+    so new steps can be added without modifying the class.
 
     Args:
         raw_dataset: Raw dataset.
         data_config: Data configuration parameters.
 
     Returns:
-        Tuple containing the preprocessed dataset and the DataPreprocessor instance.
+        Tuple[pd.DataFrame, DataPreprocessor]: Preprocessed dataset and the preprocessor instance
     """
-    data_preprocessor = DataPreprocessor(
-        input_data=raw_dataset,
+    preprocessor = DataPreprocessor(
         primary_key_names=[data_config.pk_col_name],
         date_cols_names=data_config.date_col_names,
         datetime_cols_names=data_config.datetime_col_names,
         num_feature_names=data_config.num_col_names,
         cat_feature_names=data_config.cat_col_names,
+        steps=[],  # start with empty pipeline and inject steps explicitly
     )
 
-    data_preprocessor.replace_blank_values_with_nan()
-    data_preprocessor.check_duplicate_rows()
-    data_preprocessor.remove_duplicates_by_primary_key()
-    data_preprocessor.specify_data_types()
+    # Specify steps explicitly in desired order
+    preprocessor.add_step(preprocessor.replace_blank_values_with_nan)
+    preprocessor.add_step(preprocessor.replace_common_missing_values)
+    preprocessor.add_step(preprocessor.check_duplicate_rows)
+    preprocessor.add_step(preprocessor.remove_duplicates_by_primary_key)
+    preprocessor.add_step(preprocessor.specify_data_types)
+    preprocessor.add_step(preprocessor.identify_cols_with_high_nans)
 
-    return data_preprocessor.get_preprocessed_data(), data_preprocessor
+    processed = preprocessor.run_preprocessing_pipeline(raw_dataset)
+
+    return processed, preprocessor
 
 
 def transform_data(

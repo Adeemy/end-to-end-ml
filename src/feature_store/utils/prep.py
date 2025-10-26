@@ -2,10 +2,9 @@
 Data preprocessing and transformation classes.
 """
 
-import warnings
 from datetime import datetime
 from pathlib import PosixPath
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -293,120 +292,131 @@ class TimeBasedSplitStrategy(SplitStrategy):
 
 
 class DataPreprocessor:
-    """Preprocesses input data by replacing blank values with np.nan, checking
-    for duplicate rows, removing duplicate rows by primary key, specifying data types,
-    identifying columns with high % of missing values, and returning the preprocessed
-    data when invoked.
+    """Stateless orchestrator for preprocessing steps.
+
+    - Holds configuration (column lists, formats) but does NOT store dataset.
+    - Each step is a method that accepts a DataFrame and returns a DataFrame.
+    - Callers can extend pipeline with add_step (no class modification required).
 
     Attributes:
-        input_data (pd.DataFrame): input data.
         primary_key_names (list): list of primary key column names.
         date_cols_names (list): list of date column names.
         datetime_cols_names (list): list of datetime column names.
         num_feature_names (list): list of numerical column names.
         cat_feature_names (list): list of categorical column names.
+        desired_date_format (str): desired date format.
+        desired_datetime_format (str): desired datetime format.
+        _steps (list): list of preprocessing steps (callables).
+
+    Usage examples:
+
+    1) Default pipeline (convenient, minimal code):
+        dp = DataPreprocessor(
+            primary_key_names=['ID'],
+            date_cols_names=['date_col'],
+            datetime_cols_names=['dt_col'],
+            num_feature_names=['BMI', 'Age'],
+            cat_feature_names=['Sex', 'Smoker'],
+        )
+        processed = dp.get_preprocessed_data(raw_df)
+
+    2) Explicit pipeline composition (inject steps without modifying class):
+        dp = DataPreprocessor(
+            primary_key_names=['ID'],
+            date_cols_names=['date_col'],
+            num_feature_names=['BMI'],
+            cat_feature_names=['Sex'],
+            steps=[],  # start empty and inject desired steps
+        )
+        dp.add_step(dp.replace_blank_values_with_nan)
+        dp.add_step(dp.replace_common_missing_values)
+        dp.add_step(dp.specify_data_types)
+        processed = dp.run(raw_df)
+
+    3) Prepend/append steps (augment default pipeline):
+        dp = DataPreprocessor(prepend_steps=[custom_pre_step], append_steps=[custom_post_step])
+
+    4) Inspecting metadata produced by steps:
+        # identify_cols_with_high_nans stores results in DataFrame attrs
+        processed = dp.get_preprocessed_data(raw_df)
+        cols_to_drop = processed.attrs.get('cols_to_drop_due_to_nans')
+        updated_cols = processed.attrs.get('updated_column_lists')
+
+    Notes:
+        - The instance stores only configuration; it never keeps the dataset.
+        - Steps are pure-ish: accept a DataFrame and return a DataFrame, enabling easy testing.
     """
 
     def __init__(
         self,
-        input_data: pd.DataFrame,
         primary_key_names: Optional[list] = None,
         date_cols_names: Optional[list] = None,
         datetime_cols_names: Optional[list] = None,
         num_feature_names: Optional[list] = None,
         cat_feature_names: Optional[list] = None,
+        desired_date_format: str = "%Y-%d-%m",
+        desired_datetime_format: str = "%Y-%d-%m %H:%M:%S",
+        steps: Optional[list] = None,
+        prepend_steps: Optional[list] = None,
+        append_steps: Optional[list] = None,
     ):
-        self._data = input_data.copy()
-        self.primary_key_names = primary_key_names
-        self.date_cols_names = date_cols_names
-        self.datetime_cols_names = datetime_cols_names
-        self.num_feature_names = num_feature_names
-        self.cat_feature_names = cat_feature_names
+        # store configuration (treated as immutable by methods)
+        self.primary_key_names = list(primary_key_names) if primary_key_names else []
+        self.date_cols_names = list(date_cols_names) if date_cols_names else []
+        self.datetime_cols_names = (
+            list(datetime_cols_names) if datetime_cols_names else []
+        )
+        self.num_feature_names = list(num_feature_names) if num_feature_names else []
+        self.cat_feature_names = list(cat_feature_names) if cat_feature_names else []
+        self.desired_date_format = desired_date_format
+        self.desired_datetime_format = desired_datetime_format
 
-        if self.date_cols_names is None:
-            self.date_cols_names = []
-
-        if self.datetime_cols_names is None:
-            self.datetime_cols_names = []
-
-        if self.num_feature_names is None:
-            self.num_feature_names = []
-
-        if self.cat_feature_names is None:
-            self.cat_feature_names = []
-
-        if (
-            len(
-                self.date_cols_names
-                + self.datetime_cols_names
-                + self.num_feature_names
-                + self.cat_feature_names
-            )
-            == 0
-        ):
-            raise ValueError(
-                "At least one feature data type must be provided. None was provided!"
-            )
-
-    def replace_blank_values_with_nan(self) -> None:
-        """Replaces blank values with np.nan. It is useful when reading data from
-        csv files where blank values are represented by empty strings.
-        """
-
-        self._data.replace(r"^\s*$", np.nan, regex=True, inplace=True)
-
-    def check_duplicate_rows(self) -> None:
-        """Checks if there are duplicate rows in dataset. It returns the number of
-        duplicate rows if any.
-        """
-
-        duplicates_count = self._data.duplicated().sum()
-        if self.primary_key_names is None and duplicates_count > 0:
-            raise ValueError(f"\n{duplicates_count} duplicate rows.")
-
-        # Check if there is duplicated primary_key_names
-        if self.primary_key_names is not None:
-            duplicates_by_id_count = self._data.duplicated(
-                subset=self.primary_key_names
-            ).sum()
-            if duplicates_by_id_count > 0:
-                raise ValueError(
-                    f"\n{duplicates_by_id_count} rows with duplicate {self.primary_key_names}."
-                )
-
-    def remove_duplicates_by_primary_key(self) -> None:
-        """Removes duplicate rows by primary key. It returns the number of duplicate
-        rows and keeps the last duplicate row if any. It is useful when there are
-        duplicate rows by primary key in the dataset.
-        """
-
-        # Check if there is duplicated primary_key_names and remove duplicate rows if any
-        if len(self.primary_key_names) == 0:
-            raise ValueError("No primary key column(s) provided!")
+        # build pipeline: caller-provided steps override default; allow prepend/append
+        if steps is not None:
+            self._steps = list(steps)
         else:
-            duplicates_by_id_count = self._data.duplicated(
-                subset=self.primary_key_names
-            ).sum()
-            if duplicates_by_id_count > 0:
-                logger.info(
-                    """\n{duplicates_by_id_count} rows with the non-unique
-                    %s in input data.""",
-                    self.primary_key_names,
-                )
-                self._data.drop_duplicates(
-                    subset=self.primary_key_names, keep="last", inplace=True
-                )
-            else:
-                logger.info(
-                    "\nNo duplicate rows by %s in input data.", self.primary_key_names
-                )
+            self._steps = [
+                self.replace_blank_values_with_nan,
+                self.replace_common_missing_values,
+                self.check_duplicate_rows,
+                self.remove_duplicates_by_primary_key,
+                self.specify_data_types,
+                self.identify_cols_with_high_nans,
+            ]
 
-    def replace_common_missing_values(self) -> None:
-        """Replaces common missing values with np.nan. It is useful when reading data
-        from csv files where common missing values are represented by different strings.
+        if prepend_steps:
+            self._steps = list(prepend_steps) + self._steps
+        if append_steps:
+            self._steps = self._steps + list(append_steps)
+
+    def add_step(self, step: Callable) -> None:
+        """Appends a preprocessing step (callable df -> df).
+
+        Args:
+            step: callable that accepts a DataFrame and returns a DataFrame.
         """
+        self._steps.append(step)
 
-        self._data = self._data.replace(
+    def replace_blank_values_with_nan(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Replaces blank strings with np.nan.
+
+        Args:
+            df: Input DataFrame.
+
+        Returns:
+            DataFrame with blank strings replaced by np.nan.
+        """
+        return df.replace(r"^\s*$", np.nan, regex=True)
+
+    def replace_common_missing_values(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Replaces common missing-value tokens with np.nan.
+        Args:
+            df: Input DataFrame.
+
+        Returns:
+            DataFrame with common missing-value tokens replaced by np.nan.
+        """
+        return df.replace(
             {
                 "": np.nan,
                 "<NA>": np.nan,
@@ -420,152 +430,183 @@ class DataPreprocessor:
             }
         )
 
-    def specify_data_types(
-        self,
-        desired_date_format: str = "%Y-%d-%m",
-        desired_datetime_format: str = "%Y-%d-%m %H:%M:%S",
-    ) -> None:
-        """Specifies data types for date, datetime, numerical and categorical columns
-        with their proper missing value indicator. If date, datetime, and numerical
-        columns are not provided, all columns will be converted to categorical
-        data type (categorical type).
-
+    def check_duplicate_rows(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Validates duplicates; raises on failures (no mutation).
         Args:
-            desired_date_format (str): desired date format.
-            desired_datetime_format (str): desired datetime format.
+            df: Input DataFrame.
+
+        Returns:
+            Original DataFrame if no duplicates found.
+
+        Raises:
+            ValueError: if duplicate rows found.
+            ValueError: if duplicate primary key rows found.
         """
 
-        # Categorical variables are all veriables that are not numerical or date
-        input_data_vars_names = self._data.columns.tolist()
-        non_cat_col_names = (
-            self.date_cols_names + self.datetime_cols_names + self.num_feature_names
-        )
+        duplicates_count = df.duplicated().sum()
 
-        # Replace common missing values with np.nan
-        self.replace_common_missing_values()
+        if not self.primary_key_names and duplicates_count > 0:
+            raise ValueError(f"{duplicates_count} duplicate rows.")
 
-        # Identify categorical variables if not provided
-        if len(self.cat_feature_names) == 0:
-            self.cat_feature_names = [
-                col for col in input_data_vars_names if col not in non_cat_col_names
-            ]
+        if self.primary_key_names:
+            duplicates_by_id_count = df.duplicated(subset=self.primary_key_names).sum()
+            if duplicates_by_id_count > 0:
+                raise ValueError(
+                    f"{duplicates_by_id_count} rows with duplicate {self.primary_key_names}."
+                )
 
-        # Cast columns to proper data types
-        if len(self.date_cols_names) > 0:
-            self._data[self.date_cols_names] = self._data[self.date_cols_names].apply(
-                pd.to_datetime, format=desired_date_format, errors="coerce"
+        return df
+
+    def remove_duplicates_by_primary_key(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Returns DataFrame with duplicates removed by primary key (no mutation).
+
+        Args:
+            df: Input DataFrame.
+
+        Returns:
+            DataFrame with duplicates removed by primary key.
+
+        Raises:
+            ValueError: if no primary key columns provided.
+        """
+
+        if not self.primary_key_names:
+            raise ValueError("No primary key column(s) provided!")
+        dup_count = df.duplicated(subset=self.primary_key_names).sum()
+        if dup_count > 0:
+            logger.info(
+                "%d rows with non-unique %s in input data.",
+                dup_count,
+                self.primary_key_names,
             )
+            return df.drop_duplicates(subset=self.primary_key_names, keep="last")
+        logger.info("No duplicate rows by %s in input data.", self.primary_key_names)
+        return df
 
-            self._data[self.date_cols_names] = self._data[self.date_cols_names].replace(
+    def specify_data_types(
+        self,
+        df: pd.DataFrame,
+        desired_date_format: Optional[str] = None,
+        desired_datetime_format: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """Casts columns to appropriate dtypes. Does not mutate class-level lists.
+
+        Args:
+            df: Input DataFrame.
+            desired_date_format: Optional date format to use (overrides instance value).
+            desired_datetime_format: Optional datetime format to use (overrides instance value).
+
+        Returns:
+            DataFrame with specified data types.
+        """
+
+        date_fmt = desired_date_format or self.desired_date_format
+        datetime_fmt = desired_datetime_format or self.desired_datetime_format
+
+        input_cols = df.columns.tolist()
+        non_cat = (
+            (self.date_cols_names or [])
+            + (self.datetime_cols_names or [])
+            + (self.num_feature_names or [])
+        )
+        cat_cols_local = self.cat_feature_names or [
+            c for c in input_cols if c not in non_cat
+        ]
+
+        if self.date_cols_names:
+            df = df.copy()
+            df[self.date_cols_names] = df[self.date_cols_names].apply(
+                pd.to_datetime, format=date_fmt, errors="coerce"
+            )
+            df[self.date_cols_names] = df[self.date_cols_names].replace(
                 {np.nan: pd.NaT}
             )
 
-        if len(self.datetime_cols_names) > 0:
-            self._data[self.datetime_cols_names] = self._data[
-                self.datetime_cols_names
-            ].apply(pd.to_datetime, format=desired_datetime_format, errors="coerce")
-
-            self._data[self.datetime_cols_names] = self._data[
-                self.datetime_cols_names
-            ].replace({np.nan: pd.NaT})
-
-        if len(self.num_feature_names) > 0:
-            self._data[self.num_feature_names] = self._data[
-                self.num_feature_names
-            ].astype("float32")
-
-        if len(self.cat_feature_names) > 0:
-            logger.info(
-                """The following categorical columns will be converted to 'string'
-                type.\n %s""",
-                self.cat_feature_names,
+        if self.datetime_cols_names:
+            df[self.datetime_cols_names] = df[self.datetime_cols_names].apply(
+                pd.to_datetime, format=datetime_fmt, errors="coerce"
+            )
+            df[self.datetime_cols_names] = df[self.datetime_cols_names].replace(
+                {np.nan: pd.NaT}
             )
 
-            self._data[self.cat_feature_names] = self._data[
-                self.cat_feature_names
-            ].astype("string")
+        if self.num_feature_names:
+            df[self.num_feature_names] = df[self.num_feature_names].astype("float32")
+
+        if cat_cols_local:
+            logger.info(
+                "Converting categorical columns to 'string' type: %s", cat_cols_local
+            )
+            df[cat_cols_local] = df[cat_cols_local].astype("string")
+
+        return df
 
     def identify_cols_with_high_nans(
         self,
+        df: pd.DataFrame,
         cols_to_exclude: Optional[list] = None,
         high_nans_percent_threshold: float = 0.3,
         update_cols_types: bool = True,
-    ) -> list:
-        """Identifies columns with missing values higher than high_nans_percent_threshold
-        (default: 0.3). It will update list of categorical, continuous, date and datetime
-        column names. It keeps columns specified col_names_to_exclude from exclusion if
-        provided. update_cols_types was added to pass tests where updating column names
-        by data types is not required.
+    ) -> pd.DataFrame:
+        """Identifies high-NaN cols, attach metadata to df.attrs, and return df.
+
+        - Does not mutate any instance-level column lists.
+        - Puts 'cols_to_drop_due_to_nans' and optionally 'updated_column_lists' in df.attrs.
 
         Args:
-            cols_to_exclude (list): list of columns to exclude from removal.
-            high_nans_percent_threshold (float): threshold for high % of missing values.
-            update_cols_types (bool): whether to update column names by data type.
+            df: Input DataFrame.
+            cols_to_exclude: Optional list of columns to exclude from dropping.
+            high_nans_percent_threshold: Threshold proportion of NaNs to flag a column.
+            update_cols_types: Whether to update column lists in df.attrs.
 
         Returns:
-            cols_to_drop (list): list of columns with high % of missing values.
+            DataFrame with metadata about columns to drop due to high NaNs.
         """
 
-        # Identify columns with % of missing values > high_nans_percent_threshold
-        nans_count = self._data.isna().sum().sort_values(ascending=False)
-        nans_count = nans_count / self._data.shape[0]
-        nans_count = nans_count.drop(
-            nans_count[nans_count < high_nans_percent_threshold].index
+        nans_frac = (df.isna().sum() / df.shape[0]).sort_values(ascending=False)
+        cols_to_drop = (
+            list(nans_frac[nans_frac >= high_nans_percent_threshold].index)
+            if not nans_frac.empty
+            else []
         )
 
-        if len(nans_count) > 0:
-            cols_to_drop = list(nans_count.index)
-        else:
-            cols_to_drop = None
+        if cols_to_exclude:
+            cols_to_drop = [c for c in cols_to_drop if c not in cols_to_exclude]
 
-        # Exclude columns from removal due to high NaNs
-        if cols_to_exclude is not None and cols_to_drop is not None:
-            cols_to_drop = [col for col in cols_to_drop if col not in cols_to_exclude]
+        df.attrs["cols_to_drop_due_to_nans"] = cols_to_drop
 
-        # Update column names by data type
-        if update_cols_types and cols_to_drop is not None:
-            input_data_col_names = [
-                col_name
-                for col_name in self._data.columns.tolist()
-                if col_name not in cols_to_drop
+        if update_cols_types:
+            input_cols = [c for c in df.columns.tolist() if c not in cols_to_drop]
+            date_cols = [c for c in (self.date_cols_names or []) if c in input_cols]
+            datetime_cols = [
+                c for c in (self.datetime_cols_names or []) if c in input_cols
             ]
+            num_cols = [c for c in (self.num_feature_names or []) if c in input_cols]
+            non_cat = date_cols + datetime_cols + num_cols
+            cat_cols = [c for c in input_cols if c not in non_cat]
+            df.attrs["updated_column_lists"] = {
+                "date_cols": date_cols,
+                "datetime_cols": datetime_cols,
+                "num_cols": num_cols,
+                "cat_cols": cat_cols,
+            }
 
-            self.date_cols_names = [
-                col_name
-                for col_name in self.date_cols_names
-                if col_name not in cols_to_drop
-            ]
+        return df
 
-            self.datetime_cols_names = [
-                col_name
-                for col_name in self.datetime_cols_names
-                if col_name not in cols_to_drop
-            ]
+    def run_preprocessing_pipeline(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Executes preprocessing pipeline steps on a copy of df and return preprocessed DataFrame.
 
-            self.num_feature_names = [
-                col_name
-                for col_name in self.num_feature_names
-                if col_name not in cols_to_drop
-            ]
-
-            non_categorical_vars_names = (
-                self.date_cols_names + self.datetime_cols_names + self.num_feature_names
-            )
-            self.cat_feature_names = [
-                col
-                for col in input_data_col_names
-                if col not in non_categorical_vars_names
-            ]
-
-        return cols_to_drop
-
-    def get_preprocessed_data(self) -> pd.DataFrame:
-        """Returns the preprocessed data when invoked.
+        Args:
+            df: Input DataFrame.
 
         Returns:
-            preprocessed_data (pd.DataFrame): preprocessed data.
+            Preprocessed DataFrame.
         """
-        return self._data.copy()
+        processed = df.copy()
+        for step in self._steps:
+            # step may be a bound method or callable accepting df
+            processed = step(processed)
+        return processed
 
 
 class DataTransformer:
@@ -626,7 +667,7 @@ class DataTransformer:
                 :, col_name
             ].replace(mapping_values)
         else:
-            warnings.warn(f"Column {col_name} doesn't exist in data.")
+            logger.warning("Column %s doesn't exist in data.", col_name)
 
     def map_class_labels(self, class_col_name: str, mapping_values: dict) -> None:
         """Maps class labels to expressive names: 'Diabetic' or 'Non-Diabetic'.
