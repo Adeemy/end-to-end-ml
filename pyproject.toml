@@ -45,10 +45,7 @@ dev = [
 ]
 
 analysis = [
-  "seaborn",
-  "matplotlib",
   "phik==0.12.3",
-  "plotly",
   "ipython>=8.17.2"
 ]
 
