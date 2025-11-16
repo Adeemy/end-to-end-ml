@@ -49,15 +49,18 @@ Below is the repo structure.
         ├── LICENSE
         ├── Makefile
         ├── README.md
-        ├── pytest.ini
-        ├── requirements.txt
         ├── __init__.py
+        ├── dist
+        │   ├── end_to_end_ml-0.1.0-py3-none-any.whl
+        │   └── end_to_end_ml-0.1.0.tar.gz
         ├── img
         │   └── feast_workflow.png
         ├── notebooks
         │   ├── eda.ipynb
         │   ├── eda_requirements.txt
         │   └── utils.py
+        ├── pyproject.toml
+        ├── pytest.ini
         ├── src
         │   ├── __init__.py
         │   ├── config
@@ -65,6 +68,12 @@ Below is the repo structure.
         │   │   ├── feature-store-config.yml
         │   │   ├── logging.conf
         │   │   └── training-config.yml
+        │   ├── end_to_end_ml.egg-info
+        │   │   ├── PKG-INFO
+        │   │   ├── SOURCES.txt
+        │   │   ├── dependency_links.txt
+        │   │   ├── requires.txt
+        │   │   └── top_level.txt
         │   ├── feature_store
         │   │   ├── README.md
         │   │   ├── feature_repo
@@ -99,7 +108,14 @@ Below is the repo structure.
         │   │   │   ├── champion_model.pkl
         │   │   │   ├── experiment_keys.csv
         │   │   │   ├── lightgbm.pkl
+        │   │   │   ├── logistic-regression.pkl
+        │   │   │   ├── random-forest.pkl
         │   │   │   ├── study_LGBMClassifier.csv
+        │   │   │   ├── study_LogisticRegression.csv
+        │   │   │   ├── study_RandomForestClassifier.csv
+        │   │   │   ├── study_XGBClassifier.csv
+        │   │   │   ├── voting-ensemble.pkl
+        │   │   │   └── xgboost.pkl
         │   │   ├── evaluate.py
         │   │   ├── split_data.py
         │   │   ├── train.py
@@ -111,31 +127,33 @@ Below is the repo structure.
         │   │       └── model.py
         │   └── utils
         │       ├── __init__.py
+        │       ├── config_loader.py
         │       ├── logger.py
         │       └── path.py
-        └── tests
-        ├── __init__.py
-        ├── test_feature_store
-        │   ├── test_data_preprocessor.py
-        │   ├── test_data_splitter.py
-        │   ├── test_data_transformer.py
-        │   └── test_feature_store_config.py
-        ├── test_inference
-        │   └── test_inference_model.py
-        ├── test_training
-        │   ├── test_data_utils.py
-        │   ├── test_job.py
-        │   ├── test_training_model.py
-        │   └── test_training_config.py
-        └── test_utils.py
+        ├── tests
+        │   ├── __init__.py
+        │   ├── test_feature_store
+        │   │   ├── test_data_preprocessor.py
+        │   │   ├── test_data_splitter.py
+        │   │   ├── test_data_transformer.py
+        │   │   └── test_feature_store_config.py
+        │   ├── test_inference
+        │   │   └── test_inference_model.py
+        │   ├── test_training
+        │   │   ├── test_data_utils.py
+        │   │   ├── test_job.py
+        │   │   ├── test_training_config.py
+        │   │   └── test_training_model.py
+        │   └── test_utils.py
+        └── uv.lock
 
 ### Environment setup & usage
 
-This project uses a devcontainer to set up a full-featured development environment and install required dependencies in addition to some useful VS Code extensions. It allows isolating the tools, libraries, and runtimes needed for working with this project codebase, and to use VS Code’s full feature set inside the container. A devcontainer requires [Docker](https://docs.docker.com/engine/install/) to be up and running. It's recommended to use the devcontainer for this project to ensure consistency and reproducibility across different machines and platforms, but if you prefer not to, for whatever reason, you can create a virtual environment and install the python dependencies by running the following commands from the project root:
+This project uses [uv](https://github.com/astral-sh/uv) to manage dependencies, which are defined in the `pyproject.toml` file. A devcontainer is configured to set up a full-featured development environment and install required dependencies in addition to some useful VS Code extensions. It allows isolating the tools, libraries, and runtimes needed for working with this project codebase, and to use VS Code’s full feature set inside the container. A devcontainer requires [Docker](https://docs.docker.com/engine/install/) to be up and running. It's recommended to use the devcontainer for this project to ensure consistency and reproducibility across different machines and platforms, but if not desired, for whatever reason, you can create a virtual environment and install the python dependencies by running the following commands from the project root:
 
     python3.10 -m venv .venv
     source .venv/bin/activate
-    pip install -r requirements.txt
+    make install
 
 The training and deployment pipelines can be run in GitHub Actions. You can also run the following commands in CLI to implement all steps from generating raw dataset to pulling packaged model:
 
