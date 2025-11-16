@@ -25,11 +25,13 @@ uv pip install --link-mode=copy -e '.[dev]'
 
 # Create pytest.ini to filter common warnings from jupyter_client when running tests
 echo "Configuring pytest..."
-touch pytest.ini
-echo -e '[pytest]\nfilterwarnings ='\
-'\n    ignore::DeprecationWarning:jupyter_client.*'\
-'\n    ignore::optuna.exceptions.ExperimentalWarning'\
-'\n    ignore::DeprecationWarning:comet_ml.*' > pytest.ini
+cat > pytest.ini <<'PYTEST'
+[pytest]
+filterwarnings =
+    ignore::DeprecationWarning:jupyter_client.*
+    ignore::optuna.exceptions.ExperimentalWarning
+    ignore::DeprecationWarning:comet_ml.*
+PYTEST
 
 # Install auxiliary tools
 echo "Installing auxiliary tools..."
