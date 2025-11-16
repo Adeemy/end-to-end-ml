@@ -1,11 +1,15 @@
 # Run this file in project root directory
 
+# Create a virtual environment and install uv. Primarily for CI.
+setup:
+	python -m venv .venv
+	./.venv/bin/python -m pip install -U uv
+
 # Install packages, format code, sort imports, and run unit tests
 install:
-	python -m pip install -U uv && \
 	uv pip install --link-mode=copy -e '.[dev]'
 
-pre-commit:
+pre_commit:
 	pre-commit install --hook-type pre-commit --hook-type pre-merge-commit
 
 isort:
