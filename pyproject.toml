@@ -44,7 +44,7 @@ dev = [
   "pre-commit"
 ]
 
-notebooks = [
+analysis = [
   "seaborn",
   "matplotlib",
   "phik==0.12.3",

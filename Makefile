@@ -14,8 +14,8 @@ setup:
 install: setup
 	uv pip install --link-mode=copy -e '.[dev]'
 
-# Install dependencies for analysis tasks only.
-install_notebooks: setup
+# Install dependencies for analysis tasks only in addition to base dependencies.
+install_analysis: setup
 	uv pip install --link-mode=copy -e '.[analysis]'
 
 pre_commit:
