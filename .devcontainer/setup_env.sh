@@ -1,12 +1,12 @@
 #!/bin/bash
 set -euo pipefail # Exit on error, undefined variable, or error in a pipeline
 
-# Setup default virtual environment and ensure PYTHONPATH is available in future shell sessions if not already present
-if ! [[ $(grep -c 'export PYTHONPATH=$PYTHONPATH:~/' ~/.bashrc) -gt 0 ]]; then
-    echo 'export PYTHONPATH=$PYTHONPATH:~/' >> ~/.bashrc
+# Add the project root to PYTHONPATH in .bashrc if it's not already there.
+# This makes project modules importable in interactive shells.
+PROJECT_ROOT_PATH="export PYTHONPATH=\$PYTHONPATH:$(pwd)"
+if ! grep -qF "$PROJECT_ROOT_PATH" ~/.bashrc; then
+    echo "$PROJECT_ROOT_PATH" >> ~/.bashrc
 fi
-
-
 # Create a virtual environment if it doesn't exist
 if [ ! -d ".venv" ]; then
     python3 -m venv .venv
@@ -16,6 +16,8 @@ fi
 source .venv/bin/activate
 
 # Install/Upgrade uv using pip
+echo "Installing/upgrading uv..."
+pip install -U uv
 
 # Install all dependencies from pyproject.toml using uv
 echo "Installing project dependencies with uv..."
@@ -34,4 +36,4 @@ echo "Installing auxiliary tools..."
 sudo apt-get update
 sudo apt-get install -y tree # To print project structure
 
-echo "Environment setup complete."pip install -U uv
+echo "Environment setup complete."
