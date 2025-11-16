@@ -1,17 +1,8 @@
 # Run this file in project root directory
 
-# Update requirements.txt
-#https://stackoverflow.com/questions/62496083/pipreqs-has-the-unicode-error-under-a-virtualenv
-update_reqs:
-	pip install pipreqs
-	pipreqs --force --ignore bin,etc,include,lib,lib64 "./"
-
 # Install packages, format code, sort imports, and run unit tests
-PIP_CACHE_DIR ?= $(HOME)/.cache/pip
 install:
-	pip install --upgrade pip &&\
-		pip install black[jupyter] pytest pylint isort pytest-cov pytest-mock pre-commit &&\
-		pip install --cache-dir $(PIP_CACHE_DIR) -r requirements.txt
+	uv pip install --link-mode=copy -e '.[dev]'
 
 pre-commit:
 	pre-commit install --hook-type pre-commit --hook-type pre-merge-commit
@@ -22,7 +13,7 @@ isort:
 format:
 	black ./notebooks ./src ./tests
 
-test:	
+test:
 	coverage run -m pytest -vvv
 	coverage report -m
 
@@ -88,4 +79,3 @@ test_model:
 test_packaged_model:
 	cd ./src/inference &&\
 	uvicorn --host 0.0.0.0 main:app
-
