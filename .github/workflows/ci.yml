@@ -38,7 +38,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          make setup install
+          make install
 
       - name: Add project path to sys.path
         run: |

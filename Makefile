@@ -1,15 +1,20 @@
 # Run this file in project root directory
 
+# Prepend the virtual environment's bin directory to the PATH for all rules.
+# This allows calling tools like `uv`, `python`, `isort` directly.
+VENV_BIN := $(CURDIR)/.venv/bin
+export PATH := $(VENV_BIN):$(PATH)
+
 # Create a virtual environment and install uv. Primarily for CI.
 setup:
 	python -m venv .venv
-	./.venv/bin/python -m pip install -U uv
+	python -m pip install -U uv
 
-# Install packages, format code, sort imports, and run unit tests
-install:
+# Install project dependencies. Depends on the environment being set up.
+install: setup
 	uv pip install --link-mode=copy -e '.[dev]'
 
-pre_commit:
+pre-commit:
 	pre-commit install --hook-type pre-commit --hook-type pre-merge-commit
 
 isort:
@@ -42,24 +47,19 @@ prep_data:
 
 # Setup feature store, view entities and feature views
 teardown_feast:
-	cd ./src/feature_store/feature_repo &&\
-	feast teardown
+	cd ./src/feature_store/feature_repo && feast teardown
 
 init_feast:
-	cd ./src/feature_store/feature_repo &&\
-	feast apply
+	cd ./src/feature_store/feature_repo && feast apply
 
 show_feast_entities:
-	cd ./src/feature_store/feature_repo &&\
-	feast entities list
+	cd ./src/feature_store/feature_repo && feast entities list
 
 show_feast_views:
-	cd ./src/feature_store/feature_repo &&\
-	feast feature-views list
+	cd ./src/feature_store/feature_repo && feast feature-views list
 
 show_feast_ui:
-	cd ./src/feature_store/feature_repo &&\
-	feast ui
+	cd ./src/feature_store/feature_repo && feast ui
 
 setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 
@@ -82,5 +82,4 @@ test_model:
 
 # Test model via API (go to http://localhost:8000/docs page to test sample)
 test_packaged_model:
-	cd ./src/inference &&\
-	uvicorn --host 0.0.0.0 main:app
+	cd ./src/inference && uvicorn --host 0.0.0.0 main:app
