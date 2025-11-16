@@ -57,7 +57,6 @@ Below is the repo structure.
         │   └── feast_workflow.png
         ├── notebooks
         │   ├── eda.ipynb
-        │   ├── eda_requirements.txt
         │   └── utils.py
         ├── pyproject.toml
         ├── pytest.ini
