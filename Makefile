@@ -1,10 +1,5 @@
 # Run this file in project root directory
 
-# Prepend the virtual environment's bin directory to the PATH for all rules.
-# This allows calling tools like `uv`, `python`, `isort` directly.
-VENV_BIN := $(CURDIR)/.venv/bin
-export PATH := $(VENV_BIN):$(PATH)
-
 # Create a virtual environment and install uv. Primarily for CI.
 setup:
 	python -m venv .venv
