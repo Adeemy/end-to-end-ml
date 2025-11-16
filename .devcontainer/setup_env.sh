@@ -38,4 +38,10 @@ echo "Installing auxiliary tools..."
 sudo apt-get update
 sudo apt-get install -y tree # To print project structure
 
+# Add the venv activation command to .bashrc if it's not already there.
+VENV_ACTIVATE_COMMAND="source $(pwd)/.venv/bin/activate"
+if ! grep -qF "$VENV_ACTIVATE_COMMAND" ~/.bashrc; then
+    echo "$VENV_ACTIVATE_COMMAND" >> ~/.bashrc
+fi
+
 echo "Environment setup complete."
