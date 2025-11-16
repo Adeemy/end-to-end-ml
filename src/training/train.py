@@ -1,6 +1,14 @@
 """
 Runs training experiments to perform hyperparameters optimization
 for multiple models. It tracks the experiments using Comet.ml.
+
+Data Prep Flow:
+1. split_data.py imports data from feature store and creates train/valid/test splits
+   - Saves data splits with class as parquet files in DATA_DIR.
+2. train.py loads the parquet files.
+3. prepare_data() encodes class labels using LabelEncoder
+4. Models are trained on encoded class labels.
+5. Encoded splits are saved back to parquet files for evaluation.
 """
 
 import argparse
@@ -52,6 +60,12 @@ def prepare_data(
     int,
 ]:
     """Prepare data for training by preprocessing training and validation sets.
+
+    Note: This function loads data splits that were created by split_data.py.
+    The class labels come from the feature store as integers (0, 1) and are
+    encoded using LabelEncoder. The pos_class config parameter can be specified
+    as either string ("1") or integer (1) - it will be automatically converted
+    to match the data type.
 
     Args:
         config_yaml_path (str): path to config yaml file.

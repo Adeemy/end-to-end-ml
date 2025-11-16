@@ -138,14 +138,6 @@ class FeatureMappingsConfig:
 
 
 @dataclass(frozen=True)
-class ClassMappingsConfig:
-    """Configuration for class mappings."""
-
-    class_column: str
-    class_values: Dict[str, str]
-
-
-@dataclass(frozen=True)
 class FilesConfig:
     """Configuration for file paths."""
 
@@ -163,7 +155,6 @@ class FeatureStoreConfig:
     logger: LoggerConfig
     data: DataConfig
     feature_mappings: FeatureMappingsConfig
-    class_mappings: ClassMappingsConfig
     files: FilesConfig
 
 
@@ -184,6 +175,5 @@ def build_feature_store_config(params: Dict[str, Any]) -> FeatureStoreConfig:
         feature_mappings=map_to_dataclass(
             FeatureMappingsConfig, {"mappings": params["feature_mappings"]}
         ),
-        class_mappings=map_to_dataclass(ClassMappingsConfig, params["class_mappings"]),
         files=map_to_dataclass(FilesConfig, params["files"]),
     )

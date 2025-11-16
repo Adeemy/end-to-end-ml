@@ -19,7 +19,6 @@ import pandas as pd
 from ucimlrepo import fetch_ucirepo
 
 from src.feature_store.utils.config import (
-    ClassMappingsConfig,
     Config,
     DataConfig,
     FilesConfig,
@@ -35,14 +34,11 @@ from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR
 
 
-def import_data(
-    data_config: DataConfig, class_mappings: ClassMappingsConfig
-) -> pd.DataFrame:
+def import_data(data_config: DataConfig) -> pd.DataFrame:
     """Import data from UCI repository.
 
     Args:
         data_config: Data configuration parameters.
-        class_mappings: Class mappings configuration parameters.
 
     Returns:
         pd.DataFrame: Raw dataset.
@@ -54,8 +50,8 @@ def import_data(
     raw_dataset[data_config.pk_col_name] = raw_data.data.ids.loc[
         :, [data_config.pk_col_name]
     ]
-    raw_dataset[class_mappings.class_column] = raw_data.data.targets.loc[
-        :, [class_mappings.class_column]
+    raw_dataset[data_config.class_col_name] = raw_data.data.targets.loc[
+        :, [data_config.class_col_name]
     ]
 
     # Select required columns
@@ -65,7 +61,7 @@ def import_data(
         + data_config.datetime_col_names
         + data_config.num_col_names
         + data_config.cat_col_names
-        + [class_mappings.class_column]
+        + [data_config.class_col_name]
     )
 
     return raw_dataset[required_columns]
@@ -173,7 +169,7 @@ def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> 
         config_path=config_yaml_path,
     )
 
-    raw_dataset = import_data(config.data, config.class_mappings)
+    raw_dataset = import_data(config.data)
     logger.info("Raw dataset imported from UCI repository.")
 
     raw_dataset, inference_set = split_data(raw_dataset, config.data)

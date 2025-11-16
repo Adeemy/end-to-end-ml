@@ -83,14 +83,6 @@ feature_mappings:
     "12": "75 to 79"
     "13": "80 or older"
 
-# Provide class mappings here. Must use "class" as a prefix for "_column"
-# and "_values" keys, e.g., class_column and class_values
-class_mappings:
-  class_column: Diabetes_binary
-  class_values:
-    "0": "Non-Diabetic"
-    "1": "Diabetic"
-
 files:
   raw_dataset_file_name: "raw_dataset.parquet"
   inference_set_file_name: "inference.parquet"

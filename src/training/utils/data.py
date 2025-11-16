@@ -475,6 +475,10 @@ class TrainingDataPrep:
         of training, validation, and testing sets in addition to encoded positive
         class label and fitted encoder.
 
+        It first fits the encoder on training set class labels then uses the fitted
+        encoder to transform validation and testing set class labels so that there
+        is no data leakage.
+
         Args:
             pos_class_label (str): positive class label.
 
@@ -497,13 +501,16 @@ class TrainingDataPrep:
         encoded_valid_class = fitted_class_encoder.transform(ravel(valid_class))
         encoded_test_class = fitted_class_encoder.transform(ravel(test_class))
 
-        # Get the encoded value of the positive class label
-        # Check if pos_class_label exists in the fitted classes
-        if pos_class_label not in fitted_class_encoder.classes_:
-            raise ValueError(
-                f"Positive class label '{pos_class_label}' not found in training data. "
-                f"Available classes: {list(fitted_class_encoder.classes_)}"
+        # Log original and encoded class values
+        encoding_map = dict(
+            zip(
+                fitted_class_encoder.classes_,
+                fitted_class_encoder.transform(fitted_class_encoder.classes_),
             )
+        )
+        logger.info("Original class values → Encoded: %s", encoding_map)
+
+        # Encode positive class label
         enc_pos_class_label = fitted_class_encoder.transform([pos_class_label])[0]
 
         return (
