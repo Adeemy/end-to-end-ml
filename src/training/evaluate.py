@@ -19,6 +19,7 @@ from comet_ml import ExistingExperiment
 from dotenv import load_dotenv
 
 from src.training.utils.config import Config
+from src.training.utils.experiment_tracker import CometExperimentTracker
 from src.training.utils.model import ModelChampionManager, ModelEvaluator
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
@@ -95,8 +96,11 @@ def evaluate_best_model(
         test_scores (dict): dictionary containing test scores.
     """
 
+    # Wrap Comet experiment with tracker abstraction
+    tracker = CometExperimentTracker(experiment=best_model_exp_obj)
+
     best_model_evaluator = ModelEvaluator(
-        train_exp=best_model_exp_obj,
+        tracker=tracker,
         pipeline=best_model_pipeline,
         train_features=train_set.drop(class_col_name, axis=1),
         train_class=np.array(train_set[class_col_name]),
@@ -190,6 +194,8 @@ def main(
     successful_exp_keys = pd.read_csv(
         f"{ARTIFACTS_DIR}/{exp_keys_file_name}.csv",
     )
+
+    # Create champion model manager (tracker will be added later after selecting best model)
     champ_model_manager = ModelChampionManager(champ_model_name=champ_model_name)
     best_model_name = select_best_model(
         config_yaml_path=config_yaml_path,
@@ -245,10 +251,13 @@ def main(
     # the model by raising error preventing build job.
     best_model_test_score = test_scores.get(f"test_{comparison_metric_name}")
     if best_model_test_score >= deployment_score_thresh:
+        # Create tracker for champion model and update manager
+        champ_tracker = CometExperimentTracker(experiment=best_model_exp_obj)
+        champ_model_manager.tracker = champ_tracker
+
         champ_model_manager.log_and_register_champ_model(
             local_path=artifacts_dir,
             pipeline=calib_pipeline,
-            exp_obj=best_model_exp_obj,
         )
 
         logger.info("Champion model was registered in %s workspace.", workspace_name)

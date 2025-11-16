@@ -15,7 +15,7 @@ data:
   train_set_size: 0.8 # % of train set when splitting data imported from feature store
   pk_col_name: "ID" # Primary key that uniquely identifies every row in dataset
   class_col_name: "Diabetes_binary"
-  pos_class: "Diabetic"
+  pos_class: "1"  # Positive class for binary classification (0 = no diabetes, 1 = diabetes)
   date_col_names: []
   datetime_col_names: []
   num_col_names:

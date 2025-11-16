@@ -21,6 +21,7 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
+from src.training.utils.experiment_tracker import CometExperimentTracker
 from src.training.utils.model import ModelEvaluator, ModelOptimizer
 from src.utils.logger import get_console_logger
 
@@ -147,8 +148,11 @@ class ModelTrainer:
             optimizer (ModelOptimizer): ModelOptimizer object.
         """
 
+        # Wrap Comet experiment with tracker abstraction
+        tracker = CometExperimentTracker(experiment=train_exp)
+
         optimizer = ModelOptimizer(
-            train_exp=train_exp,
+            tracker=tracker,
             train_features_preprocessed=self.train_features_preprocessed,
             train_class=self.train_class,
             valid_features_preprocessed=self.valid_features_preprocessed,
@@ -253,8 +257,11 @@ class ModelTrainer:
         """
 
         # Evaluate model performance on training and validation sets
+        # Wrap Comet experiment with tracker abstraction
+        tracker = CometExperimentTracker(experiment=train_exp)
+
         evaluator = ModelEvaluator(
-            train_exp=train_exp,
+            tracker=tracker,
             pipeline=fitted_pipeline,
             train_features=self.train_features,
             train_class=self.train_class,

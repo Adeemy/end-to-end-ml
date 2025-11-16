@@ -498,6 +498,12 @@ class TrainingDataPrep:
         encoded_test_class = fitted_class_encoder.transform(ravel(test_class))
 
         # Get the encoded value of the positive class label
+        # Check if pos_class_label exists in the fitted classes
+        if pos_class_label not in fitted_class_encoder.classes_:
+            raise ValueError(
+                f"Positive class label '{pos_class_label}' not found in training data. "
+                f"Available classes: {list(fitted_class_encoder.classes_)}"
+            )
         enc_pos_class_label = fitted_class_encoder.transform([pos_class_label])[0]
 
         return (
