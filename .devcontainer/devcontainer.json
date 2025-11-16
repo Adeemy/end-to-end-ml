@@ -49,7 +49,7 @@
   // Features to add to the dev container. More info: https://containers.dev/features.
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/mikaello/devcontainer-features/modern-shell-utils:1": {}
+    "ghcr.io/mikaello/devcontainer-features/modern-shell-utils:2": {}
   },
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   "forwardPorts": [
