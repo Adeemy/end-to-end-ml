@@ -138,6 +138,7 @@ class ModelEvaluator:
         # Catch any error raised in this function to prevent experiment
         # from registering model as it's not worth failing experiment for
         # an error in this function.
+        feature_importance_scores = None
         try:
             # Get feature names
             if num_feature_names is None and cat_feature_names is not None:
@@ -192,7 +193,10 @@ class ModelEvaluator:
                     "classifier"
                 ].feature_importances_
 
-            if classifier_name not in ["VotingClassifier"]:
+            if (
+                classifier_name not in ["VotingClassifier"]
+                and feature_importance_scores is not None
+            ):
                 # Log feature importance figure
                 feature_importance_fig = plt.figure(figsize=figure_size)
                 feature_importance_fig = self.plot_feature_importance(
@@ -523,9 +527,6 @@ def plot_data_sizes_by_date(
     second_dataset_name (str): name of the second dataset.
     font_size (int): font size for the plot (default=12).
     fig_width, fig_height (int, int): figure width and height (default= 700, 500).
-
-    Returns:
-        None
     """
 
     first_dataset_count = (
@@ -688,7 +689,7 @@ def plot_num_cols_dist_by_class(
 
     # Plot boxplots with respect to class label
     dataset = input_data.copy()
-    for i, col_name in enumerate(num_col_names):
+    for _, col_name in enumerate(num_col_names):
         # Check numerical features distribution vs. class
         plt.figure(figsize=figure_size)
         ax = sns.boxplot(
@@ -844,7 +845,7 @@ def plot_num_cols_dist(
     fig, _ = plt.subplots(len(cat_cols_names), 1, figsize=figure_size)
 
     for i, ax in enumerate(fig.axes):
-        if i < len(dataset[cat_cols_names].columns):
+        if i < len(cat_cols_names):
             categories_order = (
                 dataset[cat_cols_names[i]]
                 .value_counts()
@@ -853,15 +854,15 @@ def plot_num_cols_dist(
                 .index
             )
             sns.countplot(
-                x=dataset[cat_cols_names].columns[i],
+                x=cat_cols_names[i],
                 alpha=0.7,
-                data=dataset[cat_cols_names],
+                data=dataset,
                 ax=ax,
                 order=categories_order,
             )
             ax.tick_params(axis="x", labelsize=(x_axis_label_size - 2))
             ax.tick_params(axis="y", labelsize=(y_axis_label_size - 2))
-            ax.set(xlabel="", ylabel=dataset[cat_cols_names].columns[i] + " Count")
+            ax.set(xlabel="", ylabel=cat_cols_names[i] + " Count")
             ax.set_xticklabels(ax.get_xticklabels(), rotation=x_axis_rot, ha="right")
 
         for p in ax.patches:
@@ -998,151 +999,76 @@ def prepare_data(
     binary_class_col = train_features_set.pop(train_class_col_name)
     train_class = class_encoder.fit_transform(ravel(binary_class_col))
 
-    # Define transformers and create pipeline
-    numeric_transformer = Pipeline(
+    # Impute numerical features
+    numerical_transformer = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy=num_features_simple_imputer)),
             ("scaler", StandardScaler()),
         ]
     )
 
-    if len(high_cardinal_cat_features) > 0:
-        # Extract low cardinality features for one-hot encoding
-        low_cardinal_cat_features = [
-            col for col in categorical_features if col not in high_cardinal_cat_features
+    # Impute and encode categorical features
+    categorical_transformer = Pipeline(
+        steps=[
+            (
+                "imputer",
+                SimpleImputer(
+                    strategy=cat_features_simple_imputer, fill_value="missing"
+                ),
+            ),
+            (
+                "onehot_encoder",
+                OneHotEncoder(
+                    handle_unknown=cat_features_ohe_handle_unknown, sparse_output=False
+                ),
+            ),
         ]
-
-        # Convert high cardinality categorical features to string data type as it's one of the required data types
-        train_features_set.loc[:, high_cardinal_cat_features] = train_features_set.loc[
-            :, high_cardinal_cat_features
-        ].astype("object")
-
-        low_cardinal_cat_features_transformer = Pipeline(
-            steps=[
-                (
-                    "imputer",
-                    SimpleImputer(
-                        strategy=cat_features_simple_imputer, fill_value=np.nan
-                    ),
-                ),
-                (
-                    "onehot_encoder",
-                    OneHotEncoder(
-                        handle_unknown=cat_features_ohe_handle_unknown,
-                        categories="auto",
-                        drop="first",
-                        sparse=False,
-                    ),
-                ),
-            ]
-        )
-
-        high_cardinal_cat_features_transformer = Pipeline(
-            steps=[
-                (
-                    "imputer",
-                    SimpleImputer(
-                        strategy=cat_features_simple_imputer, fill_value=np.nan
-                    ),
-                ),  # Replace missing values with np.NaNs
-                (
-                    "hash_encoder",
-                    FeatureHasher(
-                        n_features=output_hashed_cat_features_count, input_type="string"
-                    ),
-                ),
-            ]
-        )
-
-        preprocessor = ColumnTransformer(
-            transformers=[
-                ("numeric", numeric_transformer, numerical_features),
-                (
-                    "low_cardinal",
-                    low_cardinal_cat_features_transformer,
-                    low_cardinal_cat_features,
-                ),
-                (
-                    "high_cardinal",
-                    high_cardinal_cat_features_transformer,
-                    high_cardinal_cat_features,
-                ),
-            ]
-        )
-
-    if len(high_cardinal_cat_features) == 0:
-        # Extract low cardinality features for one-hot encoding
-        low_cardinal_cat_features = categorical_features
-
-        low_cardinal_cat_features_transformer = Pipeline(
-            steps=[
-                (
-                    "imputer",
-                    SimpleImputer(
-                        strategy=cat_features_simple_imputer, fill_value=np.nan
-                    ),
-                ),
-                (
-                    "onehot_encoder",
-                    OneHotEncoder(
-                        handle_unknown=cat_features_ohe_handle_unknown,
-                        categories="auto",
-                        drop="first",
-                        sparse=False,
-                    ),
-                ),
-            ]
-        )
-
-        preprocessor = ColumnTransformer(
-            transformers=[
-                ("numeric", numeric_transformer, numerical_features),
-                (
-                    "low_cardinal",
-                    low_cardinal_cat_features_transformer,
-                    low_cardinal_cat_features,
-                ),
-            ]
-        )
-
-    selector = VarianceThreshold(threshold=features_selection_thresh)
-
-    data_transform_pipeline = Pipeline(
-        steps=[("preprocessor", preprocessor), ("selector", selector)]
     )
 
-    # Extract the transformed training set to be used for hyperparameters optimization search
-    train_set_transformed_features = data_transform_pipeline.fit_transform(
-        train_features_set
+    # Impute and hash high cardinal categorical features
+    high_cardinal_cat_transformer = Pipeline(
+        steps=[
+            (
+                "imputer",
+                SimpleImputer(
+                    strategy=cat_features_simple_imputer, fill_value="missing"
+                ),
+            ),
+            (
+                "hasher",
+                FeatureHasher(
+                    n_features=output_hashed_cat_features_count, input_type="string"
+                ),
+            ),
+        ]
     )
 
-    # Fit pipeline
-    fitted_pipeline = Pipeline(
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("numerical", numerical_transformer, numerical_features),
+            ("categorical", categorical_transformer, categorical_features),
+            (
+                "high_cardinal_categorical",
+                high_cardinal_cat_transformer,
+                high_cardinal_cat_features,
+            ),
+        ]
+    )
+
+    # Create a pipeline that transforms the data and then fits the model
+    fitted_model = Pipeline(
         steps=[
             ("preprocessor", preprocessor),
-            ("selector", selector),
+            ("selector", VarianceThreshold(threshold=features_selection_thresh)),
             ("classifier", model),
         ]
     )
-    fitted_model = fitted_pipeline.fit(train_features_set, train_class)
 
-    # Convert fitted data to pandas
-    train_set_transformed_features = pd.DataFrame(train_set_transformed_features)
+    fitted_model.fit(train_features_set, train_class)
 
-    # Add features names to ouput transformed dataframe
-    col_names = numerical_features + list(
-        fitted_model.named_steps["preprocessor"]
-        .transformers_[1][1]
-        .named_steps["onehot_encoder"]
-        .get_feature_names_out(low_cardinal_cat_features)
+    # Transform training set
+    train_set_transformed = pd.DataFrame(
+        fitted_model.named_steps["preprocessor"].transform(train_features_set)
     )
-    col_names = [i for (i, v) in zip(col_names, list(selector.get_support())) if v]
-    transformed_hashed_features_count = len(
-        list(pd.DataFrame(train_set_transformed_features).columns)
-    ) - len(col_names)
-    col_names = col_names + [
-        f"Hashed Feature {i}" for i in range(1, transformed_hashed_features_count + 1)
-    ]  # Adds names of output hashed features
-    train_set_transformed_features.columns = col_names
 
-    return train_set_transformed_features, fitted_model
+    return train_set_transformed, fitted_model

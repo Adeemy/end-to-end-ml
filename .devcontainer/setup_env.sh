@@ -3,16 +3,20 @@ set -euo pipefail # Exit on error, undefined variable, or error in a pipeline
 
 # Add the project root to PYTHONPATH in .bashrc if it's not already there.
 # This makes project modules importable in interactive shells.
+echo "Configuring PYTHONPATH..."
 PROJECT_ROOT_PATH="export PYTHONPATH=\$PYTHONPATH:$(pwd)"
 if ! grep -qF "$PROJECT_ROOT_PATH" ~/.bashrc; then
     echo "$PROJECT_ROOT_PATH" >> ~/.bashrc
 fi
+
 # Create a virtual environment if it doesn't exist
+echo "Setting up virtual environment..."
 if [ ! -d ".venv" ]; then
     python3 -m venv .venv
 fi
 
-# Activate the virtual environment
+# Activate the virtual environment for the current script
+echo "Activating virtual environment..."
 source .venv/bin/activate
 
 # Install/Upgrade uv using pip
@@ -39,6 +43,7 @@ sudo apt-get update
 sudo apt-get install -y tree # To print project structure
 
 # Add the venv activation command to .bashrc if it's not already there.
+echo "Configuring virtual environment activation in .bashrc..."
 VENV_ACTIVATE_COMMAND="source $(pwd)/.venv/bin/activate"
 if ! grep -qF "$VENV_ACTIVATE_COMMAND" ~/.bashrc; then
     echo "$VENV_ACTIVATE_COMMAND" >> ~/.bashrc

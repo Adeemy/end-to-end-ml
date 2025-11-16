@@ -14,7 +14,11 @@ setup:
 install: setup
 	uv pip install --link-mode=copy -e '.[dev]'
 
-pre-commit:
+# Install dependencies for analysis tasks only.
+install_notebooks: setup
+	uv pip install --link-mode=copy -e '.[analysis]'
+
+pre_commit:
 	pre-commit install --hook-type pre-commit --hook-type pre-merge-commit
 
 isort:
@@ -32,7 +36,7 @@ debug:
 
 # Exclude W0511 (fixme) and E1120 (no value for argument in function call) in .pylintrc file
 lint:
-	pylint ./src/feature_store ./src/training ./src/inference ./tests
+	pylint ./src/feature_store ./src/training ./src/inference ./tests ./notebooks
 
 all: install isort format test lint
 
