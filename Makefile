@@ -2,6 +2,7 @@
 
 # Install packages, format code, sort imports, and run unit tests
 install:
+	python -m pip install -U uv && \
 	uv pip install --link-mode=copy -e '.[dev]'
 
 pre-commit:
