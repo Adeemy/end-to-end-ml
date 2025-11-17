@@ -32,9 +32,10 @@ from sklearn.preprocessing import (
 )
 from xgboost import XGBClassifier
 
-from src.training.utils.config import Config
+from src.training.utils.config import Config, build_training_config
 from src.training.utils.data import TrainingDataPrep
 from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
+from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
 
@@ -201,6 +202,12 @@ def main(
 
     # Get configuration parameters
     config = Config(config_path=config_yaml_path)
+    training_config = load_config(
+        config_class=Config,
+        builder_func=build_training_config,
+        config_path=config_yaml_path,
+    )
+
     initiate_comet_project = bool(config.params["train"]["initiate_comet_project"])
     project_name = config.params["train"]["project_name"]
     workspace_name = config.params["train"]["workspace_name"]
@@ -330,6 +337,7 @@ def main(
         preprocessor_step=data_transformation_pipeline.named_steps["preprocessor"],
         selector_step=data_transformation_pipeline.named_steps["selector"],
         artifacts_path=artifacts_dir,
+        supported_models=training_config.supported_models,
         num_feature_names=num_feature_names,
         cat_feature_names=cat_feature_names,
         fbeta_score_beta=f_beta_score_beta_val,
@@ -428,6 +436,7 @@ def main(
             valid_class=valid_class,
             class_encoder=class_encoder,
             artifacts_path=artifacts_dir,
+            supported_models=training_config.supported_models,
             lr_calib_pipeline=lr_calibrated_pipeline,
             rf_calib_pipeline=rf_calibrated_pipeline,
             lgbm_calib_pipeline=lgbm_calibrated_pipeline,

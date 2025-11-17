@@ -258,6 +258,28 @@ class ModelRegistryConfig:
 
 
 @dataclass(frozen=True)
+class SupportedModelsConfig:
+    """Configuration for supported models in ModelOptimizer.
+
+    Note: When adding a new model, update the search space definition
+    in the ModelOptimizer.generate_trial_params method.
+    """
+
+    models: tuple
+
+    def is_supported(self, model_name: str) -> bool:
+        """Check if a model name is in the supported models list.
+
+        Args:
+            model_name: Name of the model to validate.
+
+        Returns:
+            bool: True if model is supported, False otherwise.
+        """
+        return model_name in self.models
+
+
+@dataclass(frozen=True)
 class IncludedModelsConfig:
     """Configuration for included models."""
 
@@ -284,6 +306,7 @@ class TrainingConfig:
     files: TrainFilesConfig = None
     modelregistry: ModelRegistryConfig = None
     included_models: IncludedModelsConfig = None
+    supported_models: SupportedModelsConfig = None
 
 
 def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
@@ -298,6 +321,17 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
     included_models_params = params.get(
         "included_models", {}
     )  # Fallback to an empty dictionary
+
+    # Build supported models tuple from modelregistry
+    modelregistry_params = params["modelregistry"]
+    models = (
+        modelregistry_params["lr_registered_model_name"],
+        modelregistry_params["rf_registered_model_name"],
+        modelregistry_params["lgbm_registered_model_name"],
+        modelregistry_params["xgb_registered_model_name"],
+    )
+    supported_models_config = SupportedModelsConfig(models=models)
+
     return TrainingConfig(
         description=params["description"],
         logger=map_to_dataclass(LoggerConfig, params["logger"]),
@@ -319,4 +353,5 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
             ModelRegistryConfig, params.get("modelregistry", {})
         ),
         included_models=map_to_dataclass(IncludedModelsConfig, included_models_params),
+        supported_models=supported_models_config,
     )

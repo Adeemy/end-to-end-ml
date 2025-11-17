@@ -23,6 +23,7 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 
+from src.training.utils.config import SupportedModelsConfig
 from src.training.utils.experiment_tracker import ExperimentTracker
 from src.utils.logger import get_console_logger
 
@@ -49,17 +50,6 @@ class ModelOptimizer:
         classifier_name (str): name of the classifier.
     """
 
-    # List of supported models in this class
-    # Note: this private variable shouldn't be mutated outside the class. It
-    # should be updated when a new model is added to the class, which requires
-    # adding its search space definition to generate_trial_params method.
-    _supported_models = (
-        "LogisticRegression",
-        "RandomForestClassifier",
-        "LGBMClassifier",
-        "XGBClassifier",
-    )
-
     def __init__(
         self,
         tracker: ExperimentTracker,
@@ -70,6 +60,8 @@ class ModelOptimizer:
         n_features: int,
         model: Callable,
         search_space_params: dict,
+        supported_models: "SupportedModelsConfig",
+        registered_model_name: str,
         fbeta_score_beta: float = 1.0,
         encoded_pos_class_label: int = 1,
         is_voting_ensemble: bool = False,
@@ -85,12 +77,14 @@ class ModelOptimizer:
             n_features: Number of features in the data.
             model: Model object.
             search_space_params: Hyperparameter search space.
+            supported_models: SupportedModelsConfig instance.
+            registered_model_name: Registry name for this model (e.g., 'logistic-regression').
             fbeta_score_beta: Beta value for fbeta score.
             encoded_pos_class_label: Encoded positive class label.
             is_voting_ensemble: Whether the model is a voting ensemble.
 
         Raises:
-            AssertionError: if the specified model name is not supported.
+            ValueError: if the specified model name is not supported.
         """
         self.tracker = tracker
         self.train_features_preprocessed = train_features_preprocessed
@@ -100,15 +94,20 @@ class ModelOptimizer:
         self.n_features = n_features
         self.model = model
         self.search_space_params = search_space_params
+        self.supported_models = supported_models
+        self.registered_model_name = registered_model_name
         self.fbeta_score_beta = fbeta_score_beta
         self.encoded_pos_class_label = encoded_pos_class_label
         self.is_voting_ensemble = is_voting_ensemble
         self.classifier_name = self.model.__class__.__name__
 
-        if not self.is_voting_ensemble:
-            assert (
-                self.classifier_name in self._supported_models
-            ), f"Supported models are: {self._supported_models}. Got {self.classifier_name}!"
+        if not self.is_voting_ensemble and not self.supported_models.is_supported(
+            self.registered_model_name
+        ):
+            raise ValueError(
+                f"Unsupported model: {self.registered_model_name}. "
+                f"Supported models are: {self.supported_models.models}"
+            )
 
     def generate_trial_params(self, trial: optuna.trial.Trial) -> dict:
         """Samples model parameters values from search space as specified in

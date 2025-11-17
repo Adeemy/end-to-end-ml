@@ -21,6 +21,7 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
+from src.training.utils.config import SupportedModelsConfig
 from src.training.utils.experiment_tracker import CometExperimentTracker
 from src.training.utils.model import ModelEvaluator, ModelOptimizer
 from src.utils.logger import get_console_logger
@@ -68,6 +69,7 @@ class ModelTrainer:
         preprocessor_step: ColumnTransformer,
         selector_step: VarianceThreshold,
         artifacts_path: str,
+        supported_models: "SupportedModelsConfig",
         num_feature_names: Optional[list] = None,
         cat_feature_names: Optional[list] = None,
         fbeta_score_beta: float = 1.0,
@@ -84,6 +86,7 @@ class ModelTrainer:
         self.preprocessor_step = preprocessor_step
         self.selector_step = selector_step
         self.artifacts_path = artifacts_path
+        self.supported_models = supported_models
         self.num_feature_names = num_feature_names
         self.cat_feature_names = cat_feature_names
         self.fbeta_score_beta = fbeta_score_beta
@@ -120,6 +123,7 @@ class ModelTrainer:
         train_exp: Experiment,
         model: Callable,
         search_space_params: dict,
+        registered_model_name: str,
         max_search_iters: int = 100,
         optimize_in_parallel: bool = False,
         n_parallel_jobs: int = 4,
@@ -132,6 +136,7 @@ class ModelTrainer:
             train_exp (Experiment): Comet experiment object,
             model (Callable): model object that implements the fit and predict methods,
             search_space_params (dict): hyperparameter search space for the model,
+            registered_model_name (str): registry name for this model,
             max_search_iters (int, optional): maximum number of iterations for the hyperparameter
                 optimization algorithm. Default to 100,
             optimize_in_parallel (bool, optional): should optimization be run in parallel. Defaults
@@ -160,6 +165,8 @@ class ModelTrainer:
             n_features=self.n_features,
             model=model,
             search_space_params=search_space_params,
+            supported_models=self.supported_models,
+            registered_model_name=registered_model_name,
             fbeta_score_beta=self.fbeta_score_beta,
             encoded_pos_class_label=self.encoded_pos_class_label,
             is_voting_ensemble=is_voting_ensemble,
@@ -422,6 +429,7 @@ class ModelTrainer:
                 train_exp=train_exp,
                 model=model,
                 search_space_params=search_space_params,
+                registered_model_name=registered_model_name,
                 max_search_iters=max_search_iters,
                 optimize_in_parallel=optimize_in_parallel,
                 n_parallel_jobs=n_parallel_jobs,
@@ -526,6 +534,7 @@ class VotingEnsembleCreator(ModelTrainer):
         valid_class: np.ndarray,
         class_encoder: LabelEncoder,
         artifacts_path: str,
+        supported_models: "SupportedModelsConfig",
         lr_calib_pipeline: Optional[Pipeline] = None,
         rf_calib_pipeline: Optional[Pipeline] = None,
         lgbm_calib_pipeline: Optional[Pipeline] = None,
@@ -548,6 +557,7 @@ class VotingEnsembleCreator(ModelTrainer):
             preprocessor_step=None,
             selector_step=None,
             artifacts_path=artifacts_path,
+            supported_models=supported_models,
             num_feature_names=None,
             cat_feature_names=None,
             fbeta_score_beta=fbeta_score_beta,
