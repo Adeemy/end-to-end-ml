@@ -32,8 +32,8 @@ from sklearn.preprocessing import (
 )
 from xgboost import XGBClassifier
 
+from src.feature_store.utils.data import TrainingDataPrep
 from src.training.utils.config import Config, build_training_config
-from src.training.utils.data import TrainingDataPrep
 from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
@@ -182,20 +182,26 @@ def main(
     data_dir: PosixPath,
     artifacts_dir: PosixPath,
     logger: logging.Logger,
-) -> None:
+    run_evaluation: bool = False,
+) -> pd.DataFrame:
     """
     Takes a config file as input and submits experiments to perform
     hyperparameters optimization for multiple models.
 
     Args:
-        config_yaml_path (str): path to config yaml file.
-        api_key (str): Comet API key.
-        data_dir (PosixPath): path to data directory.
-        artifacts_dir (PosixPath): path to artifacts directory.
-        logger (logging.Logger): logger object.
+        config_yaml_path: Path to config yaml file.
+        api_key: Comet API key.
+        data_dir: Path to data directory.
+        artifacts_dir: Path to artifacts directory.
+        logger: Logger object.
+        run_evaluation: Whether to run test evaluation after training.
+
+    Returns:
+        DataFrame containing experiment keys for successful experiments.
 
     Raises:
-        ValueError: if no model specified in config file.
+        ValueError: If no model specified in config file.
+        Exception: If evaluation fails when run_evaluation is True.
     """
 
     logger.info("Directory of training config file: %s", config_yaml_path)
@@ -483,21 +489,44 @@ def main(
 
     logger.info("Model Training Experiments Finished ...")
 
+    # Optionally run test evaluation
+    if run_evaluation:
+        logger.info("Running test set evaluation ...")
+        from src.training.evaluate import main as evaluate_main
+
+        try:
+            champion_name, test_metrics = evaluate_main(
+                config_yaml_path=config_yaml_path,
+                comet_api_key=api_key,
+                data_dir=data_dir,
+                artifacts_dir=artifacts_dir,
+                logger=logger,
+                experiment_keys=successful_exp,
+            )
+            logger.info("Champion model: %s", champion_name)
+            logger.info("Test metrics: %s", test_metrics)
+        except Exception as e:  # pylint: disable=W0718
+            logger.error("Evaluation failed: %s", e)
+            raise
+
+    return successful_exp
+
 
 ###########################################################
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Train and optimize ML models with hyperparameter tuning."
+    )
     parser.add_argument(
         "--config_yaml_path",
         type=str,
-        default="./config.yml",
-        help="Path to the configuration yaml file.",
+        default="./src/config/training-config.yml",
+        help="Path to the training configuration YAML file.",
     )
     parser.add_argument(
-        "--logger_path",
-        type=str,
-        default="./logger.conf",
-        help="Path to the logger configuration file.",
+        "--run_evaluation",
+        action="store_true",
+        help="Run test set evaluation after training.",
     )
 
     args = parser.parse_args()
@@ -506,10 +535,15 @@ if __name__ == "__main__":
     console_logger = get_console_logger(module_name)
     console_logger.info("Hyperparameters Optimization Experiments Starts ...")
 
-    main(
+    experiment_keys = main(
         config_yaml_path=args.config_yaml_path,
         api_key=os.environ["COMET_API_KEY"],
         data_dir=DATA_DIR,
         artifacts_dir=ARTIFACTS_DIR,
         logger=console_logger,
+        run_evaluation=args.run_evaluation,
+    )
+
+    console_logger.info(
+        "Training complete. %d successful experiments.", len(experiment_keys)
     )

@@ -76,7 +76,7 @@ train:
 	python ./src/training/train.py --config_yaml_path ./src/config/training-config.yml --logger_path ./src/config/logging.conf
 
 evaluate:
-	python ./src/training/evaluate.py --config_yaml_path ./src/config/training-config.yml --logger_path ./src/config/logging.conf
+	python ./src/training/evaluate.py --config_yaml_path ./src/config/training-config.yml
 
 submit_train: prep_data split_data train evaluate
 

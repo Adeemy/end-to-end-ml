@@ -13,6 +13,7 @@ import pandas as pd
 from feast import FeatureStore
 from feast.infra.offline_stores.file_source import SavedDatasetFileStorage
 
+from src.feature_store.utils.data import TrainingDataPrep
 from src.feature_store.utils.prep import (
     DataSplitter,
     RandomSplitStrategy,
@@ -26,7 +27,6 @@ from src.training.utils.config import (
     TrainPreprocessingConfig,
     build_training_config,
 )
-from src.training.utils.data import TrainingDataPrep
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR, FEATURE_REPO_DIR
