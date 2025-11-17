@@ -222,11 +222,16 @@ class ModelOptimizer:
             valid_scores["Metric"] == f"f_{self.fbeta_score_beta}_score", "Score"
         ].iloc[0]
 
-        self.tracker.log_metric(name="training_score", value=float(train_score))
-        self.tracker.log_metric(name="validation_score", value=float(valid_score))
+        # Log metrics with step for time series tracking
+        self.tracker.log_metric(
+            name="training_score", value=float(train_score), step=trial.number
+        )
+        self.tracker.log_metric(
+            name="validation_score", value=float(valid_score), step=trial.number
+        )
 
         # Return the validation score to ensure it's used for model selection
-        return -valid_score
+        return valid_score
 
     def tune_model(
         self,
@@ -267,7 +272,7 @@ class ModelOptimizer:
             multivariate=True,
             constant_liar=True,
         )
-        study = optuna.create_study(sampler=sampler)
+        study = optuna.create_study(sampler=sampler, direction="maximize")
 
         logger.info(
             """\n
@@ -312,11 +317,10 @@ class ModelOptimizer:
         )
         client = Client()
         study = optuna_distributed.from_study(
-            optuna.create_study(sampler=sampler), client=client
+            optuna.create_study(sampler=sampler, direction="maximize"), client=client
         )
 
         study.optimize(
-            direction="minimize",
             func=self.objective_function,
             n_trials=max_search_iters,
             n_jobs=n_parallel_jobs,
