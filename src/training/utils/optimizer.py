@@ -60,7 +60,7 @@ class ModelOptimizer:
         n_features: int,
         model: Callable,
         search_space_params: dict,
-        supported_models: "SupportedModelsConfig",
+        supported_models: SupportedModelsConfig,
         registered_model_name: str,
         fbeta_score_beta: float = 1.0,
         encoded_pos_class_label: int = 1,
