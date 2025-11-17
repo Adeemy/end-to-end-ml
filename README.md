@@ -48,8 +48,6 @@ The project consists of the following folders and files:
   4. **Model tracking**: All experiments tracked using Comet.ml for metrics, parameters, and artifacts
   5. **evaluate.py**: Selects best model, calibrates it, and registers as champion model in Comet workspace if test score meets threshold
 
-  **Note**: The `pos_class` parameter in `training-config.yml` can be specified as either string ("1") or integer (1) - the code automatically converts it to match the data type from the feature store.
-
 - `src/inference`: contains the script for scoring new data via REST API using containerized model, which is deployed using GitHub Actions CI/CD pipeline.
 
 - `src/utils`: contains utility modules used throughout the project, including logger class that redirects printed messages in addition to some select events that need to be logged to logger objects and constans that defines paths to to data and training artifacts directories.
