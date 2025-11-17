@@ -9,7 +9,7 @@ preprocessing, feature engineering, model selection, training, evaluation, to de
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "comet_ml==3.35.5",
+  "comet_ml==3.54.1",
   "dask==2023.12.1",
   "fastapi<0.100",
   "feast==0.34.1",
