@@ -73,7 +73,7 @@ split_data:
 	python ./src/training/split_data.py --config_yaml_path ./src/config/training-config.yml --logger_path ./src/config/logging.conf
 
 train:
-	python ./src/training/train.py --config_yaml_path ./src/config/training-config.yml --logger_path ./src/config/logging.conf
+	python ./src/training/train.py --config_yaml_path ./src/config/training-config.yml
 
 evaluate:
 	python ./src/training/evaluate.py --config_yaml_path ./src/config/training-config.yml
