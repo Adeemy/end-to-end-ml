@@ -188,6 +188,7 @@ class TrainParams:
     """Main configuration for training parameters."""
 
     initiate_comet_project: bool = False
+    experiment_tracker: str = "comet"
     project_name: str = "default-project"
     workspace_name: str = "default-workspace"
     search_max_iters: int = 10

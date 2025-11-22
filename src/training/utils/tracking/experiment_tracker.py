@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional, Union
 
 import mlflow
 import numpy as np
+from comet_ml import ExistingExperiment, Experiment
 from matplotlib.figure import Figure
 
 
@@ -137,6 +138,10 @@ class ExperimentTracker(ABC):
     def end(self) -> None:
         """End the experiment tracking session."""
 
+    def end_experiment(self) -> None:
+        """Alias for end() method for compatibility."""
+        self.end()
+
 
 class CometExperimentTracker(ExperimentTracker):
     """Comet ML experiment tracker implementation."""
@@ -148,6 +153,27 @@ class CometExperimentTracker(ExperimentTracker):
             experiment: Comet Experiment or ExistingExperiment instance.
         """
         self.experiment = experiment
+
+    def set_experiment(self, **kwargs) -> None:
+        """Set experiment for Comet tracking.
+
+        Args:
+            **kwargs: Should contain 'api_key' and 'experiment_key' for existing experiment
+                     or other Comet experiment parameters.
+        """
+
+        if "experiment_key" in kwargs and "api_key" in kwargs:
+            # Use existing experiment
+            self.experiment = ExistingExperiment(
+                api_key=kwargs["api_key"], experiment_key=kwargs["experiment_key"]
+            )
+        elif "api_key" in kwargs:
+            # Create new experiment
+            self.experiment = Experiment(
+                api_key=kwargs["api_key"],
+                **{k: v for k, v in kwargs.items() if k != "api_key"},
+            )
+        # If no api_key provided, assume experiment is already set
 
     def log_metric(self, name: str, value: float, step: Optional[int] = None) -> None:
         """Log a single metric value to Comet."""
@@ -240,6 +266,27 @@ class MLflowExperimentTracker(ExperimentTracker):
         self.mlflow = mlflow
         self.run_id = run_id
         self._metrics_cache: Dict[str, float] = {}
+
+    def set_experiment(self, **kwargs) -> None:
+        """Set experiment for MLflow tracking.
+
+        Args:
+            **kwargs: Should contain MLflow-specific parameters like 'run_id', 'experiment_id', etc.
+        """
+
+        if "run_id" in kwargs:
+            # Use existing run
+            mlflow.start_run(run_id=kwargs["run_id"])
+            self.run_id = kwargs["run_id"]
+        elif "experiment_id" in kwargs:
+            # Start new run in existing experiment
+            mlflow.set_experiment(experiment_id=kwargs["experiment_id"])
+            mlflow.start_run()
+        elif "experiment_name" in kwargs:
+            # Start run in experiment by name
+            mlflow.set_experiment(kwargs["experiment_name"])
+            mlflow.start_run()
+        # If no specific parameters, assume run is already active
 
     def log_metric(self, name: str, value: float, step: Optional[int] = None) -> None:
         """Log a single metric value to MLflow."""

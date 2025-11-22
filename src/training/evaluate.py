@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 
 from src.training.utils.config.config import Config, build_training_config
 from src.training.utils.evaluation.champion import ModelChampionManager
-from src.training.utils.evaluation.orchestrator import TestSetEvaluationOrchestrator
+from src.training.utils.evaluation.orchestrator import create_evaluation_orchestrator
 from src.training.utils.evaluation.selector import ModelSelector
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
@@ -89,7 +89,8 @@ def main(
     test_class = np.array(test_set[class_col])
 
     # Create orchestrators
-    test_evaluator = TestSetEvaluationOrchestrator(
+    test_evaluator = create_evaluation_orchestrator(
+        tracker_type=training_config.train_params.experiment_tracker,
         train_features=train_features,
         train_class=train_class,
         test_features=test_features,

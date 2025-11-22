@@ -400,7 +400,7 @@ def main(
             model_trainer.run_training_experiment(
                 api_key=api_key,
                 project_name=project_name,
-                experiment_name=f"random_forest_{datetime.now()}",
+                experiment_name=f"lightgbm_{datetime.now()}",
                 model=LGBMClassifier(
                     **lgbm_params,
                 ),
@@ -422,7 +422,7 @@ def main(
         xgb_calibrated_pipeline, xgb_experiment = model_trainer.run_training_experiment(
             api_key=api_key,
             project_name=project_name,
-            experiment_name=f"random_forest_{datetime.now()}",
+            experiment_name=f"xgboost_{datetime.now()}",
             model=XGBClassifier(
                 scale_pos_weight=sum(train_class == 0) / sum(train_class == 1),
                 **xgb_params,
