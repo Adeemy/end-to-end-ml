@@ -289,7 +289,7 @@ wheels = [
 
 [[package]]
 name = "comet-ml"
-version = "3.35.5"
+version = "3.54.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dulwich" },
@@ -304,14 +304,13 @@ dependencies = [
     { name = "sentry-sdk" },
     { name = "setuptools", marker = "python_full_version >= '3.12'" },
     { name = "simplejson" },
-    { name = "six" },
     { name = "urllib3" },
-    { name = "websocket-client" },
     { name = "wrapt" },
     { name = "wurlitzer" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/f1/85/f79737e2bf73fddfc24ef485498915b554161e4503dfa6d303871c32d83b/comet_ml-3.54.1.tar.gz", hash = "sha256:f052fbd98128fceaf337a9de86edc5c383fb52241624b1c60947f57d1bf54da2", size = 575069, upload-time = "2025-11-14T12:23:49.794Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/41/74/c47ece0c210383fa79fbc48dbbfc9e9a4be51508e948160df7f866e0003a/comet_ml-3.35.5-py3-none-any.whl", hash = "sha256:6be03690897defcf225a3aa34b39012330ac9766f71917eea44ce6106b3c1251", size = 586768, upload-time = "2023-12-14T17:27:42.304Z" },
+    { url = "https://files.pythonhosted.org/packages/31/75/b50604694c10a7f339b4a51f233e71d9d8ed4895240940023f709b595d92/comet_ml-3.54.1-py3-none-any.whl", hash = "sha256:addb752c9797735b8cbbb57a8efc99357b97e3f8816d85857bd1e9ae3e5ff924", size = 775096, upload-time = "2025-11-14T12:23:48.119Z" },
 ]
 
 [[package]]
@@ -622,12 +621,10 @@ name = "end-to-end-ml"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "black", extra = ["jupyter"] },
     { name = "comet-ml" },
     { name = "dask" },
     { name = "fastapi" },
     { name = "feast" },
-    { name = "isort" },
     { name = "joblib" },
     { name = "kds" },
     { name = "lightgbm" },
@@ -638,11 +635,7 @@ dependencies = [
     { name = "pandas" },
     { name = "plotly" },
     { name = "polars" },
-    { name = "pre-commit" },
-    { name = "pylint" },
     { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "scikit-learn" },
@@ -653,19 +646,30 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+analysis = [
+    { name = "ipython", version = "8.37.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "ipython", version = "9.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "phik" },
+]
 dev = [
+    { name = "black", extra = ["jupyter"] },
+    { name = "isort" },
+    { name = "pre-commit" },
     { name = "pylint" },
     { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-mock" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "black", extras = ["jupyter"], specifier = ">=25.11.0" },
-    { name = "comet-ml", specifier = "==3.35.5" },
+    { name = "black", extras = ["jupyter"], marker = "extra == 'dev'" },
+    { name = "comet-ml", specifier = "==3.54.1" },
     { name = "dask", specifier = "==2023.12.1" },
     { name = "fastapi", specifier = "<0.100" },
     { name = "feast", specifier = "==0.34.1" },
-    { name = "isort", specifier = ">=7.0.0" },
+    { name = "ipython", marker = "extra == 'analysis'", specifier = ">=8.17.2" },
+    { name = "isort", marker = "extra == 'dev'" },
     { name = "joblib", specifier = "==1.3.2" },
     { name = "kds", specifier = "==0.1.3" },
     { name = "lightgbm", specifier = "==4.3.0" },
@@ -674,15 +678,15 @@ requires-dist = [
     { name = "optuna", specifier = "==3.5.0" },
     { name = "optuna-distributed", specifier = "==0.6.1" },
     { name = "pandas", specifier = "==1.5.3" },
+    { name = "phik", marker = "extra == 'analysis'", specifier = "==0.12.3" },
     { name = "plotly", specifier = "==5.18.0" },
     { name = "polars", specifier = "==0.20.10" },
-    { name = "pre-commit", specifier = ">=4.4.0" },
-    { name = "pylint", specifier = ">=4.0.3" },
+    { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pylint", marker = "extra == 'dev'" },
     { name = "pytest", specifier = "==7.4.4" },
     { name = "pytest", marker = "extra == 'dev'" },
-    { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "pytest-mock", specifier = ">=3.15.1" },
+    { name = "pytest-cov", marker = "extra == 'dev'" },
+    { name = "pytest-mock", marker = "extra == 'dev'" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "pyyaml", specifier = "==6.0.1" },
     { name = "scikit-learn", specifier = "==1.3.2" },
@@ -691,7 +695,7 @@ requires-dist = [
     { name = "ucimlrepo", specifier = "==0.0.3" },
     { name = "xgboost", specifier = "==2.0.3" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "analysis"]
 
 [[package]]
 name = "everett"
@@ -2106,6 +2110,29 @@ wheels = [
 ]
 
 [[package]]
+name = "phik"
+version = "0.12.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "joblib" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8a/64/e69d13c19a6a19dbfaf742f3f08a1cc829da8df36e7661f5c671f95c6f2d/phik-0.12.3.tar.gz", hash = "sha256:29f5eb2e72d064c3215c106559ed40402c5ec0c39391ccd27afa11f88d397407", size = 620309, upload-time = "2022-12-05T10:52:37.493Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/24/73/3036744fec8926a6a7ca4a2e6ec241dcb85bb03ce24bc4b12d392fe522b1/phik-0.12.3-cp310-cp310-macosx_10_13_x86_64.whl", hash = "sha256:e877b647af1b0b5a8f0134085b2047c7a20d1e4d05f1701a33bed6d3720d4d0a", size = 652897, upload-time = "2022-12-05T10:51:45.151Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/97/fe6c51c7a7193d83b239f7c82dbc2dba4a7f362a69c7b422a914e2c0288a/phik-0.12.3-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:3d17f7ff33e0d1784cc5e969bd5e26840750b790d4f3082b85c3c90915914018", size = 649857, upload-time = "2022-12-05T10:51:48.104Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/75/76e14c8c674b0bb8f08aa6a08578474a968999e0ce1bb6c5da224ef17294/phik-0.12.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a8c2b80707db400e293cfb30e1f18a9e52a19ab974169ee49e19ede73bb9bfcb", size = 679481, upload-time = "2022-12-05T10:51:50.81Z" },
+    { url = "https://files.pythonhosted.org/packages/11/e8/f2c58f6c3e71cd0371e8db40da32e83e65030c0a52dd2f05d3cd7ae7e1a0/phik-0.12.3-cp310-cp310-win_amd64.whl", hash = "sha256:e120fd130e281e67b09bc7b00f47ec3e9b0ea4ed3ba48944799656270bbf9d7a", size = 663362, upload-time = "2022-12-05T10:51:53.163Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/25/afe81bfba6a5a3886bf50ed694ae0b2b4d58faaa01c7034b7e8151d7b03f/phik-0.12.3-cp311-cp311-macosx_10_13_x86_64.whl", hash = "sha256:22b72c92b193af9e090cded7fb59e010a52310c476e401fc24facbb8998a5c3d", size = 652905, upload-time = "2022-12-05T10:51:56.405Z" },
+    { url = "https://files.pythonhosted.org/packages/03/d6/6c7bb5a2ae869dbdfd1978284fc6e6087c187ca72d43d42df8715c3b505b/phik-0.12.3-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:1010f0ff5f34cda0e461199c86a77513c29f72dd071f6054d2060fc116d3e3c7", size = 649854, upload-time = "2022-12-05T10:52:00.349Z" },
+    { url = "https://files.pythonhosted.org/packages/09/05/bc351a83ad3174cd44c670e3557fa91433072be95df9cacc9d16fcbd9cc9/phik-0.12.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ed2c70c7bb2019c5cf75e30ae31aa9e3cff42af65811f92bd0912c47f04eefde", size = 679468, upload-time = "2022-12-05T10:52:02.937Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/b8/f3683553cb8d63eb7bdeedd6c6d69113c7fff920f6de2d4dcf49844c4ed6/phik-0.12.3-cp311-cp311-win_amd64.whl", hash = "sha256:31a11ba71a918ac4480e7fcc41e527b975a51220a880ed1b6fc1c53ec536ac74", size = 663355, upload-time = "2022-12-05T10:52:06.562Z" },
+]
+
+[[package]]
 name = "pillow"
 version = "12.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3416,15 +3443,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/24/30/6b0809f4510673dc723187aeaf24c7f5459922d01e2f794277a3dfb90345/wcwidth-0.2.14.tar.gz", hash = "sha256:4d478375d31bc5395a3c55c40ccdf3354688364cd61c4f6adacaa9215d0b3605", size = 102293, upload-time = "2025-09-22T16:29:53.023Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/af/b5/123f13c975e9f27ab9c0770f514345bd406d0e8d3b7a0723af9d43f710af/wcwidth-0.2.14-py2.py3-none-any.whl", hash = "sha256:a7bb560c8aee30f9957e5f9895805edd20602f2d7f720186dfd906e82b4982e1", size = 37286, upload-time = "2025-09-22T16:29:51.641Z" },
-]
-
-[[package]]
-name = "websocket-client"
-version = "1.3.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0e/e7/e705ead133d21de4be752af4b3a0cb1f02514ff45bf165b3955c1ce22077/websocket-client-1.3.3.tar.gz", hash = "sha256:d58c5f284d6a9bf8379dab423259fe8f85b70d5fa5d2916d5791a84594b122b1", size = 48250, upload-time = "2022-06-20T08:41:22.092Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/b4/91683d7d5f66393e8877492fe4763304f82dbe308658a8db98f7a9e20baf/websocket_client-1.3.3-py3-none-any.whl", hash = "sha256:5d55652dc1d0b3c734f044337d929aaf83f4f9138816ec680c1aefefb4dc4877", size = 54256, upload-time = "2022-06-20T08:41:19.028Z" },
 ]
 
 [[package]]
