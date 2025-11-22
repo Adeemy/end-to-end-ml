@@ -18,10 +18,10 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 
-from src.training.utils.champion import ModelChampionManager
-from src.training.utils.config import Config, build_training_config
-from src.training.utils.orchestrator import TestEvaluationOrchestrator
-from src.training.utils.selector import ModelSelector
+from src.training.utils.config.config import Config, build_training_config
+from src.training.utils.evaluation.champion import ModelChampionManager
+from src.training.utils.evaluation.orchestrator import TestSetEvaluationOrchestrator
+from src.training.utils.evaluation.selector import ModelSelector
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
@@ -89,7 +89,7 @@ def main(
     test_class = np.array(test_set[class_col])
 
     # Create orchestrators
-    test_evaluator = TestEvaluationOrchestrator(
+    test_evaluator = TestSetEvaluationOrchestrator(
         train_features=train_features,
         train_class=train_class,
         test_features=test_features,

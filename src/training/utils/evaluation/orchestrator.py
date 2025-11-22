@@ -10,10 +10,10 @@ import numpy as np
 import pandas as pd
 from comet_ml import ExistingExperiment
 
-from src.training.utils.champion import ModelChampionManager
-from src.training.utils.evaluator import ModelEvaluator
-from src.training.utils.experiment_tracker import CometExperimentTracker
-from src.training.utils.selector import ModelSelector
+from src.training.utils.evaluation.champion import ModelChampionManager
+from src.training.utils.evaluation.evaluator import create_model_evaluator
+from src.training.utils.evaluation.selector import ModelSelector
+from src.training.utils.tracking.experiment_tracker import CometExperimentTracker
 from src.utils.logger import get_console_logger
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ module_name: str = PosixPath(__file__).stem
 logger = get_console_logger(module_name)
 
 
-class TestEvaluationOrchestrator:
+class TestSetEvaluationOrchestrator:
     """Orchestrates model evaluation on test set and champion model registration.
 
     Single Responsibility: Coordinate test evaluation and champion selection.
@@ -40,7 +40,7 @@ class TestEvaluationOrchestrator:
         fbeta_score_beta: float = 1.0,
         voting_ensemble_name: Optional[str] = None,
     ):
-        """Initializes the TestEvaluationOrchestrator.
+        """Initializes the TestSetEvaluationOrchestrator.
 
         Args:
             train_features: Training features.
@@ -83,7 +83,7 @@ class TestEvaluationOrchestrator:
             else False
         )
 
-        evaluator = ModelEvaluator(
+        evaluator = create_model_evaluator(
             tracker=tracker,
             pipeline=model_pipeline,
             train_features=self.train_features,

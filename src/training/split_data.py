@@ -19,7 +19,7 @@ from src.feature_store.utils.prep import (
     RandomSplitStrategy,
     TimeBasedSplitStrategy,
 )
-from src.training.utils.config import (
+from src.training.utils.config.config import (
     Config,
     TrainFeaturesConfig,
     TrainFilesConfig,

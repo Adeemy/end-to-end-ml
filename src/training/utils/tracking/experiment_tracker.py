@@ -2,10 +2,13 @@
 Abstract experiment tracking interface and concrete implementations.
 """
 
+import json
+import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+import mlflow
 import numpy as np
 from matplotlib.figure import Figure
 
@@ -53,11 +56,7 @@ class ExperimentTracker(ABC):
 
     @abstractmethod
     def log_figure(
-        self,
-        figure_name: str,
-        figure: Figure,
-        step: Optional[int] = None,
-        overwrite: bool = False,
+        self, figure_name: str, figure: Figure, step: Optional[int] = None, **kwargs
     ) -> None:
         """Log a matplotlib figure.
 
@@ -65,7 +64,7 @@ class ExperimentTracker(ABC):
             figure_name: Name for the figure.
             figure: Matplotlib figure object.
             step: Optional step/iteration number.
-            overwrite: Whether to overwrite existing figure.
+            **kwargs: Additional backend-specific arguments (e.g., overwrite for Comet).
         """
 
     @abstractmethod
@@ -75,6 +74,7 @@ class ExperimentTracker(ABC):
         title: str,
         labels: Optional[list] = None,
         file_name: Optional[str] = None,
+        **kwargs,
     ) -> None:
         """Log a confusion matrix.
 
@@ -83,6 +83,7 @@ class ExperimentTracker(ABC):
             title: Title for the confusion matrix.
             labels: Optional class labels.
             file_name: Optional file name for saving.
+            **kwargs: Additional backend-specific arguments.
         """
 
     @abstractmethod
@@ -91,6 +92,7 @@ class ExperimentTracker(ABC):
         name: str,
         file_or_folder: Union[str, Path],
         overwrite: bool = False,
+        **kwargs,
     ) -> None:
         """Log a model artifact.
 
@@ -98,6 +100,17 @@ class ExperimentTracker(ABC):
             name: Model name.
             file_or_folder: Path to model file or folder.
             overwrite: Whether to overwrite existing model.
+            **kwargs: Additional backend-specific arguments.
+        """
+
+    @abstractmethod
+    def log_asset(self, file_path: str, file_name: str, **kwargs) -> None:
+        """Log an asset file.
+
+        Args:
+            file_path: Path to the asset file.
+            file_name: Name for the asset.
+            **kwargs: Additional backend-specific arguments.
         """
 
     @abstractmethod
@@ -129,10 +142,10 @@ class CometExperimentTracker(ExperimentTracker):
     """Comet ML experiment tracker implementation."""
 
     def __init__(self, experiment: Any) -> None:
-        """Initialize with a Comet experiment object.
+        """Initialize with a Comet experiment instance.
 
         Args:
-            experiment: Comet Experiment or ExistingExperiment object.
+            experiment: Comet Experiment or ExistingExperiment instance.
         """
         self.experiment = experiment
 
@@ -155,13 +168,10 @@ class CometExperimentTracker(ExperimentTracker):
         self.experiment.log_parameters(params)
 
     def log_figure(
-        self,
-        figure_name: str,
-        figure: Figure,
-        step: Optional[int] = None,
-        overwrite: bool = False,
+        self, figure_name: str, figure: Figure, step: Optional[int] = None, **kwargs
     ) -> None:
         """Log a matplotlib figure to Comet."""
+        overwrite = kwargs.get("overwrite", False)
         self.experiment.log_figure(
             figure_name=figure_name, figure=figure, step=step, overwrite=overwrite
         )
@@ -172,6 +182,7 @@ class CometExperimentTracker(ExperimentTracker):
         title: str,
         labels: Optional[list] = None,
         file_name: Optional[str] = None,
+        **kwargs,
     ) -> None:
         """Log a confusion matrix to Comet."""
         self.experiment.log_confusion_matrix(
@@ -183,11 +194,22 @@ class CometExperimentTracker(ExperimentTracker):
         name: str,
         file_or_folder: Union[str, Path],
         overwrite: bool = False,
+        **kwargs,
     ) -> None:
         """Log a model artifact to Comet."""
         self.experiment.log_model(
             name=name, file_or_folder=str(file_or_folder), overwrite=overwrite
         )
+
+    def log_asset(self, file_path: str, file_name: str, **kwargs) -> None:
+        """Log an asset file to Comet.
+
+        Args:
+            file_path: Path to the asset file.
+            file_name: Name for the asset.
+            **kwargs: Additional arguments (unused for Comet).
+        """
+        self.experiment.log_asset(file_data=file_path, file_name=file_name)
 
     def register_model(self, model_name: str, **kwargs) -> None:
         """Register a model in Comet's model registry."""
@@ -214,12 +236,6 @@ class MLflowExperimentTracker(ExperimentTracker):
         Args:
             run_id: Optional MLflow run ID. If None, uses active run.
         """
-        try:
-            import mlflow
-        except ImportError as e:
-            raise ImportError(
-                "MLflow is not installed. Install it with: pip install mlflow"
-            ) from e
 
         self.mlflow = mlflow
         self.run_id = run_id
@@ -246,15 +262,10 @@ class MLflowExperimentTracker(ExperimentTracker):
         self.mlflow.log_params(params)
 
     def log_figure(
-        self,
-        figure_name: str,
-        figure: Figure,
-        step: Optional[int] = None,
-        overwrite: bool = False,
+        self, figure_name: str, figure: Figure, step: Optional[int] = None, **kwargs
     ) -> None:
         """Log a matplotlib figure to MLflow."""
         # MLflow doesn't have direct figure logging, so save as artifact
-        import tempfile
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             figure.savefig(tmp.name, bbox_inches="tight")
@@ -268,10 +279,9 @@ class MLflowExperimentTracker(ExperimentTracker):
         title: str,
         labels: Optional[list] = None,
         file_name: Optional[str] = None,
+        **kwargs,
     ) -> None:
         """Log a confusion matrix to MLflow."""
-        import json
-        import tempfile
 
         # Save confusion matrix as JSON artifact
         cm_data = {
@@ -292,9 +302,21 @@ class MLflowExperimentTracker(ExperimentTracker):
         name: str,
         file_or_folder: Union[str, Path],
         overwrite: bool = False,
+        **kwargs,
     ) -> None:
         """Log a model artifact to MLflow."""
+        # Note: overwrite parameter not used in MLflow as it handles versioning differently
         self.mlflow.log_artifact(str(file_or_folder), artifact_path=f"models/{name}")
+
+    def log_asset(self, file_path: str, file_name: str, **kwargs) -> None:
+        """Log an asset file to MLflow.
+
+        Args:
+            file_path: Path to the asset file.
+            file_name: Name for the asset.
+            **kwargs: Additional arguments (unused for MLflow).
+        """
+        self.mlflow.log_artifact(file_path, artifact_path=f"assets/{file_name}")
 
     def register_model(self, model_name: str, **kwargs) -> None:
         """Register a model in MLflow's model registry."""

@@ -3,23 +3,22 @@ Model training orchestration - coordinates the full training workflow.
 """
 
 from pathlib import PosixPath
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import numpy as np
 import optuna
 import pandas as pd
-from comet_ml import Experiment
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
-from src.training.utils.config import SupportedModelsConfig
-from src.training.utils.evaluator import ModelEvaluator
-from src.training.utils.experiment import CometExperimentManager
-from src.training.utils.experiment_tracker import CometExperimentTracker
-from src.training.utils.optimizer import ModelOptimizer
-from src.training.utils.study_logger import StudyLogger
+from src.training.utils.config.config import SupportedModelsConfig
+from src.training.utils.core.optimizer import ModelOptimizer
+from src.training.utils.evaluation.evaluator import create_model_evaluator
+from src.training.utils.tracking.experiment import ExperimentManager
+from src.training.utils.tracking.experiment_tracker import ExperimentTracker
+from src.training.utils.tracking.study_logger import StudyLogger
 from src.utils.logger import get_console_logger
 
 module_name: str = PosixPath(__file__).stem
@@ -36,6 +35,7 @@ class TrainingOrchestrator:
 
     def __init__(
         self,
+        experiment_manager: ExperimentManager,
         train_features: pd.DataFrame,
         train_class: np.ndarray,
         valid_features: pd.DataFrame,
@@ -56,6 +56,7 @@ class TrainingOrchestrator:
         """Initializes the TrainingOrchestrator.
 
         Args:
+            experiment_manager: Experiment manager instance.
             train_features: Training features.
             train_class: Training class labels.
             valid_features: Validation features.
@@ -73,6 +74,7 @@ class TrainingOrchestrator:
             fbeta_score_beta: Beta value for fbeta score.
             encoded_pos_class_label: Encoded positive class label.
         """
+        self.experiment_manager = experiment_manager
         self.train_features = train_features
         self.train_class = train_class
         self.valid_features = valid_features
@@ -92,7 +94,7 @@ class TrainingOrchestrator:
 
     def optimize_model(
         self,
-        experiment: Experiment,
+        tracker: ExperimentTracker,
         model: Callable,
         search_space_params: dict,
         registered_model_name: str,
@@ -105,7 +107,7 @@ class TrainingOrchestrator:
         """Optimizes model hyperparameters.
 
         Args:
-            experiment: Comet experiment object.
+            tracker: Experiment tracker object.
             model: Model object to optimize.
             search_space_params: Hyperparameter search space.
             registered_model_name: Registry name for this model.
@@ -118,8 +120,6 @@ class TrainingOrchestrator:
         Returns:
             Tuple of (study, optimizer).
         """
-        tracker = CometExperimentTracker(experiment=experiment)
-
         optimizer = ModelOptimizer(
             tracker=tracker,
             train_features_preprocessed=self.train_features_preprocessed,
@@ -177,7 +177,7 @@ class TrainingOrchestrator:
 
     def evaluate_model(
         self,
-        experiment: Experiment,
+        tracker: ExperimentTracker,
         fitted_pipeline: Pipeline,
         is_voting_ensemble: bool = False,
         ece_nbins: int = 5,
@@ -185,7 +185,7 @@ class TrainingOrchestrator:
         """Evaluates the fitted model.
 
         Args:
-            experiment: Comet experiment object.
+            tracker: Experiment tracker object.
             fitted_pipeline: Fitted pipeline.
             is_voting_ensemble: Whether this is a voting ensemble.
             ece_nbins: Number of bins for ECE calculation.
@@ -193,9 +193,7 @@ class TrainingOrchestrator:
         Returns:
             Tuple of (train_metrics, valid_metrics, model_ece).
         """
-        tracker = CometExperimentTracker(experiment=experiment)
-
-        evaluator = ModelEvaluator(
+        evaluator = create_model_evaluator(
             tracker=tracker,
             pipeline=fitted_pipeline,
             train_features=self.train_features,
@@ -240,54 +238,54 @@ class TrainingOrchestrator:
 
     def run_training_experiment(
         self,
-        comet_api_key: str,
         project_name: str,
         experiment_name: str,
         model: Callable,
         search_space_params: dict,
         registered_model_name: str,
+        api_key: Optional[str] = None,
         max_search_iters: int = 100,
         optimize_in_parallel: bool = False,
         n_parallel_jobs: int = 4,
         model_opt_timeout_secs: int = 600,
         is_voting_ensemble: bool = False,
         ece_nbins: int = 5,
-    ) -> tuple[Optional[Pipeline], Experiment]:
+    ) -> tuple[Optional[Pipeline], Any]:
         """Runs the complete training experiment workflow.
 
         Args:
-            comet_api_key: Comet API key.
-            project_name: Comet project name.
+            project_name: Project name.
             experiment_name: Experiment name.
             model: Model to train.
             search_space_params: Hyperparameter search space.
             registered_model_name: Model registry name.
-            max_search_iters: Maximum optimization iterations.
-            optimize_in_parallel: Whether to optimize in parallel.
-            n_parallel_jobs: Number of parallel jobs.
-            model_opt_timeout_secs: Optimization timeout.
-            is_voting_ensemble: Whether this is a voting ensemble.
-            ece_nbins: Number of bins for ECE.
+            api_key: Optional API key.
+            max_search_iters: Maximum optimization iterations. Defaults to 100.
+            optimize_in_parallel: Whether to optimize in parallel. Defaults to False.
+            n_parallel_jobs: Number of parallel jobs. Defaults to 4.
+            model_opt_timeout_secs: Optimization timeout. Defaults to 600.
+            is_voting_ensemble: Whether this is a voting ensemble. Defaults to False.
+            ece_nbins: Number of bins for ECE. Defaults to 5.
 
         Returns:
             Tuple of (fitted_pipeline, experiment).
         """
         classifier_name = model.__class__.__name__
 
-        # Create experiment manager
-        experiment_manager = CometExperimentManager()
-
         # Create experiment
-        experiment = experiment_manager.create_experiment(
-            comet_api_key=comet_api_key,
+        experiment = self.experiment_manager.create_experiment(
+            api_key=api_key,
             project_name=project_name,
             experiment_name=experiment_name,
         )
 
         try:
+            # Get tracker
+            tracker = self.experiment_manager.get_tracker(experiment)
+
             # Optimize model
             study, optimizer = self.optimize_model(
-                experiment=experiment,
+                tracker=tracker,
                 model=model,
                 search_space_params=search_space_params,
                 registered_model_name=registered_model_name,
@@ -300,7 +298,7 @@ class TrainingOrchestrator:
 
             # Log study trials
             StudyLogger.log_study_trials(
-                experiment=experiment,
+                tracker=tracker,
                 study=study,
                 classifier_name=classifier_name,
                 artifacts_path=self.artifacts_path,
@@ -320,11 +318,11 @@ class TrainingOrchestrator:
                 for k, v in fitted_pipeline.get_params().items()
                 if k.startswith("classifier__")
             }
-            experiment_manager.log_parameters(experiment, model_params)
+            tracker.log_parameters(model_params)
 
             # Evaluate model
             train_metrics, valid_metrics, model_ece = self.evaluate_model(
-                experiment=experiment,
+                tracker=tracker,
                 fitted_pipeline=fitted_pipeline,
                 is_voting_ensemble=is_voting_ensemble,
                 ece_nbins=ece_nbins,
@@ -332,10 +330,10 @@ class TrainingOrchestrator:
 
             # Log metrics
             metrics_to_log = {**train_metrics, **valid_metrics, "model_ece": model_ece}
-            experiment_manager.log_metrics(experiment, metrics_to_log)
+            tracker.log_metrics(metrics_to_log)
 
             # Register model
-            experiment_manager.register_model(
+            self.experiment_manager.register_model(
                 experiment=experiment,
                 pipeline=fitted_pipeline,
                 registered_model_name=registered_model_name,
@@ -346,6 +344,6 @@ class TrainingOrchestrator:
             logger.error("Model training error --> %s", e)
             fitted_pipeline = None
 
-        experiment_manager.end_experiment(experiment)
+        self.experiment_manager.end_experiment(experiment)
 
         return fitted_pipeline, experiment

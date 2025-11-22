@@ -1,10 +1,10 @@
 """
-Test functions for training configuration class in src/training/utils/config.py
+Test functions for training configuration class in src.training.utils.config.config.py
 """
 
 import pytest
 
-from src.training.utils.config import Config
+from src.training.utils.config.config import Config
 from src.utils.path import PARENT_DIR
 
 
