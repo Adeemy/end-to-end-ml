@@ -11,7 +11,7 @@ import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.pipeline import Pipeline
 
-from src.training.utils.experiment_tracker import ExperimentTracker
+from src.training.utils.tracking.experiment_tracker import ExperimentTracker
 
 
 class ModelChampionManager:

@@ -33,8 +33,10 @@ from sklearn.preprocessing import (
 from xgboost import XGBClassifier
 
 from src.feature_store.utils.data import TrainingDataPrep
-from src.training.utils.config import Config, build_training_config
-from src.training.utils.job import ModelTrainer, VotingEnsembleCreator
+from src.training.utils.config.config import Config, build_training_config
+from src.training.utils.core.ensemble import ClassifierEnsembleOrchestrator
+from src.training.utils.core.trainer import TrainingOrchestrator
+from src.training.utils.tracking.experiment import CometExperimentManager
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
@@ -331,7 +333,8 @@ def main(
         )
 
     # Initialize training class
-    model_trainer = ModelTrainer(
+    model_trainer = TrainingOrchestrator(
+        experiment_manager=CometExperimentManager(),
         train_features=train_features,
         train_class=train_class,
         valid_features=valid_features,
@@ -353,10 +356,10 @@ def main(
     #############################################
     # Train Logistic Regression model
     if config.params["includedmodels"]["include_logistic_regression"]:
-        lr_calibrated_pipeline, lr_experiment = model_trainer.submit_train_exp(
-            comet_api_key=api_key,
+        lr_calibrated_pipeline, lr_experiment = model_trainer.run_training_experiment(
+            api_key=api_key,
             project_name=project_name,
-            comet_exp_name=f"logistic_regression_{datetime.now()}",
+            experiment_name=f"logistic_regression_{datetime.now()}",
             model=LogisticRegression(**lr_params),
             search_space_params=lr_search_space_params,
             max_search_iters=search_max_iters,
@@ -372,11 +375,13 @@ def main(
     #############################################
     # Train Random Forest model
     if config.params["includedmodels"]["include_random_forest"]:
-        rf_calibrated_pipeline, rf_experiment = model_trainer.submit_train_exp(
-            comet_api_key=api_key,
+        rf_calibrated_pipeline, rf_experiment = model_trainer.run_training_experiment(
+            api_key=api_key,
             project_name=project_name,
-            comet_exp_name=f"random_forest_{datetime.now()}",
-            model=RandomForestClassifier(**rf_params),
+            experiment_name=f"random_forest_{datetime.now()}",
+            model=RandomForestClassifier(
+                **rf_params,
+            ),
             search_space_params=rf_search_space_params,
             max_search_iters=search_max_iters,
             optimize_in_parallel=True if parallel_jobs_count > 1 else False,
@@ -391,17 +396,21 @@ def main(
     #############################################
     # Train LightGBM model
     if config.params["includedmodels"]["include_lightgbm"]:
-        lgbm_calibrated_pipeline, lgbm_experiment = model_trainer.submit_train_exp(
-            comet_api_key=api_key,
-            project_name=project_name,
-            comet_exp_name=f"random_forest_{datetime.now()}",
-            model=LGBMClassifier(**lgbm_params),
-            search_space_params=lgbm_search_space_params,
-            max_search_iters=search_max_iters,
-            optimize_in_parallel=True if parallel_jobs_count > 1 else False,
-            n_parallel_jobs=parallel_jobs_count,
-            model_opt_timeout_secs=exp_timeout_in_secs,
-            registered_model_name=lgbm_registered_model_name,
+        lgbm_calibrated_pipeline, lgbm_experiment = (
+            model_trainer.run_training_experiment(
+                api_key=api_key,
+                project_name=project_name,
+                experiment_name=f"random_forest_{datetime.now()}",
+                model=LGBMClassifier(
+                    **lgbm_params,
+                ),
+                search_space_params=lgbm_search_space_params,
+                max_search_iters=search_max_iters,
+                optimize_in_parallel=True if parallel_jobs_count > 1 else False,
+                n_parallel_jobs=parallel_jobs_count,
+                model_opt_timeout_secs=exp_timeout_in_secs,
+                registered_model_name=lgbm_registered_model_name,
+            )
         )
     else:
         lgbm_calibrated_pipeline = None
@@ -410,10 +419,10 @@ def main(
     #############################################
     # Train XGBoost model
     if config.params["includedmodels"]["include_xgboost"]:
-        xgb_calibrated_pipeline, xgb_experiment = model_trainer.submit_train_exp(
-            comet_api_key=api_key,
+        xgb_calibrated_pipeline, xgb_experiment = model_trainer.run_training_experiment(
+            api_key=api_key,
             project_name=project_name,
-            comet_exp_name=f"random_forest_{datetime.now()}",
+            experiment_name=f"random_forest_{datetime.now()}",
             model=XGBClassifier(
                 scale_pos_weight=sum(train_class == 0) / sum(train_class == 1),
                 **xgb_params,
@@ -432,10 +441,18 @@ def main(
     #############################################
     # Create a voting ensmble model with LR, RF, LightGBM, and XGBoost as base estimators
     if config.params["includedmodels"]["include_voting_ensemble"]:
-        ve_creator = VotingEnsembleCreator(
-            comet_api_key=api_key,
-            project_name=project_name,
-            comet_exp_name=f"voting_ensemble_{datetime.now()}",
+        available_pipelines = [
+            p
+            for p in [
+                lr_calibrated_pipeline,
+                rf_calibrated_pipeline,
+                lgbm_calibrated_pipeline,
+                xgb_calibrated_pipeline,
+            ]
+            if p is not None
+        ]
+        ve_orchestrator = ClassifierEnsembleOrchestrator(
+            experiment_manager=CometExperimentManager(),
             train_features=train_features,
             valid_features=valid_features,
             train_class=train_class,
@@ -443,17 +460,17 @@ def main(
             class_encoder=class_encoder,
             artifacts_path=artifacts_dir,
             supported_models=training_config.supported_models,
-            lr_calib_pipeline=lr_calibrated_pipeline,
-            rf_calib_pipeline=rf_calibrated_pipeline,
-            lgbm_calib_pipeline=lgbm_calibrated_pipeline,
-            xgb_calib_pipeline=xgb_calibrated_pipeline,
+            base_pipelines=available_pipelines,
             voting_rule=ve_voting_rule,
             encoded_pos_class_label=encoded_positive_class_label,
             fbeta_score_beta=f_beta_score_beta_val,
+        )
+        _, ve_experiment = ve_orchestrator.create_voting_ensemble(
+            api_key=api_key,
+            project_name=project_name,
+            experiment_name=f"voting_ensemble_{datetime.now()}",
             registered_model_name=ve_registered_model_name,
         )
-
-        _, ve_experiment = ve_creator.create_voting_ensemble()
 
     else:
         ve_experiment = None
@@ -520,8 +537,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config_yaml_path",
         type=str,
-        default="./src/config/training-config.yml",
-        help="Path to the training configuration YAML file.",
+        default="./config.yml",
+        help="Path to the configuration yaml file.",
     )
     parser.add_argument(
         "--run_evaluation",

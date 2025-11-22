@@ -1,29 +1,28 @@
 """
-Voting ensemble creation - orchestrates building and evaluating ensemble models.
+Orchestrates voting classifier ensemble creation and evaluation.
 """
 
 from copy import deepcopy
 from pathlib import PosixPath
-from typing import Literal, Optional
+from typing import Any, List, Literal, Optional
 
 import numpy as np
 import pandas as pd
-from comet_ml import Experiment
 from sklearn.ensemble import VotingClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
-from src.training.utils.config import SupportedModelsConfig
-from src.training.utils.evaluator import ModelEvaluator
-from src.training.utils.experiment import ExperimentManager
-from src.training.utils.experiment_tracker import CometExperimentTracker
+from src.training.utils.config.config import SupportedModelsConfig
+from src.training.utils.evaluation.evaluator import create_model_evaluator
+from src.training.utils.tracking.experiment import ExperimentManager
+from src.training.utils.tracking.experiment_tracker import ExperimentTracker
 from src.utils.logger import get_console_logger
 
 module_name: str = PosixPath(__file__).stem
 logger = get_console_logger(module_name)
 
 
-class EnsembleOrchestrator:
+class ClassifierEnsembleOrchestrator:
     """Orchestrates voting ensemble creation and evaluation.
 
     Single Responsibility: Build and evaluate voting ensemble models.
@@ -33,6 +32,7 @@ class EnsembleOrchestrator:
 
     def __init__(
         self,
+        experiment_manager: ExperimentManager,
         train_features: pd.DataFrame,
         valid_features: pd.DataFrame,
         train_class: np.ndarray,
@@ -40,17 +40,15 @@ class EnsembleOrchestrator:
         class_encoder: LabelEncoder,
         artifacts_path: str,
         supported_models: SupportedModelsConfig,
-        lr_calib_pipeline: Optional[Pipeline] = None,
-        rf_calib_pipeline: Optional[Pipeline] = None,
-        lgbm_calib_pipeline: Optional[Pipeline] = None,
-        xgb_calib_pipeline: Optional[Pipeline] = None,
+        base_pipelines: List[Pipeline],
         voting_rule: Literal["hard", "soft"] = "soft",
         encoded_pos_class_label: int = 1,
         fbeta_score_beta: float = 1.0,
     ):
-        """Initializes the EnsembleOrchestrator.
+        """Initializes the ClassifierEnsembleOrchestrator.
 
         Args:
+            experiment_manager: Experiment manager instance.
             train_features: Training features.
             valid_features: Validation features.
             train_class: Training class labels.
@@ -58,14 +56,12 @@ class EnsembleOrchestrator:
             class_encoder: Label encoder for class labels.
             artifacts_path: Path to save artifacts.
             supported_models: Supported models configuration.
-            lr_calib_pipeline: Calibrated logistic regression pipeline.
-            rf_calib_pipeline: Calibrated random forest pipeline.
-            lgbm_calib_pipeline: Calibrated LightGBM pipeline.
-            xgb_calib_pipeline: Calibrated XGBoost pipeline.
+            base_pipelines: List of calibrated pipelines to include in the ensemble.
             voting_rule: Voting rule for ensemble ("hard" or "soft").
             encoded_pos_class_label: Encoded positive class label.
             fbeta_score_beta: Beta value for fbeta score.
         """
+        self.experiment_manager = experiment_manager
         self.train_features = train_features
         self.valid_features = valid_features
         self.train_class = train_class
@@ -73,10 +69,7 @@ class EnsembleOrchestrator:
         self.class_encoder = class_encoder
         self.artifacts_path = artifacts_path
         self.supported_models = supported_models
-        self.lr_calib_pipeline = lr_calib_pipeline
-        self.rf_calib_pipeline = rf_calib_pipeline
-        self.lgbm_calib_pipeline = lgbm_calib_pipeline
-        self.xgb_calib_pipeline = xgb_calib_pipeline
+        self.base_pipelines = [p for p in base_pipelines if p is not None]
         self.voting_rule = voting_rule
         self.encoded_pos_class_label = encoded_pos_class_label
         self.fbeta_score_beta = fbeta_score_beta
@@ -92,29 +85,21 @@ class EnsembleOrchestrator:
         """
         base_models = []
 
-        try:
-            model_lr = self.lr_calib_pipeline.named_steps["classifier"]
-            base_models.append(("LR", model_lr))
-        except Exception:  # pylint: disable=W0718
-            logger.info("LR model does not exist or not in required type!")
-
-        try:
-            model_rf = self.rf_calib_pipeline.named_steps["classifier"]
-            base_models.append(("RF", model_rf))
-        except Exception:  # pylint: disable=W0718
-            logger.info("RF model does not exist or not in required type!")
-
-        try:
-            model_lgbm = self.lgbm_calib_pipeline.named_steps["classifier"]
-            base_models.append(("LightGBM", model_lgbm))
-        except Exception:  # pylint: disable=W0718
-            logger.info("LightGBM model does not exist or not in required type!")
-
-        try:
-            model_xgb = self.xgb_calib_pipeline.named_steps["classifier"]
-            base_models.append(("XGBoost", model_xgb))
-        except Exception:  # pylint: disable=W0718
-            logger.info("XGBoost model does not exist or not in required type!")
+        # Extract classifiers from pipelines into (name, model) tuples
+        for pipeline in self.base_pipelines:
+            try:
+                if "classifier" in pipeline.named_steps:
+                    name, model = (
+                        model.__class__.__name__,
+                        pipeline.named_steps["classifier"],
+                    )
+                    base_models.append((name, model))
+                else:
+                    logger.warning(
+                        "Pipeline provided to ensemble does not contain a 'classifier' step."
+                    )
+            except Exception as e:  # pylint: disable=W0718
+                logger.warning("Failed to extract classifier from pipeline: %s", e)
 
         if len(base_models) < 2:
             raise ValueError(
@@ -125,8 +110,10 @@ class EnsembleOrchestrator:
 
     def copy_data_transform_pipeline(self) -> Pipeline:
         """Copies the data transformation pipeline from the first available base model.
+        The deepcopy is used to avoid modifying the original pipeline.
 
-        Assumes all base models have the same data transformation pipeline.
+        Note:
+            This method assumes all base models have the same data transformation pipeline.
 
         Returns:
             Data transformation pipeline object.
@@ -134,23 +121,10 @@ class EnsembleOrchestrator:
         Raises:
             ValueError: If no base model pipelines are found.
         """
-        if hasattr(self, "lr_calib_pipeline") and self.lr_calib_pipeline is not None:
-            data_pipeline = deepcopy(self.lr_calib_pipeline)
-        elif hasattr(self, "rf_calib_pipeline") and self.rf_calib_pipeline is not None:
-            data_pipeline = deepcopy(self.rf_calib_pipeline)
-        elif (
-            hasattr(self, "lgbm_calib_pipeline")
-            and self.lgbm_calib_pipeline is not None
-        ):
-            data_pipeline = deepcopy(self.lgbm_calib_pipeline)
-        elif (
-            hasattr(self, "xgb_calib_pipeline") and self.xgb_calib_pipeline is not None
-        ):
-            data_pipeline = deepcopy(self.xgb_calib_pipeline)
-        else:
+        if not self.base_pipelines:
             raise ValueError("No base model pipelines found!")
 
-        return data_pipeline
+        return deepcopy(self.base_pipelines[0])
 
     def create_fitted_ensemble_pipeline(self, base_models: list) -> Pipeline:
         """Creates and fits a voting ensemble pipeline.
@@ -186,23 +160,21 @@ class EnsembleOrchestrator:
 
     def evaluate_ensemble(
         self,
-        experiment: Experiment,
+        tracker: ExperimentTracker,
         fitted_pipeline: Pipeline,
         ece_nbins: int = 5,
     ) -> tuple[dict, dict, float]:
         """Evaluates the voting ensemble model.
 
         Args:
-            experiment: Comet experiment object.
+            tracker: Experiment tracker object.
             fitted_pipeline: Fitted ensemble pipeline.
             ece_nbins: Number of bins for ECE calculation.
 
         Returns:
             Tuple of (train_metrics, valid_metrics, model_ece).
         """
-        tracker = CometExperimentTracker(experiment=experiment)
-
-        evaluator = ModelEvaluator(
+        evaluator = create_model_evaluator(
             tracker=tracker,
             pipeline=fitted_pipeline,
             train_features=self.train_features,
@@ -239,27 +211,27 @@ class EnsembleOrchestrator:
 
     def create_voting_ensemble(
         self,
-        comet_api_key: str,
         project_name: str,
         experiment_name: str,
+        api_key: Optional[str] = None,
         registered_model_name: str = "VotingEnsemble",
         ece_nbins: int = 5,
-    ) -> tuple[Optional[Pipeline], Experiment]:
+    ) -> tuple[Optional[Pipeline], Any]:
         """Creates and evaluates a voting ensemble classifier.
 
         Args:
-            comet_api_key: Comet API key.
-            project_name: Comet project name.
+            project_name: Project name.
             experiment_name: Experiment name.
-            registered_model_name: Model registry name.
-            ece_nbins: Number of bins for ECE.
+            api_key: Optional API key.
+            registered_model_name: Model registry name. Defaults to "VotingEnsemble".
+            ece_nbins: Number of bins for ECE. Defaults to 5.
 
         Returns:
             Tuple of (ensemble_pipeline, experiment).
         """
         # Create experiment
-        experiment = ExperimentManager.create_experiment(
-            comet_api_key=comet_api_key,
+        experiment = self.experiment_manager.create_experiment(
+            api_key=api_key,
             project_name=project_name,
             experiment_name=experiment_name,
         )
@@ -269,19 +241,22 @@ class EnsembleOrchestrator:
             base_models = self.get_base_models()
             ve_pipeline = self.create_fitted_ensemble_pipeline(base_models)
 
+            # Get tracker
+            tracker = self.experiment_manager.get_tracker(experiment)
+
             # Evaluate voting ensemble classifier
             train_metrics, valid_metrics, model_ece = self.evaluate_ensemble(
-                experiment=experiment,
+                tracker=tracker,
                 fitted_pipeline=ve_pipeline,
                 ece_nbins=ece_nbins,
             )
 
             # Log metrics
             metrics_to_log = {**train_metrics, **valid_metrics, "model_ece": model_ece}
-            ExperimentManager.log_metrics(experiment, metrics_to_log)
+            tracker.log_metrics(metrics_to_log)
 
             # Register model
-            ExperimentManager.register_model(
+            self.experiment_manager.register_model(
                 experiment=experiment,
                 pipeline=ve_pipeline,
                 registered_model_name=registered_model_name,
@@ -292,6 +267,6 @@ class EnsembleOrchestrator:
             logger.error("Voting ensemble error --> %s", e)
             ve_pipeline = None
 
-        ExperimentManager.end_experiment(experiment)
+        self.experiment_manager.end_experiment(experiment)
 
         return ve_pipeline, experiment

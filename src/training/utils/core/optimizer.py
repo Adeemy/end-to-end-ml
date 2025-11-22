@@ -1,5 +1,22 @@
 """
-Model hyperparameter optimization utilities.
+Model hyperparameter optimization utilities. It defines the ModelOptimizer class
+that encapsulates the logic for tuning model hyperparameters using Optuna. The class
+requires preprocessed training and validation features to avoid redundant pipeline
+fitting during optimization.
+
+Classes:
+    ModelOptimizer: A class to optimize model hyperparameters using Optuna.
+
+Design Decision:
+    The ModelOptimizer class is designed to require preprocessed training and validation
+    features. This design choice is made to enhance efficiency during hyperparameter
+    optimization, as it avoids the overhead of fitting the entire data preprocessing
+    pipeline in each trial.
+
+    The optimization process leverages Optuna's TPE sampler with multivariate sampling
+    and constant liar strategy to effectively explore the hyperparameter space, especially
+    in parallel execution scenarios. This approach helps mitigate redundant sampling and
+    promotes a more diverse exploration of hyperparameters.
 """
 
 from pathlib import PosixPath
@@ -23,12 +40,15 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 
-from src.training.utils.config import SupportedModelsConfig
-from src.training.utils.experiment_tracker import ExperimentTracker
+from src.training.utils.config.config import SupportedModelsConfig
+from src.training.utils.tracking.experiment_tracker import ExperimentTracker
 from src.utils.logger import get_console_logger
 
 module_name: str = PosixPath(__file__).stem
 logger = get_console_logger(module_name)
+
+# Specify optimization direction, e.g., "maximize" for maximizing a metric like f1-score
+OPTIMIZATION_DIRECTION: str = "maximize"
 
 
 class ModelOptimizer:
@@ -75,7 +95,7 @@ class ModelOptimizer:
             valid_features_preprocessed: Preprocessed validation features.
             valid_class: Validation class labels.
             n_features: Number of features in the data.
-            model: Model object.
+            model: Model instance.
             search_space_params: Hyperparameter search space.
             supported_models: SupportedModelsConfig instance.
             registered_model_name: Registry name for this model (e.g., 'logistic-regression').
@@ -177,7 +197,7 @@ class ModelOptimizer:
 
         return performance_metrics
 
-    def objective_function(
+    def obj_func(
         self,
         trial: optuna.trial.Trial,
     ) -> float:
@@ -255,7 +275,15 @@ class ModelOptimizer:
         # A callback function to output a log only when the best value is updated
         # Note: this callback may show incorrect values when optimizing an objective
         # function with n_jobs > 1
-        def logging_callback(study, frozen_trial):
+        def logging_callback(
+            study: optuna.study.Study, frozen_trial: optuna.trial.FrozenTrial
+        ) -> None:
+            """Logs only when the best value is updated during hyperparameter optimization.
+
+            Args:
+                study: Optuna study object.
+                frozen_trial: Optuna frozen trial object.
+            """
             previous_best_value = study.user_attrs.get("previous_best_value", None)
             if previous_best_value != study.best_value:
                 study.set_user_attr("previous_best_value", study.best_value)
@@ -266,15 +294,18 @@ class ModelOptimizer:
                     frozen_trial.params,
                 )
 
+        # Define the sampler for hyperparameter optimization
         sampler = optuna.samplers.TPESampler(
-            n_startup_trials=int(0.1 * max_search_iters),
+            n_startup_trials=int(
+                0.1 * max_search_iters
+            ),  # Warm-up trials that use random sampling
             warn_independent_sampling=False,
             multivariate=True,
             constant_liar=True,
         )
-        study = optuna.create_study(sampler=sampler, direction="maximize")
+        study = optuna.create_study(sampler=sampler, direction=OPTIMIZATION_DIRECTION)
 
-        logger.info(
+        print(
             """\n
         ----------------------------------------------------------------
         --- Hyperparameter Optimization of %s Starts ...
@@ -283,7 +314,7 @@ class ModelOptimizer:
         )
 
         study.optimize(
-            func=self.objective_function,
+            func=self.obj_func,
             n_trials=max_search_iters,
             timeout=model_opt_timeout_secs,
             gc_after_trial=False,  # Set to True if memory consumption increases over several trials
@@ -295,10 +326,25 @@ class ModelOptimizer:
     def tune_model_in_parallel(
         self,
         max_search_iters: int = 100,
-        n_parallel_jobs: int = 1,
+        n_parallel_jobs: int = 2,
         model_opt_timeout_secs: int = 180,
     ) -> optuna.study.Study:
-        """Tunes model hyperparameters using Optuna package.
+        """Performs hyperparameters optimization using Optuna package in parallel. If
+        Dask distributed client is available, it distributes trials across many physical
+        workers in the cluster. Otherwise, it distributes work among available CPU cores
+        by using multiprocessing.
+
+        Note:
+            The TPE sampler is inherently sequential, using the history of completed
+            trials to suggest the next hyperparameters. In parallel execution,
+            concurrent trials are not yet completed, which can lead to redundant
+            sampling due to incomplete information. To mitigate this, `constant_liar=True`
+            is used in the TPESampler. This strategy assigns a temporary "poor" objective
+            value to running trials, discouraging other workers from exploring the same
+            hyperparameter space immediately. This promotes exploration and prevents
+            workers from chasing the same local optima simultaneously, though it may
+            slightly alter the optimization trajectory compared to a purely sequential
+            run.
 
         Args:
             max_search_iters (int): maximum number of search iterations.
@@ -310,18 +356,21 @@ class ModelOptimizer:
         """
 
         sampler = optuna.samplers.TPESampler(
-            n_startup_trials=int(0.1 * max_search_iters),
-            warn_independent_sampling=False,
-            multivariate=True,
-            constant_liar=True,
+            n_startup_trials=int(
+                0.1 * max_search_iters
+            ),  # Warm-up trials that use random sampling
+            warn_independent_sampling=False,  # Disable warning for independent sampling
+            multivariate=True,  # Enable multivariate sampling to consider interactions between hyperparameters
+            constant_liar=True,  # to mitigate redundant sampling in parallel execution
         )
         client = Client()
         study = optuna_distributed.from_study(
-            optuna.create_study(sampler=sampler, direction="maximize"), client=client
+            optuna.create_study(sampler=sampler, direction=OPTIMIZATION_DIRECTION),
+            client=client,
         )
 
         study.optimize(
-            func=self.objective_function,
+            func=self.obj_func,
             n_trials=max_search_iters,
             n_jobs=n_parallel_jobs,
             timeout=model_opt_timeout_secs,

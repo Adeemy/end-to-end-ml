@@ -6,9 +6,8 @@ import re
 from pathlib import PosixPath
 
 import optuna
-from comet_ml import Experiment
 
-from src.training.utils.experiment import ExperimentManager
+from src.training.utils.tracking.experiment_tracker import ExperimentTracker
 from src.utils.logger import get_console_logger
 
 module_name: str = PosixPath(__file__).stem
@@ -23,7 +22,7 @@ class StudyLogger:
 
     @staticmethod
     def log_study_trials(
-        experiment: Experiment,
+        tracker: ExperimentTracker,
         study: optuna.study.Study,
         classifier_name: str,
         artifacts_path: str,
@@ -32,7 +31,7 @@ class StudyLogger:
         """Logs Optuna study results to Comet experiment.
 
         Args:
-            experiment: Comet experiment object.
+            tracker: Experiment tracker object.
             study: Optuna study object.
             classifier_name: Name of the classifier.
             artifacts_path: Path to save study artifacts.
@@ -47,8 +46,7 @@ class StudyLogger:
         csv_path = f"{artifacts_path}/study_{classifier_name}.csv"
         study_results.to_csv(csv_path, index=False)
 
-        ExperimentManager.log_asset(
-            experiment=experiment,
+        tracker.log_asset(
             file_path=csv_path,
             file_name=f"study_{classifier_name}",
         )

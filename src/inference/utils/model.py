@@ -11,7 +11,7 @@ from comet_ml import API
 from fastapi import Body
 from sklearn.pipeline import Pipeline
 
-from src.training.utils.config import Config
+from src.training.utils.config.config import Config
 
 
 class ModelLoader:
