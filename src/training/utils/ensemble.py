@@ -15,7 +15,7 @@ from sklearn.preprocessing import LabelEncoder
 
 from src.training.utils.config import SupportedModelsConfig
 from src.training.utils.evaluator import ModelEvaluator
-from src.training.utils.experiment import ExperimentManager
+from src.training.utils.experiment import CometExperimentManager
 from src.training.utils.experiment_tracker import CometExperimentTracker
 from src.utils.logger import get_console_logger
 
@@ -257,8 +257,11 @@ class EnsembleOrchestrator:
         Returns:
             Tuple of (ensemble_pipeline, experiment).
         """
+        # Create experiment manager
+        experiment_manager = CometExperimentManager()
+
         # Create experiment
-        experiment = ExperimentManager.create_experiment(
+        experiment = experiment_manager.create_experiment(
             comet_api_key=comet_api_key,
             project_name=project_name,
             experiment_name=experiment_name,
@@ -278,10 +281,10 @@ class EnsembleOrchestrator:
 
             # Log metrics
             metrics_to_log = {**train_metrics, **valid_metrics, "model_ece": model_ece}
-            ExperimentManager.log_metrics(experiment, metrics_to_log)
+            experiment_manager.log_metrics(experiment, metrics_to_log)
 
             # Register model
-            ExperimentManager.register_model(
+            experiment_manager.register_model(
                 experiment=experiment,
                 pipeline=ve_pipeline,
                 registered_model_name=registered_model_name,
@@ -292,6 +295,6 @@ class EnsembleOrchestrator:
             logger.error("Voting ensemble error --> %s", e)
             ve_pipeline = None
 
-        ExperimentManager.end_experiment(experiment)
+        experiment_manager.end_experiment(experiment)
 
         return ve_pipeline, experiment

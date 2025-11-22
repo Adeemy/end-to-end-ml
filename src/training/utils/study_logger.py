@@ -8,7 +8,7 @@ from pathlib import PosixPath
 import optuna
 from comet_ml import Experiment
 
-from src.training.utils.experiment import ExperimentManager
+from src.training.utils.experiment import CometExperimentManager
 from src.utils.logger import get_console_logger
 
 module_name: str = PosixPath(__file__).stem
@@ -47,7 +47,7 @@ class StudyLogger:
         csv_path = f"{artifacts_path}/study_{classifier_name}.csv"
         study_results.to_csv(csv_path, index=False)
 
-        ExperimentManager.log_asset(
+        CometExperimentManager().log_asset(
             experiment=experiment,
             file_path=csv_path,
             file_name=f"study_{classifier_name}",

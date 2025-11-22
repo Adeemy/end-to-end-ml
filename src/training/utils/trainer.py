@@ -16,7 +16,7 @@ from sklearn.preprocessing import LabelEncoder
 
 from src.training.utils.config import SupportedModelsConfig
 from src.training.utils.evaluator import ModelEvaluator
-from src.training.utils.experiment import ExperimentManager
+from src.training.utils.experiment import CometExperimentManager
 from src.training.utils.experiment_tracker import CometExperimentTracker
 from src.training.utils.optimizer import ModelOptimizer
 from src.training.utils.study_logger import StudyLogger
@@ -274,8 +274,11 @@ class TrainingOrchestrator:
         """
         classifier_name = model.__class__.__name__
 
+        # Create experiment manager
+        experiment_manager = CometExperimentManager()
+
         # Create experiment
-        experiment = ExperimentManager.create_experiment(
+        experiment = experiment_manager.create_experiment(
             comet_api_key=comet_api_key,
             project_name=project_name,
             experiment_name=experiment_name,
@@ -317,7 +320,7 @@ class TrainingOrchestrator:
                 for k, v in fitted_pipeline.get_params().items()
                 if k.startswith("classifier__")
             }
-            ExperimentManager.log_parameters(experiment, model_params)
+            experiment_manager.log_parameters(experiment, model_params)
 
             # Evaluate model
             train_metrics, valid_metrics, model_ece = self.evaluate_model(
@@ -329,10 +332,10 @@ class TrainingOrchestrator:
 
             # Log metrics
             metrics_to_log = {**train_metrics, **valid_metrics, "model_ece": model_ece}
-            ExperimentManager.log_metrics(experiment, metrics_to_log)
+            experiment_manager.log_metrics(experiment, metrics_to_log)
 
             # Register model
-            ExperimentManager.register_model(
+            experiment_manager.register_model(
                 experiment=experiment,
                 pipeline=fitted_pipeline,
                 registered_model_name=registered_model_name,
@@ -343,6 +346,6 @@ class TrainingOrchestrator:
             logger.error("Model training error --> %s", e)
             fitted_pipeline = None
 
-        ExperimentManager.end_experiment(experiment)
+        experiment_manager.end_experiment(experiment)
 
         return fitted_pipeline, experiment
