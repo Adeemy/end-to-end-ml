@@ -111,8 +111,8 @@ def main(
             f"f_{training_config.train_params.fbeta_score_beta_val}_score"
         )
 
-    else:
-        comparison_metric = "validation_score"
+    # Add valid_ prefix to ensure the model selection is based on validation set
+    comparison_metric = f"valid_{comparison_metric}"
 
     model_selector = ModelSelector(
         project_name=training_config.train_params.project_name,

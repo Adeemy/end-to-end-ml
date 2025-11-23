@@ -18,7 +18,7 @@ Design Decision:
 """
 
 from abc import ABC, abstractmethod
-from pathlib import PosixPath
+from pathlib import Path, PosixPath
 from typing import Any, Optional
 
 import joblib
@@ -217,11 +217,21 @@ class CometExperimentManager(ExperimentManager):
             registered_model_name: Name of the registered model.
             artifacts_path: Path to save model artifacts.
         """
-        model_path = f"{artifacts_path}/{registered_model_name}.pkl"
-        joblib.dump(pipeline, model_path)
+        # Ensure artifacts directory exists
+        artifacts_dir = Path(artifacts_path)
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create full model path
+        model_path = artifacts_dir / f"{registered_model_name}.pkl"
+
+        # Save model locally
+        joblib.dump(pipeline, str(model_path))
+        logger.info("Saved model to: %s", model_path)
+
+        # Log model to Comet ML
         experiment.log_model(
             name=registered_model_name,
-            file_or_folder=model_path,
+            file_or_folder=str(model_path),
             overwrite=False,
         )
         experiment.register_model(model_name=registered_model_name)

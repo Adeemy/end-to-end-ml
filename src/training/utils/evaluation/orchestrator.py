@@ -2,9 +2,12 @@
 Test set evaluation orchestration - evaluates models on held-out test data.
 """
 
+import os
 from pathlib import PosixPath
 from typing import TYPE_CHECKING, Any, Optional
 
+# Load comet_ml early to avoid issues with sklearn auto-logging
+import comet_ml  # noqa: F401 # pylint: disable=unused-import
 import joblib
 import numpy as np
 import pandas as pd
@@ -250,14 +253,23 @@ class TestSetEvaluationOrchestrator:
             ValueError: If test score is below deployment threshold.
         """
         # Select best model
-        best_model_name, _ = model_selector.select_best_model(
+        best_model_name, best_experiment_key = model_selector.select_best_model(
             experiment_keys=experiment_keys
         )
 
-        # Load model pipeline
+        # Try to load model locally, if not found download from Comet ML
         model_path = f"{self.artifacts_path}/{best_model_name}.pkl"
-        model_pipeline = joblib.load(model_path)
-        logger.info("Loaded model from: %s", model_path)
+
+        if not os.path.exists(model_path):
+            logger.info("Model not found locally, downloading from Comet ML")
+            model_pipeline = self._download_model_from_comet(
+                experiment_key=best_experiment_key,
+                model_name=best_model_name,
+                save_path=model_path,
+            )
+        else:
+            model_pipeline = joblib.load(model_path)
+            logger.info("Loaded model from local path: %s", model_path)
 
         # Initialize experiment with backend-specific kwargs
         # For Comet: experiment_kwargs should contain api_key and experiment_key
@@ -304,3 +316,53 @@ class TestSetEvaluationOrchestrator:
             self.tracker.end_experiment()
 
         return best_model_name, test_metrics
+
+    def _download_model_from_comet(
+        self,
+        experiment_key: str,
+        model_name: str,
+        save_path: str,
+    ) -> "Pipeline":
+        """Downloads model from Comet ML experiment.
+
+        Args:
+            experiment_key: Comet ML experiment key.
+            model_name: Name of the model to download.
+            save_path: Local path to save the downloaded model.
+
+        Returns:
+            Loaded model pipeline.
+        """
+        # Login and get API
+        comet_ml.login()
+        api = comet_ml.API()
+
+        # Get experiment
+        experiment = api.get_experiment_by_key(experiment_key)
+
+        # Download model assets
+        assets = experiment.get_asset_list()
+        model_assets = [
+            asset
+            for asset in assets
+            if asset["fileName"].endswith(".pkl") and model_name in asset["fileName"]
+        ]
+
+        if not model_assets:
+            raise FileNotFoundError(
+                f"No model file found for {model_name} in experiment {experiment_key}"
+            )
+
+        # Download the model file
+        model_asset = model_assets[0]  # Take the first matching model
+        asset_id = model_asset["assetId"]
+
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+        # Download and save
+        experiment.get_asset(asset_id, save_path)
+        logger.info("Downloaded model from Comet ML to: %s", save_path)
+
+        # Load and return the model
+        return joblib.load(save_path)
