@@ -111,8 +111,8 @@ def main(
             f"f_{training_config.train_params.fbeta_score_beta_val}_score"
         )
 
-    # Add 'valid_' prefix for validation metrics
-    comparison_metric = f"valid_{comparison_metric}"
+    else:
+        comparison_metric = "validation_score"
 
     model_selector = ModelSelector(
         project_name=training_config.train_params.project_name,
