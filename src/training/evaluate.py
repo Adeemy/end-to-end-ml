@@ -1,14 +1,19 @@
 """
 Evaluates trained models on test set and registers champion model.
 
-This script can be run standalone or called from train.py with experiment keys.
-It selects the best model based on validation performance, evaluates it on the
-test set, and registers it as the champion model if it meets the deployment threshold.
+This script supports two evaluation workflows:
+1. Integrated workflow: Called directly from train.py with experiment keys passed in-memory
+2. Standalone workflow: Run independently with automatic Comet ML experiment discovery
+
+For standalone evaluation, the script queries Comet ML directly to discover recent experiments
+based on naming patterns (e.g., 'lightgbm_', 'random_forest_').
+
+The script selects the best model based on validation performance, evaluates it on the
+testing set, and registers it as the champion model if it meets the deployment threshold.
 """
 
 import argparse
 import logging
-import os
 from pathlib import PosixPath
 from typing import Optional
 
@@ -31,7 +36,6 @@ load_dotenv()
 
 def main(
     config_yaml_path: str,
-    comet_api_key: str,
     data_dir: PosixPath,
     artifacts_dir: PosixPath,
     logger: logging.Logger,
@@ -39,39 +43,35 @@ def main(
 ) -> tuple[str, dict]:
     """Evaluates best model on test set and registers as champion.
 
+    Note: This script requires trained models to exist in Comet ML.
+    If no experiments are found, run training first: 'make train'
+
     Args:
         config_yaml_path: Path to training config YAML file.
-        comet_api_key: Comet API key.
         data_dir: Path to data directory.
         artifacts_dir: Path to artifacts directory.
         logger: Logger object.
         experiment_keys: Optional DataFrame with experiment keys from training.
-                        If None, will load from CSV file.
+                        If None, will query Comet ML directly.
 
     Returns:
         Tuple of (champion_model_name, test_metrics).
 
     Raises:
-        ValueError: If test score is below deployment threshold.
+        ValueError: If test score is below deployment threshold or no experiments found.
     """
-    logger.info("Directory of training config file: %s", config_yaml_path)
-
-    # Load configuration using new config system
+    logger.info(
+        "Directory of training config file: %s", config_yaml_path
+    )  # Load configuration using new config system
     training_config = load_config(
         config_class=Config,
         builder_func=build_training_config,
         config_path=config_yaml_path,
     )
 
-    # Load experiment keys (from train.py or from file)
-    if experiment_keys is None:
-        exp_keys_path = (
-            artifacts_dir / f"{training_config.files.experiments_keys_file_name}.csv"
-        )
-        experiment_keys = pd.read_csv(exp_keys_path)
-        logger.info("Loaded experiment keys from: %s", exp_keys_path)
-    else:
-        logger.info("Using experiment keys passed from training")
+    # Use experiment keys passed from training or query Comet ML directly
+    if experiment_keys is not None:
+        logger.info("Using experiment keys passed from training.")
 
     # Load datasets
     train_set = pd.read_parquet(data_dir / training_config.files.train_set_file_name)
@@ -118,13 +118,10 @@ def main(
         project_name=training_config.train_params.project_name,
         workspace_name=training_config.train_params.workspace_name,
         comparison_metric=comparison_metric,
-        comet_api_key=comet_api_key,
     )
 
     # Run evaluation workflow
     champion_name, test_metrics = test_evaluator.run_evaluation_workflow(
-        comet_api_key=comet_api_key,
-        experiment_keys=experiment_keys,
         model_selector=model_selector,
         valid_features=valid_features,
         valid_class=valid_class,
@@ -132,6 +129,7 @@ def main(
         comparison_metric_name=comparison_metric,
         deployment_threshold=training_config.train_params.deployment_score_thresh,
         cv_folds=training_config.train_params.cross_val_folds,
+        experiment_keys=experiment_keys,
     )
 
     logger.info("Champion model %s deployed successfully", champion_name)
@@ -158,10 +156,9 @@ if __name__ == "__main__":
     console_logger = get_console_logger(module_name)
     console_logger.info("Model Evaluation on Test Set Starts ...")
 
-    # Run evaluation (without experiment_keys will load from file)
+    # Run evaluation (without experiment_keys will query Comet ML directly)
     champ_name, metrics = main(
         config_yaml_path=args.config_yaml_path,
-        comet_api_key=os.environ["COMET_API_KEY"],
         data_dir=DATA_DIR,
         artifacts_dir=ARTIFACTS_DIR,
         logger=console_logger,

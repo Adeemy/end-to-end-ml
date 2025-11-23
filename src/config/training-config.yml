@@ -157,7 +157,6 @@ files:
   train_set_file_name: "train.parquet"
   valid_set_file_name: "validation.parquet"
   test_set_file_name: "test.parquet"
-  experiments_keys_file_name: "experiment_keys" # Name of the csv file storing keys of experiments that ran successfully (needed for evaluate.py)
 
 modelregistry:
   lr_registered_model_name: "logistic-regression" # Name used to register logistic regression model

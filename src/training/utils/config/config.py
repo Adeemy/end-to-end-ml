@@ -190,7 +190,7 @@ class TrainParams:
     initiate_comet_project: bool = False
     experiment_tracker: str = "comet"
     project_name: str = "default-project"
-    workspace_name: str = "default-workspace"
+    workspace_name: str = "comet-workspace-name"
     search_max_iters: int = 10
     parallel_jobs_count: int = 1
     exp_timout_secs: int = 3600
@@ -243,7 +243,6 @@ class TrainFilesConfig:
     train_set_file_name: str
     valid_set_file_name: str
     test_set_file_name: str
-    experiments_keys_file_name: str
 
 
 @dataclass(frozen=True)
@@ -340,7 +339,7 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
         preprocessing=map_to_dataclass(
             TrainPreprocessingConfig, params.get("preprocessing", {})
         ),
-        train_params=map_to_dataclass(TrainParams, params.get("train_params", {})),
+        train_params=map_to_dataclass(TrainParams, params.get("train", {})),
         logistic_regression=map_to_dataclass(
             LogisticRegressionConfig, params.get("logistic_regression", {})
         ),

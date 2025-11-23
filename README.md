@@ -48,6 +48,20 @@ The project consists of the following folders and files:
   4. **Model tracking**: All experiments tracked using Comet.ml for metrics, parameters, and artifacts
   5. **evaluate.py**: Selects best model, calibrates it, and registers as champion model in Comet workspace if test score meets threshold
 
+  **Evaluation Workflows:**
+
+  The project supports two evaluation workflows:
+  - **Integrated workflow**: `train.py` directly calls `evaluate.py` and passes experiment data in-memory
+  - **Standalone workflow**: `evaluate.py` can be run independently (via `make evaluate`) and automatically discovers experiments from Comet ML
+
+  **Automatic Experiment Discovery**: The evaluation system queries Comet ML directly to find recent experiments
+  based on naming patterns (e.g., 'lightgbm_', 'random_forest_'), eliminating the need for any intermediate files. This enables:
+  - Simplified evaluation without file dependencies
+  - Automatic discovery of experiments from any training session
+  - Better integration with CI/CD pipelines
+  - Reduced storage and maintenance overhead
+  - Direct leveraging of Comet ML's experiment management capabilities
+
 - `src/inference`: contains the script for scoring new data via REST API using containerized model, which is deployed using GitHub Actions CI/CD pipeline.
 
 - `src/utils`: contains utility modules used throughout the project, including logger class that redirects printed messages in addition to some select events that need to be logged to logger objects and constans that defines paths to to data and training artifacts directories.
@@ -64,6 +78,8 @@ Below is the repo structure.
         ├── dist
         │   ├── end_to_end_ml-0.1.0-py3-none-any.whl
         │   └── end_to_end_ml-0.1.0.tar.gz
+        ├── docs
+        ├── examples
         ├── img
         │   └── feast_workflow.png
         ├── notebooks
@@ -105,6 +121,7 @@ Below is the repo structure.
         │   │   └── utils
         │   │       ├── __init__.py
         │   │       ├── config.py
+        │   │       ├── data.py
         │   │       └── prep.py
         │   ├── inference
         │   │   ├── Dockerfile
@@ -115,26 +132,28 @@ Below is the repo structure.
         │   │       └── model.py
         │   ├── training
         │   │   ├── artifacts
-        │   │   │   ├── champion_model.pkl
-        │   │   │   ├── experiment_keys.csv
-        │   │   │   ├── lightgbm.pkl
-        │   │   │   ├── logistic-regression.pkl
-        │   │   │   ├── random-forest.pkl
-        │   │   │   ├── study_LGBMClassifier.csv
-        │   │   │   ├── study_LogisticRegression.csv
-        │   │   │   ├── study_RandomForestClassifier.csv
-        │   │   │   ├── study_XGBClassifier.csv
-        │   │   │   ├── voting-ensemble.pkl
-        │   │   │   └── xgboost.pkl
+        │   │   │   └── study_LGBMClassifier.csv
         │   │   ├── evaluate.py
         │   │   ├── split_data.py
         │   │   ├── train.py
         │   │   └── utils
         │   │       ├── __init__.py
-        │   │       ├── config.py
-        │   │       ├── data.py
-        │   │       ├── job.py
-        │   │       └── model.py
+        │   │       ├── config
+        │   │       │   └── config.py
+        │   │       ├── core
+        │   │       │   ├── ensemble.py
+        │   │       │   ├── optimizer.py
+        │   │       │   └── trainer.py
+        │   │       ├── evaluation
+        │   │       │   ├── champion.py
+        │   │       │   ├── evaluator.py
+        │   │       │   ├── orchestrator.py
+        │   │       │   ├── selector.py
+        │   │       │   └── visualizer.py
+        │   │       └── tracking
+        │   │           ├── experiment.py
+        │   │           ├── experiment_tracker.py
+        │   │           └── study_logger.py
         │   └── utils
         │       ├── __init__.py
         │       ├── config_loader.py
@@ -198,3 +217,35 @@ The training and deployment pipelines can be run in GitHub Actions. You can also
 - Pull containerized model
 
         docker pull ghcr.io/adeemy/end-to-end-ml:c35fb9610651e155d7a3799644e6ff64c1a5a2db
+
+### Troubleshooting
+
+**"No experiments found for model evaluation" Error**
+
+If you get this error when running `make evaluate`:
+
+```
+ValueError: No experiments found for model evaluation.
+
+This typically means:
+• No training has been run yet
+• Comet ML workspace/project doesn't exist
+• COMET_API_KEY is not set or invalid
+
+To resolve this:
+1. Run training first: 'make train'
+2. Check Comet ML setup: 'make test_comet'
+3. Verify workspace name in training-config.yml
+```
+
+**Solution:**
+1. **First-time users**: Run the complete workflow: `make workflow`
+2. **Missing training**: Run `make train` before `make evaluate`
+3. **Comet ML setup issues**: Run `make test_comet` to diagnose authentication problems
+4. **Wrong workspace**: Run `make fix_workspace` to auto-detect and update your workspace configuration
+5. **Manual fix**: Update `workspace_name` in `src/config/training-config.yml` to match your Comet ML workspace
+
+**Other Common Issues:**
+- **API Key not set**: `export COMET_API_KEY=your_api_key_here`
+- **Workspace access denied**: Ensure your API key has access to the specified workspace
+- **No internet connection**: Comet ML requires internet access for experiment tracking

@@ -1,11 +1,16 @@
 """
 Model selection utilities - selects best performing model from candidates.
+
+This module queries Comet ML directly to retrieve recent experiments and their
+validation metrics, eliminating the need for experiment_keys.csv files.
+It automatically discovers experiments based on naming patterns and selects
+the best performing model.
 """
 
 from pathlib import PosixPath
 
+import comet_ml
 import pandas as pd
-from comet_ml import API
 
 from src.utils.logger import get_console_logger
 
@@ -25,7 +30,6 @@ class ModelSelector:
         project_name: str,
         workspace_name: str,
         comparison_metric: str,
-        comet_api_key: str,
     ):
         """Initializes the ModelSelector.
 
@@ -33,21 +37,108 @@ class ModelSelector:
             project_name: Comet project name.
             workspace_name: Comet workspace name.
             comparison_metric: Metric name for comparison (e.g., 'valid_f1_score').
-            comet_api_key: Comet ML API key.
         """
         self.project_name = project_name
         self.workspace_name = workspace_name
         self.comparison_metric = comparison_metric
-        self.api = API(api_key=comet_api_key)
+
+        # Follow the working pattern: login first
+        comet_ml.login()
+
+    def get_recent_experiments(self, max_experiments: int = 50) -> pd.DataFrame:
+        """Get recent experiments directly from Comet ML.
+
+        Args:
+            max_experiments: Maximum number of recent experiments to retrieve.
+
+        Returns:
+            DataFrame with columns [model_name, experiment_key] extracted from
+            recent experiments based on experiment name patterns.
+        """
+        try:
+            # Follow your working pattern
+            comet_ml.login()
+            api = comet_ml.API()
+
+            # Get recent experiments from Comet ML
+            experiments = api.get_experiments(
+                workspace=self.workspace_name,
+                project_name=self.project_name,
+                sort_by="startTime",
+                sort_order="desc",
+                page_size=max_experiments,
+            )
+
+            experiment_data = []
+            # Extract model names from experiment names using common patterns
+            for exp in experiments:
+                exp_name = exp.name if hasattr(exp, "name") else exp.get_name()
+                exp_key = exp.key if hasattr(exp, "key") else exp.get_key()
+
+                # Extract model type from experiment name (e.g., "lightgbm_2024-11-22" -> "lightgbm")
+                if exp_name:
+                    # Common model name patterns
+                    model_patterns = [
+                        "logistic_regression",
+                        "logisticregression",
+                        "lr",
+                        "random_forest",
+                        "randomforest",
+                        "rf",
+                        "lightgbm",
+                        "lgbm",
+                        "xgboost",
+                        "xgb",
+                        "voting_ensemble",
+                    ]
+
+                    model_name = None
+                    exp_name_lower = exp_name.lower()
+
+                    for pattern in model_patterns:
+                        if pattern in exp_name_lower:
+                            if "logistic" in pattern:
+                                model_name = "logistic-regression"
+                            elif "random" in pattern or pattern == "rf":
+                                model_name = "random-forest"
+                            elif "lightgbm" in pattern or pattern == "lgbm":
+                                model_name = "lightgbm"
+                            elif "xgboost" in pattern or pattern == "xgb":
+                                model_name = "xgboost"
+                            elif "voting" in pattern:
+                                model_name = "voting-ensemble"
+                            break
+
+                    if model_name:
+                        experiment_data.append([model_name, exp_key])
+
+            if not experiment_data:
+                logger.warning(
+                    "No experiments found with recognizable model name patterns"
+                )
+                return pd.DataFrame(columns=["0", "1"])
+
+            # Create DataFrame with same column structure as CSV file
+            df = pd.DataFrame(experiment_data, columns=["0", "1"])
+            logger.info("Found %d recent experiments from Comet ML", len(df))
+            return df
+
+        except Exception as e:  # pylint: disable=W0718
+            logger.error("Failed to retrieve experiments from Comet ML: %s", e)
+            return pd.DataFrame(columns=["0", "1"])
 
     def select_best_model(
         self,
-        experiment_keys: pd.DataFrame,
+        experiment_keys: pd.DataFrame = None,
     ) -> tuple[str, str]:
         """Selects best model based on validation performance.
 
+        First attempts to use provided experiment_keys DataFrame (from CSV or training).
+        If not provided or empty, queries Comet ML directly for recent experiments.
+
         Args:
-            experiment_keys: DataFrame with columns [model_name, experiment_key].
+            experiment_keys: Optional DataFrame with columns [model_name, experiment_key].
+                           If None, will query Comet ML directly.
 
         Returns:
             Tuple of (best_model_name, best_model_experiment_key).
@@ -55,9 +146,14 @@ class ModelSelector:
         Raises:
             ValueError: If no successful experiments found or no valid metrics.
         """
+        # Use provided experiment_keys or query Comet ML directly
+        if experiment_keys is None or experiment_keys.shape[0] == 0:
+            logger.info("No experiment_keys provided, querying Comet ML directly")
+            experiment_keys = self.get_recent_experiments()
+
         if experiment_keys.shape[0] == 0:
             raise ValueError(
-                "No successful experiments found. Please check the experiment logs."
+                "No experiments found. Please run training first: 'make train'"
             )
 
         # Get metrics for each experiment from Comet ML
@@ -67,7 +163,11 @@ class ModelSelector:
             exp_key = row["1"]  # Second column is experiment key
 
             try:
-                experiment = self.api.get_experiment(
+                # Follow your working pattern
+                comet_ml.login()
+                api = comet_ml.API()
+
+                experiment = api.get_experiment(
                     workspace=self.workspace_name,
                     project_name=self.project_name,
                     experiment=exp_key,

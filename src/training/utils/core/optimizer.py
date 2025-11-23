@@ -242,12 +242,14 @@ class ModelOptimizer:
             valid_scores["Metric"] == f"f_{self.fbeta_score_beta}_score", "Score"
         ].iloc[0]
 
-        # Log metrics with step for time series tracking
+        # Log metrics with specific names that evaluation expects
+        # Use f-score naming convention: f_{beta}_score (e.g., f_0.5_score)
+        metric_name = f"f_{self.fbeta_score_beta}_score"
         self.tracker.log_metric(
-            name="training_score", value=float(train_score), step=trial.number
+            name=f"train_{metric_name}", value=float(train_score), step=trial.number
         )
         self.tracker.log_metric(
-            name="validation_score", value=float(valid_score), step=trial.number
+            name=f"valid_{metric_name}", value=float(valid_score), step=trial.number
         )
 
         # Return the validation score to ensure it's used for model selection

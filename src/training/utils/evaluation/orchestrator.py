@@ -219,7 +219,6 @@ class TestSetEvaluationOrchestrator:
 
     def run_evaluation_workflow(
         self,
-        experiment_keys: pd.DataFrame,
         model_selector: ModelSelector,
         valid_features: pd.DataFrame,
         valid_class: np.ndarray,
@@ -227,12 +226,12 @@ class TestSetEvaluationOrchestrator:
         comparison_metric_name: str,
         deployment_threshold: float,
         cv_folds: int = 5,
+        experiment_keys: Optional[pd.DataFrame] = None,
         **experiment_kwargs,
     ) -> tuple[str, dict]:
         """Runs complete evaluation workflow: select, evaluate, calibrate, register.
 
         Args:
-            experiment_keys: DataFrame with model names and experiment keys.
             model_selector: ModelSelector instance.
             valid_features: Validation features for calibration.
             valid_class: Validation class labels for calibration.
@@ -240,6 +239,8 @@ class TestSetEvaluationOrchestrator:
             comparison_metric_name: Metric name for deployment decision.
             deployment_threshold: Minimum score required for deployment.
             cv_folds: Number of CV folds for calibration.
+            experiment_keys: Optional DataFrame with model names and experiment keys.
+                           If None, ModelSelector will query Comet ML directly.
             **experiment_kwargs: Additional arguments for experiment setup (e.g., api_key, experiment_key).
 
         Returns:

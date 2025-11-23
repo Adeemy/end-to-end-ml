@@ -2,6 +2,15 @@
 Runs training experiments to perform hyperparameters optimization
 for multiple models. It tracks the experiments using Comet.ml.
 
+This script handles the complete training pipeline:
+1. Loads and preprocesses data from feature store
+2. Trains multiple models (LR, RF, LightGBM, XGBoost) with Optuna optimization
+3. Logs experiments to Comet ML for tracking
+4. Saves trained models as pickle files
+5. Optionally runs evaluation workflow
+
+Experiments are automatically discoverable via Comet ML API.
+
 Data Prep Flow:
 1. split_data.py imports data from feature store and creates train/valid/test splits
    - Saves data splits with class as parquet files in DATA_DIR.
@@ -231,7 +240,6 @@ def main(
     train_file_name = config.params["files"]["train_set_file_name"]
     valid_set_file_name = config.params["files"]["valid_set_file_name"]
     test_set_file_name = config.params["files"]["test_set_file_name"]
-    exp_key_file_name = config.params["files"]["experiments_keys_file_name"]
     lr_registered_model_name = config.params["modelregistry"][
         "lr_registered_model_name"
     ]
@@ -493,8 +501,7 @@ def main(
             "No model was selected in config for training or all training experiments failed."
         )
 
-    # Save names of successful experiments names so that logged training
-    # metrics can imported in evaluate.py from workspace
+    # Create experiment DataFrame for return/evaluation
     exp_names_keys = {}
     for i in range(len(exp_objects)):
         exp_key = list(exp_objects.keys())[i]
@@ -502,7 +509,6 @@ def main(
         exp_names_keys.update(**{f"{exp_key}": exp_value.get_key()})
 
     successful_exp = pd.DataFrame(exp_names_keys.items())
-    successful_exp.to_csv(f"{ARTIFACTS_DIR}/{exp_key_file_name}.csv", index=False)
 
     logger.info("Model Training Experiments Finished ...")
 
@@ -514,7 +520,6 @@ def main(
         try:
             champion_name, test_metrics = evaluate_main(
                 config_yaml_path=config_yaml_path,
-                comet_api_key=api_key,
                 data_dir=data_dir,
                 artifacts_dir=artifacts_dir,
                 logger=logger,
