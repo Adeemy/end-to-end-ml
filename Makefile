@@ -87,3 +87,7 @@ test_model:
 # Test model via API (go to http://localhost:8000/docs page to test sample)
 test_packaged_model:
 	cd ./src/inference && uvicorn --host 0.0.0.0 main:app
+
+# Print recent directory structure
+print_tree:
+	tree -I "__pycache__|*.pyc|.git|.venv|node_modules"
