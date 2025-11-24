@@ -13,12 +13,12 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
-from src.training.utils.config.config import SupportedModelsConfig
-from src.training.utils.core.optimizer import ModelOptimizer
-from src.training.utils.evaluation.evaluator import create_model_evaluator
-from src.training.utils.tracking.experiment import ExperimentManager
-from src.training.utils.tracking.experiment_tracker import ExperimentTracker
-from src.training.utils.tracking.study_logger import StudyLogger
+from src.training.core.optimizer import ModelOptimizer
+from src.training.evaluation.evaluator import create_model_evaluator
+from src.training.schemas import SupportedModelsConfig
+from src.training.tracking.experiment import ExperimentManager
+from src.training.tracking.experiment_tracker import ExperimentTracker
+from src.training.tracking.study_logger import StudyLogger
 from src.utils.logger import get_console_logger
 
 module_name: str = PosixPath(__file__).stem

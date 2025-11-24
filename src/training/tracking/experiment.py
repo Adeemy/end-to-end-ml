@@ -27,7 +27,7 @@ import mlflow.sklearn
 from comet_ml import Experiment as CometExperiment
 from sklearn.pipeline import Pipeline
 
-from src.training.utils.tracking.experiment_tracker import (
+from src.training.tracking.experiment_tracker import (
     CometExperimentTracker,
     ExperimentTracker,
     MLflowExperimentTracker,

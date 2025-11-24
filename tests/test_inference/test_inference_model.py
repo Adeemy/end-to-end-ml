@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from src.inference.utils.model import ModelLoader, predict
-from src.training.utils.config.config import Config
+from src.training.schemas import Config
 from src.utils.path import PARENT_DIR
 
 

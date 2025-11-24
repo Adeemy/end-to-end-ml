@@ -377,7 +377,7 @@ def load_yaml(file_path: Path) -> dict:
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR, ARTIFACTS_DIR
-from src.training.utils.config.config import Config, build_training_config
+from src.training.schemas import Config, build_training_config
 
 # Setup
 logger = get_console_logger("training")

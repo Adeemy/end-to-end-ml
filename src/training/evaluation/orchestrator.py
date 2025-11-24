@@ -13,10 +13,10 @@ import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
-from src.training.utils.evaluation.champion import ModelChampionManager
-from src.training.utils.evaluation.evaluator import create_model_evaluator
-from src.training.utils.evaluation.selector import ModelSelector
-from src.training.utils.tracking.experiment_tracker import (
+from src.training.evaluation.champion import ModelChampionManager
+from src.training.evaluation.evaluator import create_model_evaluator
+from src.training.evaluation.selector import ModelSelector
+from src.training.tracking.experiment_tracker import (
     CometExperimentTracker,
     ExperimentTracker,
     MLflowExperimentTracker,

@@ -1,5 +1,7 @@
-"""Defines a class that loads parameters from config.yml file.
-and dataclasses for configuration sections.
+"""Feature store configuration loader and dataclasses.
+
+Handles loading and validation of feature store configuration from YAML files.
+Defines dataclasses for different configuration sections.
 """
 
 from dataclasses import dataclass

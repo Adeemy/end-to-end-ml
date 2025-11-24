@@ -7,7 +7,7 @@ from pathlib import PosixPath
 
 import optuna
 
-from src.training.utils.tracking.experiment_tracker import ExperimentTracker
+from src.training.tracking.experiment_tracker import ExperimentTracker
 from src.utils.logger import get_console_logger
 
 module_name: str = PosixPath(__file__).stem

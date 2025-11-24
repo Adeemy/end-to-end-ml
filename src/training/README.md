@@ -142,8 +142,8 @@ print(f"Completed {len(experiment_keys)} experiments")
 
 ### Custom Model Training
 ```python
-from src.training.utils.core.trainer import TrainingOrchestrator
-from src.training.utils.tracking.experiment import CometExperimentManager
+from src.training.core.trainer import TrainingOrchestrator
+from src.training.tracking.experiment import CometExperimentManager
 
 # Initialize orchestrator
 trainer = TrainingOrchestrator(
@@ -167,7 +167,7 @@ study, optimizer = trainer.optimize_model(
 
 ### Model Evaluation
 ```python
-from src.training.utils.evaluation.selector import ModelSelector
+from src.training.evaluation.selector import ModelSelector
 
 # Select best model
 selector = ModelSelector(

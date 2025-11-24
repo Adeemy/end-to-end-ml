@@ -40,8 +40,8 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 
-from src.training.utils.config.config import SupportedModelsConfig
-from src.training.utils.tracking.experiment_tracker import ExperimentTracker
+from src.training.schemas import SupportedModelsConfig
+from src.training.tracking.experiment_tracker import ExperimentTracker
 from src.utils.logger import get_console_logger
 
 module_name: str = PosixPath(__file__).stem

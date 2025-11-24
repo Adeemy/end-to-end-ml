@@ -14,7 +14,7 @@ from feast.types import Float32, String
 
 sys.path.append(str(Path(__file__).parent.resolve().parent.parent.parent))
 
-from src.feature.utils.config import Config
+from src.feature.schemas import Config
 from src.utils.path import DATA_DIR
 
 #################################
