@@ -1,6 +1,6 @@
 """
 Test functions for the DataSplitter class in the feature store
-module src/feature_store/utils/prep.py.
+module src/feature/utils/prep.py.
 """
 
 import re
@@ -9,7 +9,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from src.feature_store.utils.prep import (
+from src.feature.utils.prep import (
     DataSplitter,
     RandomSplitStrategy,
     SplitStrategy,

@@ -1,6 +1,6 @@
 """
 Test functions for the DataTransformer class in the feature store
-module src/feature_store/utils/prep.py.
+module src/feature/utils/prep.py.
 """
 
 import logging
@@ -8,7 +8,7 @@ import logging
 import pandas as pd
 import pytest
 
-from src.feature_store.utils.prep import DataTransformer
+from src.feature.utils.prep import DataTransformer
 
 
 @pytest.fixture

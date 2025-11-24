@@ -41,7 +41,7 @@ from sklearn.preprocessing import (
 )
 from xgboost import XGBClassifier
 
-from src.feature_store.utils.data import TrainingDataPrep
+from src.feature.utils.data import TrainingDataPrep
 from src.training.utils.config.config import Config, build_training_config
 from src.training.utils.core.ensemble import ClassifierEnsembleOrchestrator
 from src.training.utils.core.trainer import TrainingOrchestrator

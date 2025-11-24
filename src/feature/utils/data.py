@@ -22,7 +22,7 @@ from sklearn.preprocessing import (
     StandardScaler,
 )
 
-from src.feature_store.utils.prep import (
+from src.feature.utils.prep import (
     DataPreprocessor,
     DataSplitter,
     RandomSplitStrategy,

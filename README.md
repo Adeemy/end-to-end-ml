@@ -33,13 +33,13 @@ The project consists of the following folders and files:
 
 - `src/config`: contains configuration files that includes parameters for data preprocessing and transformation, and model training.
 
-- `src/feature_store`: contains the scripts for data ingestion and transformation. The script (generate_initial_data.py) imports the original dataset from the source [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), and creates inference set (5% of the original dataset). The inference set is used to simulate production data, which is scored using the deployed model via a REST API call. The script (prep_data.py) preprocesses and transforms the raw dataset before ingesting it by feature store. For more details about feature store setup, see README.md in the feature_store folder.
+- `src/feature`: contains the scripts for data ingestion and transformation. The script (generate_initial_data.py) imports the original dataset from the source [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), and creates inference set (5% of the original dataset). The inference set is used to simulate production data, which is scored using the deployed model via a REST API call. The script (prep_data.py) preprocesses and transforms the raw dataset before ingesting it by feature store. For more details about feature store setup, see README.md in the feature folder.
 
 - `src/training`: contains the scripts for data splitting, model training, evaluation, and selection.
 
   **Training Flow:**
 
-  1. **split_data.py**: Imports preprocessed features from the feature store using Feast's `get_historical_features()`, then splits into train/validation/test sets and saves as parquet files in `src/feature_store/feature_repo/data/`. The class labels at this stage are raw values stored from the feature store.
+  1. **split_data.py**: Imports preprocessed features from the feature store using Feast's `get_historical_features()`, then splits into train/validation/test sets and saves as parquet files in `src/feature/feature_repo/data/`. The class labels at this stage are raw values stored from the feature store.
   2. **train.py**: Loads the parquet files created by split_data.py, then calls `prepare_data()` which:
      - Encodes class labels using `LabelEncoder` (handles both string and integer class labels in config)
      - Creates data transformation pipeline (imputation, scaling, encoding, feature selection)
@@ -51,11 +51,13 @@ The project consists of the following folders and files:
   **Evaluation Workflows:**
 
   The project supports two evaluation workflows:
+
   - **Integrated workflow**: `train.py` directly calls `evaluate.py` and passes experiment data in-memory
   - **Standalone workflow**: `evaluate.py` can be run independently (via `make evaluate`) and automatically discovers experiments from Comet ML
 
   **Automatic Experiment Discovery**: The evaluation system queries Comet ML directly to find recent experiments
-  based on naming patterns (e.g., 'lightgbm_', 'random_forest_'), eliminating the need for any intermediate files. This enables:
+  based on naming patterns (e.g., 'lightgbm*', 'random_forest*'), eliminating the need for any intermediate files. This enables:
+
   - Simplified evaluation without file dependencies
   - Automatic discovery of experiments from any training session
   - Better integration with CI/CD pipelines
@@ -87,6 +89,7 @@ Below is the repo structure.
         │   └── utils.py
         ├── pyproject.toml
         ├── pytest.ini
+        ├── scripts
         ├── src
         │   ├── __init__.py
         │   ├── config
@@ -100,7 +103,7 @@ Below is the repo structure.
         │   │   ├── dependency_links.txt
         │   │   ├── requires.txt
         │   │   └── top_level.txt
-        │   ├── feature_store
+        │   ├── feature
         │   │   ├── README.md
         │   │   ├── feature_repo
         │   │   │   ├── data
@@ -125,13 +128,16 @@ Below is the repo structure.
         │   │       └── prep.py
         │   ├── inference
         │   │   ├── Dockerfile
+        │   │   ├── README.md
         │   │   ├── main.py
         │   │   ├── predict.py
         │   │   └── utils
         │   │       ├── __init__.py
         │   │       └── model.py
         │   ├── training
+        │   │   ├── README.md
         │   │   ├── artifacts
+        │   │   │   ├── lightgbm.pkl
         │   │   │   └── study_LGBMClassifier.csv
         │   │   ├── evaluate.py
         │   │   ├── split_data.py
@@ -155,13 +161,14 @@ Below is the repo structure.
         │   │           ├── experiment_tracker.py
         │   │           └── study_logger.py
         │   └── utils
+        │       ├── README.md
         │       ├── __init__.py
         │       ├── config_loader.py
         │       ├── logger.py
         │       └── path.py
         ├── tests
         │   ├── __init__.py
-        │   ├── test_feature_store
+        │   ├── test_feature
         │   │   ├── test_data_preprocessor.py
         │   │   ├── test_data_splitter.py
         │   │   ├── test_data_transformer.py
@@ -217,35 +224,3 @@ The training and deployment pipelines can be run in GitHub Actions. You can also
 - Pull containerized model
 
         docker pull ghcr.io/adeemy/end-to-end-ml:c35fb9610651e155d7a3799644e6ff64c1a5a2db
-
-### Troubleshooting
-
-**"No experiments found for model evaluation" Error**
-
-If you get this error when running `make evaluate`:
-
-```
-ValueError: No experiments found for model evaluation.
-
-This typically means:
-• No training has been run yet
-• Comet ML workspace/project doesn't exist
-• COMET_API_KEY is not set or invalid
-
-To resolve this:
-1. Run training first: 'make train'
-2. Check Comet ML setup: 'make test_comet'
-3. Verify workspace name in training-config.yml
-```
-
-**Solution:**
-1. **First-time users**: Run the complete workflow: `make workflow`
-2. **Missing training**: Run `make train` before `make evaluate`
-3. **Comet ML setup issues**: Run `make test_comet` to diagnose authentication problems
-4. **Wrong workspace**: Run `make fix_workspace` to auto-detect and update your workspace configuration
-5. **Manual fix**: Update `workspace_name` in `src/config/training-config.yml` to match your Comet ML workspace
-
-**Other Common Issues:**
-- **API Key not set**: `export COMET_API_KEY=your_api_key_here`
-- **Workspace access denied**: Ensure your API key has access to the specified workspace
-- **No internet connection**: Comet ML requires internet access for experiment tracking
