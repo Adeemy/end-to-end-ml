@@ -181,8 +181,8 @@ class TrainingOrchestrator:
         fitted_pipeline: Pipeline,
         is_voting_ensemble: bool = False,
         ece_nbins: int = 5,
-    ) -> tuple[dict, dict, float]:
-        """Evaluates the fitted model.
+    ) -> tuple[dict, dict, Optional[float]]:
+        """Evaluates the fitted model for both binary and multi-class models.
 
         Args:
             tracker: Experiment tracker object.
@@ -192,6 +192,9 @@ class TrainingOrchestrator:
 
         Returns:
             Tuple of (train_metrics, valid_metrics, model_ece).
+
+        Note: model_ece is only calculated for binary classification models,
+            returns None for multi-class models.
         """
         evaluator = create_model_evaluator(
             tracker=tracker,
@@ -223,16 +226,49 @@ class TrainingOrchestrator:
             scores=valid_scores, prefix="valid_"
         )
 
-        # Calculate ECE
-        pred_probs = fitted_pipeline.predict_proba(self.valid_features)
-        pos_class_index = list(fitted_pipeline.classes_).index(
-            self.encoded_pos_class_label
-        )
-        model_ece = evaluator.calc_expected_calibration_error(
-            pred_probs=pred_probs[:, pos_class_index],
-            true_labels=self.valid_class,
-            nbins=ece_nbins,
-        )
+        # Determine if this is a binary or multi-class model
+        num_classes = len(fitted_pipeline.classes_)
+        is_binary_classification = num_classes == 2
+
+        # Calculate ECE only for binary classification models
+        model_ece = None
+        if is_binary_classification:
+            pred_probs = fitted_pipeline.predict_proba(self.valid_features)
+            pos_class_index = list(fitted_pipeline.classes_).index(
+                self.encoded_pos_class_label
+            )
+
+            # Probability array handlers registry for binary classification
+            prob_handlers = {
+                1: lambda probs, pos_idx: probs,  # 1D array case (binary edge case)
+                2: lambda probs, pos_idx: probs[
+                    :, pos_idx
+                ],  # 2D array case (normal binary)
+            }
+
+            # Handle both 1D and 2D probability arrays using registry
+            handler = prob_handlers.get(pred_probs.ndim)
+            if handler is None:
+                available_dims = ", ".join(map(str, prob_handlers.keys()))
+                raise ValueError(
+                    f"Unexpected predict_proba shape for binary classification: {pred_probs.shape}. "
+                    f"Supported dimensions: {available_dims}"
+                )
+
+            pos_probs = handler(pred_probs, pos_class_index)
+
+            model_ece = evaluator.calc_expected_calibration_error(
+                pred_probs=pos_probs,
+                true_labels=self.valid_class,
+                nbins=ece_nbins,
+            )
+
+            logger.info("Calculated ECE for binary model %.4f", model_ece)
+        else:
+            logger.info(
+                "Skipping ECE calculation for multi-class model with %d classes",
+                num_classes,
+            )
 
         return train_metric_values, valid_metric_values, model_ece
 

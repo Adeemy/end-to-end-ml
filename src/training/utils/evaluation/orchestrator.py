@@ -4,13 +4,14 @@ Test set evaluation orchestration - evaluates models on held-out test data.
 
 import os
 from pathlib import PosixPath
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Callable, Optional
 
 # Load comet_ml early to avoid issues with sklearn auto-logging
 import comet_ml  # noqa: F401 # pylint: disable=unused-import
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.pipeline import Pipeline
 
 from src.training.utils.evaluation.champion import ModelChampionManager
 from src.training.utils.evaluation.evaluator import create_model_evaluator
@@ -22,11 +23,93 @@ from src.training.utils.tracking.experiment_tracker import (
 )
 from src.utils.logger import get_console_logger
 
-if TYPE_CHECKING:
-    from sklearn.pipeline import Pipeline
-
 module_name: str = PosixPath(__file__).stem
 logger = get_console_logger(module_name)
+
+
+class TrackerRegistry:
+    """Registry for experiment tracker factories. It allows for easy addition
+    of new tracker types without modifying existing code. It follows the factory
+    pattern to create tracker instances based on registered factory functions. If
+    new tracker types are needed, they can be registered without changing the core
+    registry implementation.
+    """
+
+    def __init__(self):
+        """Initialize the registry with an empty tracker dictionary."""
+        self._trackers = {}
+
+    def register(
+        self, name: str, factory_func: Callable[..., ExperimentTracker]
+    ) -> None:
+        """Register a tracker factory function.
+
+        Args:
+            name: Name of the tracker type (e.g., 'comet', 'mlflow').
+            factory_func: Factory function that creates the tracker instance.
+        """
+        self._trackers[name.lower()] = factory_func
+
+    def create_tracker(self, tracker_type: str, **kwargs) -> ExperimentTracker:
+        """Create a tracker instance using registered factory.
+
+        Args:
+            tracker_type: Type of tracker to create.
+            **kwargs: Arguments to pass to the factory function.
+
+        Returns:
+            ExperimentTracker instance.
+
+        Raises:
+            ValueError: If tracker type is not registered.
+        """
+        factory_func = self._trackers.get(tracker_type.lower())
+        if not factory_func:
+            available_types = ", ".join(self._trackers.keys())
+            raise ValueError(
+                f"Unsupported tracker type: {tracker_type}. "
+                f"Available types: {available_types}"
+            )
+        return factory_func(**kwargs)
+
+
+def _create_comet_tracker(experiment_instance=None) -> CometExperimentTracker:
+    """Factory function for creating Comet tracker. If no experiment instance is provided,
+    a dummy disabled experiment is created.
+
+    Args:
+        experiment_instance: Pre-initialized Comet experiment instance (optional).
+
+    Returns:
+        CometExperimentTracker instance.
+    """
+    if experiment_instance is not None:
+        return CometExperimentTracker(experiment=experiment_instance)
+    else:
+        # Create a dummy experiment for now - will be set later via set_experiment
+        from comet_ml import Experiment
+
+        dummy_experiment = Experiment(disabled=True)
+        return CometExperimentTracker(experiment=dummy_experiment)
+
+
+def _create_mlflow_tracker(run_id=None) -> MLflowExperimentTracker:
+    """Factory function for creating MLflow tracker. If no run_id is provided,
+    a new run will be started.
+
+    Args:
+        run_id: Optional MLflow run ID.
+
+    Returns:
+        MLflowExperimentTracker instance.
+    """
+    return MLflowExperimentTracker(run_id=run_id)
+
+
+# Create and configure the default tracker registry
+_default_tracker_registry = TrackerRegistry()
+_default_tracker_registry.register("comet", _create_comet_tracker)
+_default_tracker_registry.register("mlflow", _create_mlflow_tracker)
 
 
 def create_evaluation_orchestrator(
@@ -44,7 +127,7 @@ def create_evaluation_orchestrator(
     """Factory function to create TestSetEvaluationOrchestrator with appropriate tracker.
 
     Args:
-        tracker_type: Type of tracker to use ('comet' or 'mlflow').
+        tracker_type: Type of tracker to use (e.g., 'comet', 'mlflow').
         train_features: Training features.
         train_class: Training class labels.
         test_features: Test features.
@@ -61,24 +144,13 @@ def create_evaluation_orchestrator(
     Raises:
         ValueError: If unsupported tracker_type is provided.
     """
-    if tracker_type.lower() == "comet":
-        if experiment_instance is not None:
-            tracker = CometExperimentTracker(experiment=experiment_instance)
-        else:
-            # Create a dummy experiment for now - will be set later via set_experiment
-            from comet_ml import Experiment
 
-            dummy_experiment = Experiment(disabled=True)
-            tracker = CometExperimentTracker(experiment=dummy_experiment)
-
-    elif tracker_type.lower() == "mlflow":
-        run_id = tracker_kwargs.get("run_id", None)
-        tracker = MLflowExperimentTracker(run_id=run_id)
-
-    else:
-        raise ValueError(
-            f"Unsupported tracker type: {tracker_type}. Use 'comet' or 'mlflow'."
-        )
+    # Create tracker using registry pattern
+    tracker = _default_tracker_registry.create_tracker(
+        tracker_type=tracker_type,
+        experiment_instance=experiment_instance,
+        **tracker_kwargs,
+    )
 
     return TestSetEvaluationOrchestrator(
         tracker=tracker,
@@ -163,13 +235,16 @@ class TestSetEvaluationOrchestrator:
             is_voting_ensemble=is_voting_ensemble,
         )
 
+        # Evaluate on test set - get test scores directly
         _, test_scores = evaluator.evaluate_model_perf(class_encoder=None)
 
         test_metrics = evaluator.convert_metrics_from_df_to_dict(
             scores=test_scores, prefix="test_"
         )
 
-        logger.info("Evaluated %s on test set", model_name)
+        logger.info(
+            "Evaluated %s on test set. Test metrics: %s", model_name, test_metrics
+        )
 
         return test_metrics
 
@@ -260,16 +335,37 @@ class TestSetEvaluationOrchestrator:
         # Try to load model locally, if not found download from Comet ML
         model_path = f"{self.artifacts_path}/{best_model_name}.pkl"
 
+        model_pipeline = None
         if not os.path.exists(model_path):
-            logger.info("Model not found locally, downloading from Comet ML")
-            model_pipeline = self._download_model_from_comet(
-                experiment_key=best_experiment_key,
-                model_name=best_model_name,
-                save_path=model_path,
-            )
+            logger.info("Model not found locally, downloading from workspace")
+            try:
+                model_pipeline = self._download_model_from_comet(
+                    experiment_key=best_experiment_key,
+                    model_name=best_model_name,
+                    save_path=model_path,
+                )
+            except FileNotFoundError as e:
+                logger.warning("Could not download model from workspace: %s", str(e))
+                logger.warning("Skipping evaluation for model: %s", best_model_name)
+                return best_model_name, {}
+            except Exception as e:  # pylint: disable=W0718
+                logger.warning("Error downloading model from workspace: %s", str(e))
+                logger.warning("Skipping evaluation for model: %s", best_model_name)
+                return best_model_name, {}
         else:
-            model_pipeline = joblib.load(model_path)
-            logger.info("Loaded model from local path: %s", model_path)
+            try:
+                model_pipeline = joblib.load(model_path)
+                logger.info("Loaded model from local path: %s", model_path)
+            except Exception as e:  # pylint: disable=W0703
+                logger.warning(
+                    "Could not load model from local path %s: %s", model_path, str(e)
+                )
+                logger.warning("Skipping evaluation for model: %s", best_model_name)
+                return best_model_name, {}
+
+        if model_pipeline is None:
+            logger.warning("No model pipeline available for evaluation")
+            return best_model_name, {}
 
         # Initialize experiment with backend-specific kwargs
         # For Comet: experiment_kwargs should contain api_key and experiment_key
@@ -287,7 +383,17 @@ class TestSetEvaluationOrchestrator:
         self.tracker.log_metrics(test_metrics)
 
         # Check deployment threshold
-        test_score = test_metrics.get(f"test_{comparison_metric_name}")
+        metric_key = f"test_{comparison_metric_name}"
+        test_score = test_metrics.get(metric_key)
+
+        if test_score is None:
+            available_metrics = ", ".join(test_metrics.keys())
+            raise ValueError(
+                f"Metric '{metric_key}' not found in test metrics. "
+                f"Available metrics: {available_metrics}"
+            )
+
+        test_score = float(test_score)
         if test_score < deployment_threshold:
             raise ValueError(
                 f"Best model score ({test_score:.4f}) is below deployment "
@@ -350,7 +456,9 @@ class TestSetEvaluationOrchestrator:
 
         if not model_assets:
             raise FileNotFoundError(
-                f"No model file found for {model_name} in experiment {experiment_key}"
+                f"No model file found for {model_name} in experiment {experiment_key}. "
+                f"Available assets: {len(assets)} total. "
+                f"Model files (.pkl): {len([a for a in assets if a['fileName'].endswith('.pkl')])}"
             )
 
         # Download the model file

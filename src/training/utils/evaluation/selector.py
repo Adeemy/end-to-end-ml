@@ -158,6 +158,8 @@ class ModelSelector:
 
         # Get metrics for each experiment from Comet ML
         exp_scores = {}
+        valid_experiments = {}  # Track experiments with available models
+
         for _, row in experiment_keys.iterrows():
             model_name = row["0"]  # First column is model name
             exp_key = row["1"]  # Second column is experiment key
@@ -172,20 +174,43 @@ class ModelSelector:
                     project_name=self.project_name,
                     experiment=exp_key,
                 )
+
+                # Check if experiment has model files available
+                assets = experiment.get_asset_list()
+                model_assets = [
+                    asset
+                    for asset in assets
+                    if asset["fileName"].endswith(".pkl")
+                    and model_name in asset["fileName"]
+                ]
+
+                has_model = len(model_assets) > 0
+
                 metric_value = experiment.get_metrics(self.comparison_metric)
                 if metric_value:
                     # Get the latest value of the metric
-                    exp_scores[model_name] = metric_value[-1]["metricValue"]
+                    score = metric_value[-1]["metricValue"]
+                    exp_scores[model_name] = score
+                    valid_experiments[model_name] = {
+                        "exp_key": exp_key,
+                        "score": score,
+                        "has_model": has_model,
+                    }
+
                     logger.debug(
-                        "Model %s: %s = %s",
+                        "Model %s: %s = %s (model available: %s)",
                         model_name,
                         self.comparison_metric,
-                        exp_scores[model_name],
+                        score,
+                        has_model,
                     )
             except (KeyError, IndexError, AttributeError) as e:
                 logger.warning(
                     "Failed to get metrics for %s (exp: %s): %s", model_name, exp_key, e
                 )
+                continue
+            except Exception as e:  # pylint: disable=W0718
+                logger.warning("Error checking experiment %s: %s", exp_key, e)
                 continue
 
         if not exp_scores:
@@ -194,19 +219,36 @@ class ModelSelector:
                 "across experiments."
             )
 
-        # Select the best performer (highest score)
-        best_model_name = max(exp_scores, key=exp_scores.get)
+        # Prioritize experiments with available models
+        experiments_with_models = {
+            name: info for name, info in valid_experiments.items() if info["has_model"]
+        }
 
-        # Get experiment key for the best model
-        best_model_exp_key = experiment_keys.loc[
-            experiment_keys["0"] == best_model_name, "1"
-        ].iloc[0]
-
-        logger.info(
-            "Selected best model: %s with %s = %.4f",
-            best_model_name,
-            self.comparison_metric,
-            float(exp_scores[best_model_name]),
-        )
+        if experiments_with_models:
+            # Select best from experiments that have model files
+            best_model_name = max(
+                experiments_with_models,
+                key=lambda x: experiments_with_models[x]["score"],
+            )
+            best_model_exp_key = experiments_with_models[best_model_name]["exp_key"]
+            logger.info(
+                "Selected best model with available artifacts: %s with %s = %.4f",
+                best_model_name,
+                self.comparison_metric,
+                experiments_with_models[best_model_name]["score"],
+            )
+        else:
+            # Fallback to best metric score (will likely fail during download)
+            best_model_name = max(exp_scores, key=exp_scores.get)
+            best_model_exp_key = experiment_keys.loc[
+                experiment_keys["0"] == best_model_name, "1"
+            ].iloc[0]
+            logger.warning(
+                "No experiments have model artifacts available. "
+                "Selected best model by metric only: %s with %s = %.4f",
+                best_model_name,
+                self.comparison_metric,
+                float(exp_scores[best_model_name]),
+            )
 
         return best_model_name, best_model_exp_key
