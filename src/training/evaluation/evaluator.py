@@ -308,6 +308,24 @@ class ModelEvaluator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def evaluate_test_set_only(
+        self,
+        class_encoder: LabelEncoder,
+        pos_class_label_thresh: float = 0.5,
+    ) -> pd.DataFrame:
+        """Evaluates model on test set only and logs test-specific artifacts.
+
+        Args:
+            class_encoder (LabelEncoder): class encoder object for confusion matrix labels.
+            pos_class_label_thresh (float): decision threshold value for positive class.
+
+        Returns:
+            test_scores (pd.DataFrame): test set scores.
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
     def _get_pred_class(self, pred_probs: np.ndarray, threshold: float) -> np.ndarray:
         """Returns predicted class labels based on decision threshold value.
 
@@ -377,6 +395,8 @@ class ModelEvaluator(ABC):
         original_valid_class: np.ndarray,
         pred_original_valid_class: np.ndarray,
         original_class_labels: list,
+        log_train_set: bool = True,
+        valid_set_label: str = "Validation Set",
     ) -> None:
         """Logs confusion matrices (normalized and non-normalized) for the best model on
         both the training and validation sets using expressive labels, e.g., Y/N, instead
@@ -388,33 +408,36 @@ class ModelEvaluator(ABC):
             original_valid_class (np.ndarray): true class labels for validation set (expressive labels).
             pred_original_valid_class (np.ndarray): predicted class labels for validation set (expressive labels).
             original_class_labels (list): list of expressive class labels.
+            log_train_set (bool): whether to log training set confusion matrices (default True).
+            valid_set_label (str): label to use for validation/test set confusion matrices (default "Validation Set").
         """
 
-        train_cm = confusion_matrix(
-            y_true=original_train_class,
-            y_pred=pred_original_train_class,
-            labels=original_class_labels,
-            normalize=None,
-        )
-        self.tracker.log_confusion_matrix(
-            matrix=train_cm,
-            title="Train Set Confusion Matrix",
-            labels=original_class_labels,
-            file_name="Train Set Confusion Matrix.json",
-        )
+        if log_train_set:
+            train_cm = confusion_matrix(
+                y_true=original_train_class,
+                y_pred=pred_original_train_class,
+                labels=original_class_labels,
+                normalize=None,
+            )
+            self.tracker.log_confusion_matrix(
+                matrix=train_cm,
+                title="Train Set Confusion Matrix",
+                labels=original_class_labels,
+                file_name="Train Set Confusion Matrix.json",
+            )
 
-        train_cm_norm = confusion_matrix(
-            y_true=original_train_class,
-            y_pred=pred_original_train_class,
-            labels=original_class_labels,
-            normalize="true",
-        )
-        self.tracker.log_confusion_matrix(
-            matrix=train_cm_norm,
-            title="Train Set Normalized Confusion Matrix",
-            labels=original_class_labels,
-            file_name="Train Set Normalized Confusion Matrix.json",
-        )
+            train_cm_norm = confusion_matrix(
+                y_true=original_train_class,
+                y_pred=pred_original_train_class,
+                labels=original_class_labels,
+                normalize="true",
+            )
+            self.tracker.log_confusion_matrix(
+                matrix=train_cm_norm,
+                title="Train Set Normalized Confusion Matrix",
+                labels=original_class_labels,
+                file_name="Train Set Normalized Confusion Matrix.json",
+            )
 
         valid_cm = confusion_matrix(
             y_true=original_valid_class,
@@ -424,8 +447,8 @@ class ModelEvaluator(ABC):
         )
         self.tracker.log_confusion_matrix(
             matrix=valid_cm,
-            title="Validation Set Confusion Matrix",
-            file_name="Validation Set Confusion Matrix.json",
+            title=f"{valid_set_label} Confusion Matrix",
+            file_name=f"{valid_set_label} Confusion Matrix.json",
             labels=original_class_labels,
         )
 
@@ -437,8 +460,8 @@ class ModelEvaluator(ABC):
         )
         self.tracker.log_confusion_matrix(
             matrix=valid_cm_norm,
-            title="Validation Set Normalized Confusion Matrix",
-            file_name="Validation Set Normalized Confusion Matrix.json",
+            title=f"{valid_set_label} Normalized Confusion Matrix",
+            file_name=f"{valid_set_label} Normalized Confusion Matrix.json",
             labels=original_class_labels,
         )
 
@@ -839,6 +862,92 @@ class BinaryClassificationEvaluator(ModelEvaluator):
 
         return ece[0]
 
+    def evaluate_test_set_only(
+        self,
+        class_encoder: LabelEncoder,
+        pos_class_label_thresh: float = 0.5,
+    ) -> pd.DataFrame:
+        """Evaluates model on test set only and logs test-specific artifacts.
+
+        Args:
+            class_encoder (LabelEncoder): class encoder object for confusion matrix labels.
+            pos_class_label_thresh (float): decision threshold value for positive class.
+
+        Returns:
+            test_scores (pd.DataFrame): test set scores.
+        """
+
+        # Generate predictions for test set (valid_features/valid_class are actually test data)
+        pred_test_probs = self.pipeline.predict_proba(self.valid_features)
+        pred_test_class = self._get_pred_class(pred_test_probs, pos_class_label_thresh)
+
+        # Generate predictions for train set (needed for confusion matrix comparison)
+        pred_train_probs = self.pipeline.predict_proba(self.train_features)
+        pred_train_class = self._get_pred_class(
+            pred_train_probs, pos_class_label_thresh
+        )
+
+        # Calculate test scores
+        test_scores = self.calc_perf_metrics(
+            true_class=self.valid_class,  # This is actually test data
+            pred_class=pred_test_class,
+        )
+
+        # Get original class labels for confusion matrix
+        (
+            original_train_class,
+            pred_original_train_class,
+            original_class_labels,
+        ) = self._get_original_class_labels(
+            true_class=self.train_class,
+            pred_class=pred_train_class,
+            class_encoder=class_encoder,
+        )
+
+        (
+            original_test_class,
+            pred_original_test_class,
+            _,
+        ) = self._get_original_class_labels(
+            true_class=self.valid_class,  # This is actually test data
+            pred_class=pred_test_class,
+            class_encoder=class_encoder,
+        )
+
+        # Log only test set confusion matrices
+        self._log_confusion_matrix(
+            original_train_class=original_train_class,
+            pred_original_train_class=pred_original_train_class,
+            original_valid_class=original_test_class,
+            pred_original_valid_class=pred_original_test_class,
+            original_class_labels=original_class_labels,
+            log_train_set=False,  # Skip training set confusion matrices
+            valid_set_label="Test Set",  # Use "Test Set" label
+        )
+        logger.info("Test set confusion matrices were logged to workspace.")
+
+        # Log evaluation curves using test data
+        self._log_calibration_curve(pred_test_probs)
+        logger.info("Calibration curve was logged to workspace.")
+
+        self._log_roc_curve(pred_test_probs, self.encoded_pos_class_label)
+        logger.info("ROC curve was logged to workspace.")
+
+        self._log_precision_recall_curve(pred_test_probs, self.encoded_pos_class_label)
+        logger.info("Precision-Recall curve was logged to workspace.")
+
+        self._log_cumulative_gains(
+            pred_test_probs, self.valid_class
+        )  # This is actually test data
+        logger.info("Cumulative gains curve was logged to workspace.")
+
+        self._log_lift_curve(
+            pred_test_probs, self.valid_class
+        )  # This is actually test data
+        logger.info("Lift curve was logged to workspace.")
+
+        return test_scores
+
 
 class MultiClassificationEvaluator(ModelEvaluator):
     """Concrete implementation of ModelEvaluator for multi-class classification tasks.
@@ -1189,6 +1298,92 @@ class MultiClassificationEvaluator(ModelEvaluator):
                 ece += np.abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
 
         return ece[0]
+
+    def evaluate_test_set_only(
+        self,
+        class_encoder: LabelEncoder,
+        pos_class_label_thresh: float = 0.5,
+    ) -> pd.DataFrame:
+        """Evaluates model on test set only and logs test-specific artifacts.
+
+        Args:
+            class_encoder (LabelEncoder): class encoder object for confusion matrix labels.
+            pos_class_label_thresh (float): decision threshold value for positive class.
+
+        Returns:
+            test_scores (pd.DataFrame): test set scores.
+        """
+
+        # Generate predictions for test set (valid_features/valid_class are actually test data)
+        pred_test_probs = self.pipeline.predict_proba(self.valid_features)
+        pred_test_class = self._get_pred_class(pred_test_probs, pos_class_label_thresh)
+
+        # Generate predictions for train set (needed for confusion matrix comparison)
+        pred_train_probs = self.pipeline.predict_proba(self.train_features)
+        pred_train_class = self._get_pred_class(
+            pred_train_probs, pos_class_label_thresh
+        )
+
+        # Calculate test scores
+        test_scores = self.calc_perf_metrics(
+            true_class=self.valid_class,  # This is actually test data
+            pred_class=pred_test_class,
+        )
+
+        # Get original class labels for confusion matrix
+        (
+            original_train_class,
+            pred_original_train_class,
+            original_class_labels,
+        ) = self._get_original_class_labels(
+            true_class=self.train_class,
+            pred_class=pred_train_class,
+            class_encoder=class_encoder,
+        )
+
+        (
+            original_test_class,
+            pred_original_test_class,
+            _,
+        ) = self._get_original_class_labels(
+            true_class=self.valid_class,  # This is actually test data
+            pred_class=pred_test_class,
+            class_encoder=class_encoder,
+        )
+
+        # Log only test set confusion matrices
+        self._log_confusion_matrix(
+            original_train_class=original_train_class,
+            pred_original_train_class=pred_original_train_class,
+            original_valid_class=original_test_class,
+            pred_original_valid_class=pred_original_test_class,
+            original_class_labels=original_class_labels,
+            log_train_set=False,  # Skip training set confusion matrices
+            valid_set_label="Test Set",  # Use "Test Set" label
+        )
+        logger.info("Test set confusion matrices were logged to workspace.")
+
+        # Log evaluation curves using test data (multi-class specific)
+        self._log_calibration_curve(pred_test_probs)
+        logger.info("Calibration curve was logged to workspace.")
+
+        self._log_roc_curve(pred_test_probs, self.encoded_pos_class_label)
+        logger.info("ROC curve was logged to workspace.")
+
+        self._log_precision_recall_curve(pred_test_probs, self.encoded_pos_class_label)
+        logger.info("Precision-Recall curve was logged to workspace.")
+
+        self._log_cumulative_gains(
+            pred_test_probs, self.valid_class
+        )  # This is actually test data
+        logger.info("Cumulative gains curve was logged to workspace.")
+
+        self._log_lift_curve(
+            pred_test_probs, self.valid_class
+        )  # This is actually test data
+        logger.info("Lift curve was logged to workspace.")
+
+        return test_scores
 
 
 def create_model_evaluator(

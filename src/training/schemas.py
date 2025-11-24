@@ -199,6 +199,7 @@ class TrainParams:
     comparison_metric: str = "fbeta_score"
     voting_rule: str = "soft"
     deployment_score_thresh: float = 0.8
+    max_eval_experiments: int = 10
 
 
 @dataclass(frozen=True)

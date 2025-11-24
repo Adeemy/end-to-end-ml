@@ -17,9 +17,10 @@ Design Decision:
     strict adherence to the experiment tracking interface.
 """
 
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path, PosixPath
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import joblib
 import mlflow
@@ -42,7 +43,30 @@ class ExperimentManager(ABC):
     """Abstract base class for experiment management.
 
     Allows swapping different experiment tracking backends (e.g., Comet ML, MLflow).
+    Includes credential management for each tracker type.
     """
+
+    @abstractmethod
+    def get_tracker_type(self) -> str:
+        """Get the tracker type identifier."""
+
+    @abstractmethod
+    def get_credentials(self) -> Dict[str, str]:
+        """Get credentials from environment variables."""
+
+    @abstractmethod
+    def get_base_config(self, experiment_kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Get base configuration for standalone experiments."""
+
+    @abstractmethod
+    def should_initialize_project(self, config_params: Dict[str, Any]) -> bool:
+        """Check if project initialization is needed."""
+
+    @abstractmethod
+    def initialize_project(
+        self, project_name: str, workspace_name: str, credentials: Dict[str, str]
+    ) -> None:
+        """Initialize experiment tracking project."""
 
     @abstractmethod
     def create_experiment(
@@ -131,8 +155,114 @@ class ExperimentManager(ABC):
         raise NotImplementedError
 
 
+def create_experiment_manager(tracker_type: str) -> ExperimentManager:
+    """Factory function to create experiment managers based on tracker type.
+
+    Args:
+        tracker_type: Type of tracker (e.g., 'comet', 'mlflow').
+
+    Returns:
+        ExperimentManager instance for the specified tracker.
+
+    Raises:
+        ValueError: If tracker type is not supported.
+    """
+    # Simple registry dictionary
+    _managers = {
+        "comet": CometExperimentManager,
+        "mlflow": MLflowExperimentManager,
+    }
+
+    tracker_type = tracker_type.lower()
+
+    if tracker_type not in _managers:
+        available = ", ".join(_managers.keys())
+        raise ValueError(
+            f"Unsupported tracker type: {tracker_type}. Available: {available}"
+        )
+
+    return _managers[tracker_type]()
+
+
+# Convenience functions for the consolidated API
+def get_tracker_credentials(tracker_type: str) -> Dict[str, str]:
+    """Get credentials for a tracker type."""
+    manager = create_experiment_manager(tracker_type)
+    return manager.get_credentials()
+
+
+def get_tracker_base_config(
+    tracker_type: str, experiment_kwargs: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Get base configuration for a tracker type."""
+    manager = create_experiment_manager(tracker_type)
+    return manager.get_base_config(experiment_kwargs)
+
+
+def should_initialize_tracker_project(
+    tracker_type: str, config_params: Dict[str, Any]
+) -> bool:
+    """Check if project initialization is needed."""
+    try:
+        manager = create_experiment_manager(tracker_type)
+        return manager.should_initialize_project(config_params)
+    except ValueError:
+        return False
+
+
+def initialize_tracker_project(
+    tracker_type: str,
+    project_name: str,
+    workspace_name: str,
+    credentials: Dict[str, str],
+) -> None:
+    """Initialize project for a tracker."""
+    try:
+        manager = create_experiment_manager(tracker_type)
+        manager.initialize_project(project_name, workspace_name, credentials)
+    except ValueError:
+        pass  # Silently ignore unsupported trackers
+
+
 class CometExperimentManager(ExperimentManager):
     """Manages Comet ML experiments including creation, logging, and model registration."""
+
+    def get_tracker_type(self) -> str:
+        """Get tracker type identifier."""
+        return "comet"
+
+    def get_credentials(self) -> Dict[str, str]:
+        """Get Comet ML credentials from environment variables."""
+        credentials = {}
+        api_key = os.environ.get("COMET_API_KEY")
+        if api_key:
+            credentials["api_key"] = api_key
+        return credentials
+
+    def get_base_config(self, experiment_kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Get Comet ML specific base configuration."""
+        return {
+            "project_name": experiment_kwargs.get("project_name"),
+            "workspace": experiment_kwargs.get("workspace_name"),
+        }
+
+    def should_initialize_project(self, config_params: Dict[str, Any]) -> bool:
+        """Check if Comet project should be initialized."""
+        return bool(config_params.get("initiate_comet_project", False))
+
+    def initialize_project(
+        self, project_name: str, workspace_name: str, credentials: Dict[str, str]
+    ) -> None:
+        """Initialize Comet ML project."""
+        api_key = credentials.get("api_key")
+        if api_key:
+            import comet_ml
+
+            comet_ml.init(
+                project_name=project_name,
+                workspace=workspace_name,
+                api_key=api_key,
+            )
 
     def create_experiment(
         self, project_name: str, experiment_name: str, api_key: Optional[str] = None
@@ -254,6 +384,41 @@ class MLflowExperimentManager(ExperimentManager):
     Note: MLflow typically doesn't require API keys for local usage, but may need them
     for remote tracking servers or managed services like Databricks.
     """
+
+    def get_tracker_type(self) -> str:
+        """Get tracker type identifier."""
+        return "mlflow"
+
+    def get_credentials(self) -> Dict[str, str]:
+        """Get MLflow credentials from environment variables."""
+        credentials = {}
+        tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
+        if tracking_uri:
+            credentials["tracking_uri"] = tracking_uri
+
+        username = os.environ.get("MLFLOW_USERNAME")
+        if username:
+            credentials["username"] = username
+
+        password = os.environ.get("MLFLOW_PASSWORD")
+        if password:
+            credentials["password"] = password
+
+        return credentials
+
+    def get_base_config(self, experiment_kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Get MLflow specific base configuration."""
+        return {}  # MLflow uses experiment_name directly
+
+    def should_initialize_project(self, config_params: Dict[str, Any]) -> bool:
+        """MLflow doesn't require explicit project initialization."""
+        return False
+
+    def initialize_project(
+        self, project_name: str, workspace_name: str, credentials: Dict[str, str]
+    ) -> None:
+        """MLflow doesn't require project initialization."""
+        pass  # pylint: disable=unnecessary-pass
 
     def create_experiment(
         self, project_name: str, experiment_name: str, api_key: Optional[str] = None

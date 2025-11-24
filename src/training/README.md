@@ -104,6 +104,44 @@ train:
   deployment_score_thresh: 0.7
 ```
 
+## Evaluation Experiments
+
+The evaluation system supports two modes of experiment creation depending on how it's invoked:
+
+### **Integrated Evaluation (Child Experiments)**
+When running the full pipeline with `make submit_train`, evaluation creates child experiments:
+
+```bash
+make submit_train  # Runs: prep_data → split_data → train → evaluate
+```
+
+**Result**: Training experiments (e.g., `train_lightgbm`) with child evaluation experiments that contain test metrics and maintain parent-child relationships for traceability.
+
+### **Standalone Evaluation (Independent Experiments)**
+When running evaluation independently with `make evaluate`:
+
+```bash
+make evaluate  # Queries existing experiments and evaluates best model
+```
+
+**Result**: Standalone evaluation experiments (e.g., `eval_lightgbm`) that are independent and can evaluate any previously trained models.
+
+### **Multi-Tracker Support**
+The evaluation system is designed to be tracker-agnostic:
+
+- **Comet ML**: Uses `COMET_API_KEY` environment variable
+- **MLflow**: Uses `MLFLOW_TRACKING_URI` environment variable
+- **Extensible**: Easy to add support for other experiment tracking systems
+
+**Environment Variables**:
+```bash
+# For Comet ML
+export COMET_API_KEY=your_comet_api_key
+
+# For MLflow (if using MLflow)
+export MLFLOW_TRACKING_URI=http://localhost:5000
+```
+
 ## Usage Examples
 
 ### Basic Training

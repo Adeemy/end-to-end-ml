@@ -45,11 +45,12 @@ class ModelSelector:
         # Follow the working pattern: login first
         comet_ml.login()
 
-    def get_recent_experiments(self, max_experiments: int = 50) -> pd.DataFrame:
+    def get_recent_experiments(self, max_experiments: int = None) -> pd.DataFrame:
         """Get recent experiments directly from Comet ML.
 
         Args:
             max_experiments: Maximum number of recent experiments to retrieve.
+                           If None, uses default of 50.
 
         Returns:
             DataFrame with columns [model_name, experiment_key] extracted from
@@ -61,6 +62,7 @@ class ModelSelector:
             api = comet_ml.API()
 
             # Get recent experiments from Comet ML
+            max_experiments = int(max_experiments or 50)  # Default to 50 if None
             experiments = api.get_experiments(
                 workspace=self.workspace_name,
                 project_name=self.project_name,
@@ -130,15 +132,17 @@ class ModelSelector:
     def select_best_model(
         self,
         experiment_keys: pd.DataFrame = None,
+        max_experiments: int = None,
     ) -> tuple[str, str]:
         """Selects best model based on validation performance.
 
         First attempts to use provided experiment_keys DataFrame (from CSV or training).
-        If not provided or empty, queries Comet ML directly for recent experiments.
+        If not provided or empty, queries ML workspace directly for recent experiments.
 
         Args:
             experiment_keys: Optional DataFrame with columns [model_name, experiment_key].
-                           If None, will query Comet ML directly.
+                           If None, will query ML workspace directly.
+            max_experiments: Maximum number of recent experiments to consider.
 
         Returns:
             Tuple of (best_model_name, best_model_experiment_key).
@@ -146,10 +150,11 @@ class ModelSelector:
         Raises:
             ValueError: If no successful experiments found or no valid metrics.
         """
-        # Use provided experiment_keys or query Comet ML directly
+        # Use provided experiment_keys or query ML workspace directly
+        max_experiments = int(max_experiments or 50)
         if experiment_keys is None or experiment_keys.shape[0] == 0:
-            logger.info("No experiment_keys provided, querying Comet ML directly")
-            experiment_keys = self.get_recent_experiments()
+            logger.info("No experiment_keys provided, querying ML workspace directly")
+            experiment_keys = self.get_recent_experiments(max_experiments)
 
         if experiment_keys.shape[0] == 0:
             raise ValueError(
@@ -188,8 +193,8 @@ class ModelSelector:
 
                 metric_value = experiment.get_metrics(self.comparison_metric)
                 if metric_value:
-                    # Get the latest value of the metric
-                    score = metric_value[-1]["metricValue"]
+                    # Get the latest value of the metric and convert to float
+                    score = float(metric_value[-1]["metricValue"])
                     exp_scores[model_name] = score
                     valid_experiments[model_name] = {
                         "exp_key": exp_key,
@@ -232,10 +237,11 @@ class ModelSelector:
             )
             best_model_exp_key = experiments_with_models[best_model_name]["exp_key"]
             logger.info(
-                "Selected best model with available artifacts: %s with %s = %.4f",
+                "Selected best model with available artifacts for evaluation: %s with %s = %.4f (from %d experiments)",
                 best_model_name,
                 self.comparison_metric,
                 experiments_with_models[best_model_name]["score"],
+                len(experiments_with_models),
             )
         else:
             # Fallback to best metric score (will likely fail during download)
@@ -244,11 +250,12 @@ class ModelSelector:
                 experiment_keys["0"] == best_model_name, "1"
             ].iloc[0]
             logger.warning(
-                "No experiments have model artifacts available. "
-                "Selected best model by metric only: %s with %s = %.4f",
+                "No experiments have model artifacts available for evaluation. "
+                "Selected best model by metric only: %s with %s = %.4f (from %d experiments)",
                 best_model_name,
                 self.comparison_metric,
                 float(exp_scores[best_model_name]),
+                len(exp_scores),
             )
 
         return best_model_name, best_model_exp_key

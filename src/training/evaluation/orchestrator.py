@@ -3,6 +3,7 @@ Test set evaluation orchestration - evaluates models on held-out test data.
 """
 
 import os
+from datetime import datetime
 from pathlib import PosixPath
 from typing import Any, Callable, Optional
 
@@ -12,10 +13,15 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder
 
 from src.training.evaluation.champion import ModelChampionManager
 from src.training.evaluation.evaluator import create_model_evaluator
 from src.training.evaluation.selector import ModelSelector
+from src.training.tracking.experiment import (
+    get_tracker_base_config,
+    get_tracker_credentials,
+)
 from src.training.tracking.experiment_tracker import (
     CometExperimentTracker,
     ExperimentTracker,
@@ -73,12 +79,15 @@ class TrackerRegistry:
         return factory_func(**kwargs)
 
 
-def _create_comet_tracker(experiment_instance=None) -> CometExperimentTracker:
+def _create_comet_tracker(
+    experiment_instance=None, **kwargs  # pylint: disable=unused-argument
+) -> CometExperimentTracker:
     """Factory function for creating Comet tracker. If no experiment instance is provided,
     a dummy disabled experiment is created.
 
     Args:
         experiment_instance: Pre-initialized Comet experiment instance (optional).
+        **kwargs: Additional arguments (ignored for compatibility).
 
     Returns:
         CometExperimentTracker instance.
@@ -93,12 +102,15 @@ def _create_comet_tracker(experiment_instance=None) -> CometExperimentTracker:
         return CometExperimentTracker(experiment=dummy_experiment)
 
 
-def _create_mlflow_tracker(run_id=None) -> MLflowExperimentTracker:
+def _create_mlflow_tracker(
+    run_id=None, **kwargs  # pylint: disable=unused-argument
+) -> MLflowExperimentTracker:
     """Factory function for creating MLflow tracker. If no run_id is provided,
     a new run will be started.
 
     Args:
         run_id: Optional MLflow run ID.
+        **kwargs: Additional arguments (ignored for compatibility).
 
     Returns:
         MLflowExperimentTracker instance.
@@ -235,8 +247,14 @@ class TestSetEvaluationOrchestrator:
             is_voting_ensemble=is_voting_ensemble,
         )
 
-        # Evaluate on test set - get test scores directly
-        _, test_scores = evaluator.evaluate_model_perf(class_encoder=None)
+        # Create class encoder for confusion matrix logging
+        # Fit on combined train and test class labels to ensure all labels are known
+        class_encoder = LabelEncoder()
+        all_class_labels = np.concatenate([self.train_class, self.test_class])
+        class_encoder.fit(all_class_labels)
+
+        # Use the public method for test-only evaluation to avoid accessing protected members
+        test_scores = evaluator.evaluate_test_set_only(class_encoder=class_encoder)
 
         test_metrics = evaluator.convert_metrics_from_df_to_dict(
             scores=test_scores, prefix="test_"
@@ -285,7 +303,19 @@ class TestSetEvaluationOrchestrator:
             pipeline=calibrated_pipeline,
         )
 
-        logger.info("Registered champion model: %s", model_name)
+        try:
+            evaluation_exp_name = (
+                self.tracker.experiment.get_name()
+                if hasattr(self.tracker, "experiment")
+                else "unknown"
+            )
+        except AttributeError:
+            evaluation_exp_name = "unknown"
+        logger.info(
+            "Registered champion model: %s in evaluation experiment: %s",
+            model_name,
+            evaluation_exp_name,
+        )
 
         # Save champion model locally
         champion_model_path = (
@@ -294,6 +324,53 @@ class TestSetEvaluationOrchestrator:
         joblib.dump(model_pipeline, champion_model_path)
 
         logger.info("Saved champion model to: %s", champion_model_path)
+
+    def _create_standalone_evaluation_kwargs(
+        self, experiment_kwargs: dict, experiment_name: str
+    ) -> dict:
+        """Create tracker-agnostic kwargs for standalone evaluation experiments.
+
+        Args:
+            experiment_kwargs: Original experiment configuration.
+            experiment_name: Name for the evaluation experiment.
+
+        Returns:
+            Dictionary of experiment kwargs for the specific tracker.
+        """
+        tracker_type = experiment_kwargs.get("experiment_tracker_type", "comet")
+
+        # Start with base configuration
+        kwargs = {
+            "experiment_name": experiment_name,
+        }
+
+        # Add tracker-specific base configuration using registry
+        try:
+            base_config = get_tracker_base_config(tracker_type, experiment_kwargs)
+            kwargs.update(base_config)
+        except ValueError:
+            logger.warning(
+                "Unknown tracker type: %s, using generic fallback", tracker_type
+            )
+            # Generic fallback - include non-tracker-type keys
+            kwargs.update(
+                {
+                    k: v
+                    for k, v in experiment_kwargs.items()
+                    if k not in ["experiment_tracker_type"]
+                }
+            )
+
+        # Add credentials using the credential provider
+        try:
+            credentials = get_tracker_credentials(tracker_type)
+            kwargs.update(credentials)
+        except ValueError:
+            logger.warning(
+                "Could not get credentials for tracker type: %s", tracker_type
+            )
+
+        return kwargs
 
     def run_evaluation_workflow(
         self,
@@ -305,6 +382,7 @@ class TestSetEvaluationOrchestrator:
         deployment_threshold: float,
         cv_folds: int = 5,
         experiment_keys: Optional[pd.DataFrame] = None,
+        max_eval_experiments: int = 50,
         **experiment_kwargs,
     ) -> tuple[str, dict]:
         """Runs complete evaluation workflow: select, evaluate, calibrate, register.
@@ -319,6 +397,7 @@ class TestSetEvaluationOrchestrator:
             cv_folds: Number of CV folds for calibration.
             experiment_keys: Optional DataFrame with model names and experiment keys.
                            If None, ModelSelector will query Comet ML directly.
+            max_eval_experiments: Maximum number of recent experiments to consider.
             **experiment_kwargs: Additional arguments for experiment setup (e.g., api_key, experiment_key).
 
         Returns:
@@ -329,7 +408,7 @@ class TestSetEvaluationOrchestrator:
         """
         # Select best model
         best_model_name, best_experiment_key = model_selector.select_best_model(
-            experiment_keys=experiment_keys
+            experiment_keys=experiment_keys, max_experiments=max_eval_experiments
         )
 
         # Try to load model locally, if not found download from Comet ML
@@ -367,11 +446,54 @@ class TestSetEvaluationOrchestrator:
             logger.warning("No model pipeline available for evaluation")
             return best_model_name, {}
 
-        # Initialize experiment with backend-specific kwargs
-        # For Comet: experiment_kwargs should contain api_key and experiment_key
-        # For MLflow: experiment_kwargs might contain run_id, etc.
+        # Handle experiment creation based on tracker type and available experiment ID
         if hasattr(self.tracker, "set_experiment"):
-            self.tracker.set_experiment(**experiment_kwargs)
+            tracker_type = experiment_kwargs.get("experiment_tracker_type", "comet")
+
+            # Check if we're running from training pipeline (with experiment_keys) or standalone
+            if experiment_keys is not None and best_experiment_key:
+                # Running from training pipeline - create child/linked experiment
+                evaluation_kwargs = {
+                    "is_child_experiment": True,
+                }
+
+                # Add tracker-specific parent/child linking
+                if tracker_type == "comet":
+                    evaluation_kwargs["experiment_key"] = best_experiment_key
+                elif tracker_type == "mlflow":
+                    evaluation_kwargs["parent_run_id"] = best_experiment_key
+                # Additional trackers can be added here without modifying existing code
+
+                # Add credentials using the credential provider
+                try:
+                    credentials = get_tracker_credentials(tracker_type)
+                    evaluation_kwargs.update(credentials)
+                except ValueError:
+                    logger.warning(
+                        "Could not get credentials for tracker type: %s", tracker_type
+                    )
+
+                self.tracker.set_experiment(**evaluation_kwargs)
+                logger.info(
+                    "Creating child/linked evaluation experiment for model: %s (parent: %s)",
+                    best_model_name,
+                    best_experiment_key,
+                )
+            else:
+                # Running standalone - create independent evaluation experiment
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                evaluation_experiment_name = (
+                    f"eval_{best_model_name.replace('-', '_')}_{timestamp}"
+                )
+                evaluation_kwargs = self._create_standalone_evaluation_kwargs(
+                    experiment_kwargs, evaluation_experiment_name
+                )
+
+                self.tracker.set_experiment(**evaluation_kwargs)
+                logger.info(
+                    "Creating standalone evaluation experiment: %s",
+                    evaluation_experiment_name,
+                )
 
         # Evaluate on test set
         test_metrics = self.evaluate_on_test_set(
@@ -379,7 +501,21 @@ class TestSetEvaluationOrchestrator:
             model_name=best_model_name,
         )
 
-        # Log test metrics
+        # Log test metrics with evaluation experiment context
+        try:
+            evaluation_exp_name = (
+                self.tracker.experiment.get_name()
+                if hasattr(self.tracker, "experiment")
+                else "unknown"
+            )
+        except AttributeError:
+            evaluation_exp_name = "unknown"
+        logger.info(
+            "Evaluated %s on test set in experiment: %s. Test metrics: %s",
+            best_model_name,
+            evaluation_exp_name,
+            test_metrics,
+        )
         self.tracker.log_metrics(test_metrics)
 
         # Check deployment threshold
@@ -394,14 +530,29 @@ class TestSetEvaluationOrchestrator:
             )
 
         test_score = float(test_score)
+        try:
+            evaluation_exp_name = (
+                self.tracker.experiment.get_name()
+                if hasattr(self.tracker, "experiment")
+                else "unknown"
+            )
+        except AttributeError:
+            evaluation_exp_name = "unknown"
         if test_score < deployment_threshold:
+            logger.error(
+                "Deployment check failed in experiment %s: Best model score (%.4f) is below threshold (%.4f). Model not deployed.",
+                evaluation_exp_name,
+                test_score,
+                deployment_threshold,
+            )
             raise ValueError(
                 f"Best model score ({test_score:.4f}) is below deployment "
                 f"threshold ({deployment_threshold:.4f}). Model not deployed."
             )
 
         logger.info(
-            "Test score (%s: %.4f) meets deployment threshold (%.4f)",
+            "Deployment check passed in experiment %s: Test score (%s: %.4f) meets threshold (%.4f)",
+            evaluation_exp_name,
             comparison_metric_name,
             test_score,
             deployment_threshold,

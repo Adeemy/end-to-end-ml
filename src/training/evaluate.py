@@ -27,6 +27,7 @@ from src.training.evaluation.champion import ModelChampionManager
 from src.training.evaluation.orchestrator import create_evaluation_orchestrator
 from src.training.evaluation.selector import ModelSelector
 from src.training.schemas import Config, build_training_config
+from src.training.tracking.experiment import get_tracker_credentials
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
@@ -122,6 +123,28 @@ def main(
 
     # Run evaluation workflow
     deployment_threshold = float(training_config.train_params.deployment_score_thresh)
+    max_eval_experiments = int(training_config.train_params.max_eval_experiments)
+
+    # Setup experiment kwargs for evaluation tracking
+    experiment_tracker_type = training_config.train_params.experiment_tracker
+    experiment_kwargs = {
+        "experiment_tracker_type": experiment_tracker_type,
+        "project_name": training_config.train_params.project_name,
+        "workspace_name": training_config.train_params.workspace_name,
+    }
+
+    # Add tracker-specific credentials using the credential provider
+    try:
+        credentials = get_tracker_credentials(experiment_tracker_type)
+        experiment_kwargs.update(credentials)
+    except ValueError as e:
+        logger.error(
+            "Could not get credentials for tracker %s. Error -> %s",
+            experiment_tracker_type,
+            e,
+        )
+        raise
+
     champion_name, test_metrics = test_evaluator.run_evaluation_workflow(
         model_selector=model_selector,
         valid_features=valid_features,
@@ -131,6 +154,8 @@ def main(
         deployment_threshold=deployment_threshold,
         cv_folds=training_config.train_params.cross_val_folds,
         experiment_keys=experiment_keys,
+        max_eval_experiments=max_eval_experiments,
+        **experiment_kwargs,
     )
 
     logger.info("Champion model %s deployed successfully", champion_name)
