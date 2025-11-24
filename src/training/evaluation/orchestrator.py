@@ -16,6 +16,10 @@ from sklearn.pipeline import Pipeline
 from src.training.evaluation.champion import ModelChampionManager
 from src.training.evaluation.evaluator import create_model_evaluator
 from src.training.evaluation.selector import ModelSelector
+from src.training.tracking.experiment import (
+    get_tracker_base_config,
+    get_tracker_credentials,
+)
 from src.training.tracking.experiment_tracker import (
     CometExperimentTracker,
     ExperimentTracker,
@@ -73,12 +77,15 @@ class TrackerRegistry:
         return factory_func(**kwargs)
 
 
-def _create_comet_tracker(experiment_instance=None) -> CometExperimentTracker:
+def _create_comet_tracker(
+    experiment_instance=None, **kwargs  # pylint: disable=unused-argument
+) -> CometExperimentTracker:
     """Factory function for creating Comet tracker. If no experiment instance is provided,
     a dummy disabled experiment is created.
 
     Args:
         experiment_instance: Pre-initialized Comet experiment instance (optional).
+        **kwargs: Additional arguments (ignored for compatibility).
 
     Returns:
         CometExperimentTracker instance.
@@ -93,12 +100,15 @@ def _create_comet_tracker(experiment_instance=None) -> CometExperimentTracker:
         return CometExperimentTracker(experiment=dummy_experiment)
 
 
-def _create_mlflow_tracker(run_id=None) -> MLflowExperimentTracker:
+def _create_mlflow_tracker(
+    run_id=None, **kwargs  # pylint: disable=unused-argument
+) -> MLflowExperimentTracker:
     """Factory function for creating MLflow tracker. If no run_id is provided,
     a new run will be started.
 
     Args:
         run_id: Optional MLflow run ID.
+        **kwargs: Additional arguments (ignored for compatibility).
 
     Returns:
         MLflowExperimentTracker instance.
@@ -295,6 +305,53 @@ class TestSetEvaluationOrchestrator:
 
         logger.info("Saved champion model to: %s", champion_model_path)
 
+    def _create_standalone_evaluation_kwargs(
+        self, experiment_kwargs: dict, experiment_name: str
+    ) -> dict:
+        """Create tracker-agnostic kwargs for standalone evaluation experiments.
+
+        Args:
+            experiment_kwargs: Original experiment configuration.
+            experiment_name: Name for the evaluation experiment.
+
+        Returns:
+            Dictionary of experiment kwargs for the specific tracker.
+        """
+        tracker_type = experiment_kwargs.get("experiment_tracker_type", "comet")
+
+        # Start with base configuration
+        kwargs = {
+            "experiment_name": experiment_name,
+        }
+
+        # Add tracker-specific base configuration using registry
+        try:
+            base_config = get_tracker_base_config(tracker_type, experiment_kwargs)
+            kwargs.update(base_config)
+        except ValueError:
+            logger.warning(
+                "Unknown tracker type: %s, using generic fallback", tracker_type
+            )
+            # Generic fallback - include non-tracker-type keys
+            kwargs.update(
+                {
+                    k: v
+                    for k, v in experiment_kwargs.items()
+                    if k not in ["experiment_tracker_type"]
+                }
+            )
+
+        # Add credentials using the credential provider
+        try:
+            credentials = get_tracker_credentials(tracker_type)
+            kwargs.update(credentials)
+        except ValueError:
+            logger.warning(
+                "Could not get credentials for tracker type: %s", tracker_type
+            )
+
+        return kwargs
+
     def run_evaluation_workflow(
         self,
         model_selector: ModelSelector,
@@ -367,11 +424,50 @@ class TestSetEvaluationOrchestrator:
             logger.warning("No model pipeline available for evaluation")
             return best_model_name, {}
 
-        # Initialize experiment with backend-specific kwargs
-        # For Comet: experiment_kwargs should contain api_key and experiment_key
-        # For MLflow: experiment_kwargs might contain run_id, etc.
+        # Handle experiment creation based on tracker type and available experiment ID
         if hasattr(self.tracker, "set_experiment"):
-            self.tracker.set_experiment(**experiment_kwargs)
+            tracker_type = experiment_kwargs.get("experiment_tracker_type", "comet")
+
+            # Check if we're running from training pipeline (with experiment_keys) or standalone
+            if experiment_keys is not None and best_experiment_key:
+                # Running from training pipeline - create child/linked experiment
+                evaluation_kwargs = {
+                    "is_child_experiment": True,
+                }
+
+                # Add tracker-specific parent/child linking
+                if tracker_type == "comet":
+                    evaluation_kwargs["experiment_key"] = best_experiment_key
+                elif tracker_type == "mlflow":
+                    evaluation_kwargs["parent_run_id"] = best_experiment_key
+                # Additional trackers can be added here without modifying existing code
+
+                # Add credentials using the credential provider
+                try:
+                    credentials = get_tracker_credentials(tracker_type)
+                    evaluation_kwargs.update(credentials)
+                except ValueError:
+                    logger.warning(
+                        "Could not get credentials for tracker type: %s", tracker_type
+                    )
+
+                self.tracker.set_experiment(**evaluation_kwargs)
+                logger.info(
+                    "Creating child/linked evaluation experiment for: %s",
+                    best_model_name,
+                )
+            else:
+                # Running standalone - create independent evaluation experiment
+                evaluation_experiment_name = f"eval_{best_model_name.replace('-', '_')}"
+                evaluation_kwargs = self._create_standalone_evaluation_kwargs(
+                    experiment_kwargs, evaluation_experiment_name
+                )
+
+                self.tracker.set_experiment(**evaluation_kwargs)
+                logger.info(
+                    "Creating standalone evaluation experiment: %s",
+                    evaluation_experiment_name,
+                )
 
         # Evaluate on test set
         test_metrics = self.evaluate_on_test_set(

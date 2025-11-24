@@ -22,12 +22,10 @@ Data Prep Flow:
 
 import argparse
 import logging
-import os
 from datetime import datetime
 from pathlib import PosixPath
 from typing import List, Tuple
 
-import comet_ml
 import pandas as pd
 from dotenv import load_dotenv
 from lightgbm import LGBMClassifier
@@ -45,7 +43,12 @@ from src.feature.utils.data import TrainingDataPrep
 from src.training.core.ensemble import ClassifierEnsembleOrchestrator
 from src.training.core.trainer import TrainingOrchestrator
 from src.training.schemas import Config, build_training_config
-from src.training.tracking.experiment import CometExperimentManager
+from src.training.tracking.experiment import (
+    create_experiment_manager,
+    get_tracker_credentials,
+    initialize_tracker_project,
+    should_initialize_tracker_project,
+)
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
@@ -189,7 +192,6 @@ def prepare_data(
 
 def main(
     config_yaml_path: str,
-    api_key: str,
     data_dir: PosixPath,
     artifacts_dir: PosixPath,
     logger: logging.Logger,
@@ -201,7 +203,6 @@ def main(
 
     Args:
         config_yaml_path: Path to config yaml file.
-        api_key: Comet API key.
         data_dir: Path to data directory.
         artifacts_dir: Path to artifacts directory.
         logger: Logger object.
@@ -225,7 +226,8 @@ def main(
         config_path=config_yaml_path,
     )
 
-    initiate_comet_project = bool(config.params["train"]["initiate_comet_project"])
+    # Get tracker configuration from training config
+    tracker_type = training_config.train_params.experiment_tracker
     project_name = config.params["train"]["project_name"]
     workspace_name = config.params["train"]["workspace_name"]
     class_column_name = config.params["data"]["class_col_name"]
@@ -332,17 +334,30 @@ def main(
         index=False,
     )
 
-    # Initiate a comet project if needed
-    if initiate_comet_project:
-        comet_ml.init(
-            project_name=project_name,
-            workspace=workspace_name,
-            api_key=api_key,
-        )
+    # Get tracker credentials and initialize project if needed
+    try:
+        credentials = get_tracker_credentials(tracker_type)
+
+        # Check if project initialization is needed for this tracker
+        if should_initialize_tracker_project(tracker_type, config.params["train"]):
+            initialize_tracker_project(
+                tracker_type=tracker_type,
+                project_name=project_name,
+                workspace_name=workspace_name,
+                credentials=credentials,
+            )
+            logger.info("Initialized %s project: %s", tracker_type, project_name)
+
+        # Extract API key for backward compatibility with existing code
+        api_key = credentials.get("api_key")
+    except ValueError as e:
+        logger.warning("Could not get %s credentials: %s", tracker_type, e)
+        api_key = None
 
     # Initialize training class
+    experiment_manager = create_experiment_manager(tracker_type)
     model_trainer = TrainingOrchestrator(
-        experiment_manager=CometExperimentManager(),
+        experiment_manager=experiment_manager,
         train_features=train_features,
         train_class=train_class,
         valid_features=valid_features,
@@ -367,7 +382,7 @@ def main(
         lr_calibrated_pipeline, lr_experiment = model_trainer.run_training_experiment(
             api_key=api_key,
             project_name=project_name,
-            experiment_name=f"logistic_regression_{datetime.now()}",
+            experiment_name=f"train_logistic_regression_{datetime.now()}",
             model=LogisticRegression(**lr_params),
             search_space_params=lr_search_space_params,
             max_search_iters=search_max_iters,
@@ -386,7 +401,7 @@ def main(
         rf_calibrated_pipeline, rf_experiment = model_trainer.run_training_experiment(
             api_key=api_key,
             project_name=project_name,
-            experiment_name=f"random_forest_{datetime.now()}",
+            experiment_name=f"train_random_forest_{datetime.now()}",
             model=RandomForestClassifier(
                 **rf_params,
             ),
@@ -408,7 +423,7 @@ def main(
             model_trainer.run_training_experiment(
                 api_key=api_key,
                 project_name=project_name,
-                experiment_name=f"lightgbm_{datetime.now()}",
+                experiment_name=f"train_lightgbm_{datetime.now()}",
                 model=LGBMClassifier(
                     **lgbm_params,
                 ),
@@ -430,7 +445,7 @@ def main(
         xgb_calibrated_pipeline, xgb_experiment = model_trainer.run_training_experiment(
             api_key=api_key,
             project_name=project_name,
-            experiment_name=f"xgboost_{datetime.now()}",
+            experiment_name=f"train_xgboost_{datetime.now()}",
             model=XGBClassifier(
                 scale_pos_weight=sum(train_class == 0) / sum(train_class == 1),
                 **xgb_params,
@@ -460,7 +475,7 @@ def main(
             if p is not None
         ]
         ve_orchestrator = ClassifierEnsembleOrchestrator(
-            experiment_manager=CometExperimentManager(),
+            experiment_manager=create_experiment_manager(tracker_type),
             train_features=train_features,
             valid_features=valid_features,
             train_class=train_class,
@@ -476,7 +491,7 @@ def main(
         _, ve_experiment = ve_orchestrator.create_voting_ensemble(
             api_key=api_key,
             project_name=project_name,
-            experiment_name=f"voting_ensemble_{datetime.now()}",
+            experiment_name=f"train_voting_ensemble_{datetime.now()}",
             registered_model_name=ve_registered_model_name,
         )
 
@@ -559,7 +574,6 @@ if __name__ == "__main__":
 
     experiment_keys = main(
         config_yaml_path=args.config_yaml_path,
-        api_key=os.environ["COMET_API_KEY"],
         data_dir=DATA_DIR,
         artifacts_dir=ARTIFACTS_DIR,
         logger=console_logger,

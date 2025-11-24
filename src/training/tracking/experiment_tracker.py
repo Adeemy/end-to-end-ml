@@ -158,20 +158,54 @@ class CometExperimentTracker(ExperimentTracker):
         """Set experiment for Comet tracking.
 
         Args:
-            **kwargs: Should contain 'api_key' and 'experiment_key' for existing experiment
-                     or other Comet experiment parameters.
+            **kwargs: Can contain:
+                     - 'api_key' + 'experiment_key' for existing experiment
+                     - 'api_key' + 'experiment_name' for new experiment
+                     - 'is_child_experiment': True to create child experiment
         """
 
         if "experiment_key" in kwargs and "api_key" in kwargs:
-            # Use existing experiment
-            self.experiment = ExistingExperiment(
-                api_key=kwargs["api_key"], experiment_key=kwargs["experiment_key"]
-            )
+            if kwargs.get("is_child_experiment", False):
+                # Create a child experiment under the parent
+                try:
+                    parent_exp = ExistingExperiment(
+                        api_key=kwargs["api_key"],
+                        experiment_key=kwargs["experiment_key"],
+                    )
+
+                    self.experiment = Experiment(
+                        api_key=kwargs["api_key"],
+                        experiment_name=f"eval_{parent_exp.get_name() or 'model'}",
+                        project_name=parent_exp.get_project_name(),
+                        workspace=parent_exp.get_workspace(),
+                    )
+
+                    # Log parent relationship
+                    self.experiment.log_parameter(
+                        "parent_experiment_key", kwargs["experiment_key"]
+                    )
+                    self.experiment.log_parameter("evaluation_type", "test_evaluation")
+
+                except Exception:  # pylint: disable=broad-except
+                    # Fallback to existing experiment
+                    self.experiment = ExistingExperiment(
+                        api_key=kwargs["api_key"],
+                        experiment_key=kwargs["experiment_key"],
+                    )
+            else:
+                # Use existing experiment
+                self.experiment = ExistingExperiment(
+                    api_key=kwargs["api_key"], experiment_key=kwargs["experiment_key"]
+                )
         elif "api_key" in kwargs:
             # Create new experiment
             self.experiment = Experiment(
                 api_key=kwargs["api_key"],
-                **{k: v for k, v in kwargs.items() if k != "api_key"},
+                **{
+                    k: v
+                    for k, v in kwargs.items()
+                    if k not in ["api_key", "is_child_experiment"]
+                },
             )
         # If no api_key provided, assume experiment is already set
 
