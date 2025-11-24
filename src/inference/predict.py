@@ -5,7 +5,6 @@ production data via API calls.
 
 import argparse
 import logging
-import logging.config
 import os
 
 from dotenv import load_dotenv

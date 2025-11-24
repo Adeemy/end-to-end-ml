@@ -78,7 +78,7 @@ preprocessing:
 
 train:
   initiate_comet_project: False # Should be True if new Comet project should be created
-  experiment_tracker: "comet" # Type of experiment tracker to use ("comet" or "mlflow")
+  experiment_tracker: "comet" # Type of experiment tracker to use (e.g., "comet", "mlflow")
   project_name: "end-to-end-ml"
   workspace_name: "6bmod5d8"
   search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization

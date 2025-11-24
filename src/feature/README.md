@@ -1,3 +1,90 @@
+# Feature Store Module
+
+This module handles data ingestion, preprocessing, and feature engineering for the ML pipeline.
+
+## Overview
+
+The feature store module is responsible for:
+- Loading and preprocessing raw data
+- Creating train/validation/test splits
+- Feature engineering and transformations
+- Data validation and quality checks
+- Storing processed features for training and inference
+
+## Workflow
+
+### 1. Initial Data Generation
+```bash
+python src/feature_store/generate_initial_data.py
+```
+
+**Purpose**: Creates the initial dataset for the ML pipeline.
+- Downloads or generates raw data
+- Performs basic data validation
+- Saves raw data to the feature store
+
+### 2. Data Preprocessing and Splitting
+```bash
+python src/training/split_data.py
+```
+
+**Purpose**: Prepares data for training by creating proper splits.
+- Loads raw data from feature store
+- Applies initial preprocessing (cleaning, type conversion)
+- Creates stratified train/validation/test splits
+- Saves splits as parquet files in `DATA_DIR`
+
+**Output Files**:
+- `train_set.parquet` - Training data (70%)
+- `valid_set.parquet` - Validation data (15%)
+- `test_set.parquet` - Test data (15%)
+
+### 3. Feature Engineering Pipeline
+The feature engineering happens during training via `TrainingDataPrep` class:
+
+```python
+from src.feature_store.utils.data import TrainingDataPrep
+
+data_prep = TrainingDataPrep(...)
+pipeline = data_prep.create_data_transformation_pipeline(...)
+```
+
+**Features**:
+- Numerical feature scaling (StandardScaler, RobustScaler, MinMaxScaler)
+- Categorical feature encoding (OneHotEncoder)
+- Missing value imputation
+- Feature selection (VarianceThreshold)
+
+## Directory Structure
+
+```
+feature_store/
+├── README.md                 # This file
+├── generate_initial_data.py  # Initial data generation
+├── prep_data.py             # Data preprocessing utilities
+├── feature_repo/            # Feast feature store configuration
+│   ├── feature_store.yaml   # Feast configuration
+│   ├── define_feature.py    # Feature definitions
+│   └── data/               # Raw data storage
+└── utils/                   # Utility modules
+    ├── __init__.py
+    ├── config.py           # Feature store configuration
+    ├── data.py             # Main data preprocessing classes
+    └── prep.py             # Data preparation utilities
+```
+
+## Key Classes
+
+### `TrainingDataPrep` (utils/data.py)
+Main class for data preprocessing and feature engineering.
+
+**Key Methods**:
+- `load_data()` - Load data splits from parquet files
+- `create_data_transformation_pipeline()` - Create sklearn pipeline for feature engineering
+- `get_feature_names()` - Get processed feature names after transformation
+
+---
+
 ## Using Feast for Feature Store
 
 Feature store is a centralized place to store and serve features for machine learning. [Feast](https://feast.dev/), an open source feature store for machine learning, is used in this project to manage and serve features consistently across offline training and online inference environments.

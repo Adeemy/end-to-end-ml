@@ -1,6 +1,6 @@
 """
 Test functions for the DataPreprocessor class in the
-src/feature_store/utils/prep.py file.
+src/feature/utils/prep.py file.
 """
 
 import re
@@ -10,7 +10,7 @@ import pandas as pd
 import pandas.api.types as ptypes
 import pytest
 
-from src.feature_store.utils.prep import DataPreprocessor
+from src.feature.utils.prep import DataPreprocessor
 
 
 #################################

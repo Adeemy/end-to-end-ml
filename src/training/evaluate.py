@@ -111,23 +111,24 @@ def main(
             f"f_{training_config.train_params.fbeta_score_beta_val}_score"
         )
 
-    else:
-        comparison_metric = "validation_score"
+    # Add valid_ prefix to ensure the model selection is based on validation set
+    valid_comparison_metric = f"valid_{comparison_metric}"
 
     model_selector = ModelSelector(
         project_name=training_config.train_params.project_name,
         workspace_name=training_config.train_params.workspace_name,
-        comparison_metric=comparison_metric,
+        comparison_metric=valid_comparison_metric,
     )
 
     # Run evaluation workflow
+    deployment_threshold = float(training_config.train_params.deployment_score_thresh)
     champion_name, test_metrics = test_evaluator.run_evaluation_workflow(
         model_selector=model_selector,
         valid_features=valid_features,
         valid_class=valid_class,
         champion_manager=champion_manager,
         comparison_metric_name=comparison_metric,
-        deployment_threshold=training_config.train_params.deployment_score_thresh,
+        deployment_threshold=deployment_threshold,
         cv_folds=training_config.train_params.cross_val_folds,
         experiment_keys=experiment_keys,
     )

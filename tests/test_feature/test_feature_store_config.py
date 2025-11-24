@@ -1,11 +1,11 @@
 """
 Test functions for the Config class in the feature store
-module src/feature_store/utils/config.py.
+module src/feature/utils/config.py.
 """
 
 import pytest
 
-from src.feature_store.utils.config import Config
+from src.feature.utils.config import Config
 from src.utils.path import PARENT_DIR
 
 

@@ -36,34 +36,34 @@ debug:
 
 # Exclude W0511 (fixme) and E1120 (no value for argument in function call) in .pylintrc file
 lint:
-	pylint ./src/feature_store ./src/training ./src/inference ./tests ./notebooks
+	pylint ./src/feature ./src/training ./src/inference ./tests ./notebooks
 
 all: install isort format test lint
 
 
 # Import raw dataset from source
 get_init_data:
-	python ./src/feature_store/generate_initial_data.py --config_yaml_path ./src/config/feature-store-config.yml --logger_path ./src/config/logging.conf
+	python ./src/feature/generate_initial_data.py --config_yaml_path ./src/config/feature-store-config.yml --logger_path ./src/config/logging.conf
 
 # Preprocess and transform data before ingestion by feature store
 prep_data:
-	python ./src/feature_store/prep_data.py --config_yaml_path ./src/config/feature-store-config.yml --logger_path ./src/config/logging.conf
+	python ./src/feature/prep_data.py --config_yaml_path ./src/config/feature-store-config.yml --logger_path ./src/config/logging.conf
 
 # Setup feature store, view entities and feature views
 teardown_feast:
-	cd ./src/feature_store/feature_repo && feast teardown
+	cd ./src/feature/feature_repo && feast teardown
 
 init_feast:
-	cd ./src/feature_store/feature_repo && feast apply
+	cd ./src/feature/feature_repo && feast apply
 
 show_feast_entities:
-	cd ./src/feature_store/feature_repo && feast entities list
+	cd ./src/feature/feature_repo && feast entities list
 
 show_feast_views:
-	cd ./src/feature_store/feature_repo && feast feature-views list
+	cd ./src/feature/feature_repo && feast feature-views list
 
 show_feast_ui:
-	cd ./src/feature_store/feature_repo && feast ui
+	cd ./src/feature/feature_repo && feast ui
 
 setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 

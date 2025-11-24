@@ -10,14 +10,14 @@ from typing import Tuple
 
 import pandas as pd
 
-from src.feature_store.utils.config import (
+from src.feature.utils.config import (
     Config,
     DataConfig,
     FeatureMappingsConfig,
     FilesConfig,
     build_feature_store_config,
 )
-from src.feature_store.utils.prep import DataPreprocessor, DataTransformer
+from src.feature.utils.prep import DataPreprocessor, DataTransformer
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR

@@ -259,7 +259,27 @@ class ModelEvaluator(ABC):
             metrics_values (dict): dictionary of metric names and values.
         """
 
-        metrics_values = dict(scores.set_index("Metric").iloc[:, 0])
+        # More robust conversion - handle different DataFrame structures
+        if "Metric" not in scores.columns:
+            raise ValueError(
+                f"DataFrame must have 'Metric' column. Found columns: {scores.columns.tolist()}"
+            )
+
+        if scores.shape[1] < 2:
+            raise ValueError(
+                f"DataFrame must have at least 2 columns. Found shape: {scores.shape}"
+            )
+
+        # Set Metric as index and get the first value column
+        indexed_scores = scores.set_index("Metric")
+
+        # Use the first column after setting index (should be Score column)
+        if indexed_scores.shape[1] == 1:
+            # Single column case - get as Series
+            metrics_values = indexed_scores.squeeze().to_dict()
+        else:
+            # Multiple columns case - take first column
+            metrics_values = indexed_scores.iloc[:, 0].to_dict()
 
         # Add prefix to metric names to distinguish train scores from valid scores
         if prefix is not None:
@@ -300,6 +320,27 @@ class ModelEvaluator(ABC):
         """
 
         raise NotImplementedError
+
+    def _safe_extract_pos_probs(
+        self, pred_probs: np.ndarray, pos_class_index: int
+    ) -> np.ndarray:
+        """Safely extract positive class probabilities from predict_proba output.
+
+        Args:
+            pred_probs (np.ndarray): predicted probabilities from predict_proba.
+            pos_class_index (int): index of positive class.
+
+        Returns:
+            np.ndarray: probabilities for positive class.
+        """
+        if pred_probs.ndim == 1:
+            # 1D array case (binary classification edge case)
+            return pred_probs
+        elif pred_probs.ndim == 2:
+            # 2D array case (normal case)
+            return pred_probs[:, pos_class_index]
+        else:
+            raise ValueError(f"Unexpected predict_proba shape: {pred_probs.shape}")
 
     def _get_original_class_labels(
         self,
@@ -629,9 +670,11 @@ class BinaryClassificationEvaluator(ModelEvaluator):
             pred_class (np.ndarray): predicted class labels.
         """
 
-        pred_class = np.where(
-            pred_probs[:, self.encoded_pos_class_label] > threshold, 1, 0
+        # Use helper method to safely extract positive class probabilities
+        pos_probs = self._safe_extract_pos_probs(
+            pred_probs, self.encoded_pos_class_label
         )
+        pred_class = np.where(pos_probs > threshold, 1, 0)
 
         return pred_class
 
@@ -643,9 +686,12 @@ class BinaryClassificationEvaluator(ModelEvaluator):
             of the best model on the validation set.
         """
 
+        pos_probs = self._safe_extract_pos_probs(
+            pred_probs, self.encoded_pos_class_label
+        )
         calib_curve = CalibrationDisplay.from_predictions(
             self.valid_class,
-            pred_probs[:, self.encoded_pos_class_label],
+            pos_probs,
             n_bins=10,
         )
         self.tracker.log_figure(
@@ -662,9 +708,10 @@ class BinaryClassificationEvaluator(ModelEvaluator):
             encoded_pos_class_label (int): encoded positive class label.
         """
 
+        pos_probs = self._safe_extract_pos_probs(pred_probs, encoded_pos_class_label)
         roc_curve_fig = self.visualizer.plot_roc_curve(
             y_true=self.valid_class,
-            y_pred=pred_probs[:, encoded_pos_class_label],
+            y_pred=pos_probs,
             fig_size=(6, 6),
         )
         self.tracker.log_figure(
@@ -681,9 +728,10 @@ class BinaryClassificationEvaluator(ModelEvaluator):
             encoded_pos_class_label (int): encoded positive class label.
         """
 
+        pos_probs = self._safe_extract_pos_probs(pred_probs, encoded_pos_class_label)
         prec_recall_fig = self.visualizer.plot_precision_recall_curve(
             y_true=self.valid_class,
-            y_pred=pred_probs[:, encoded_pos_class_label],
+            y_pred=pos_probs,
             fig_size=(6, 6),
         )
         self.tracker.log_figure(
@@ -700,9 +748,12 @@ class BinaryClassificationEvaluator(ModelEvaluator):
             valid_class (np.ndarray): validation class labels.
         """
 
+        pos_probs = self._safe_extract_pos_probs(
+            pred_probs, self.encoded_pos_class_label
+        )
         cum_gain_fig = self.visualizer.plot_cumulative_gains(
             y_true=valid_class,
-            y_pred=pred_probs[:, self.encoded_pos_class_label],
+            y_pred=pos_probs,
             fig_size=(6, 6),
         )
         self.tracker.log_figure(
@@ -717,9 +768,12 @@ class BinaryClassificationEvaluator(ModelEvaluator):
             valid_class (np.ndarray): validation class labels.
         """
 
+        pos_probs = self._safe_extract_pos_probs(
+            pred_probs, self.encoded_pos_class_label
+        )
         lift_curve_fig = self.visualizer.plot_lift_curve(
             y_true=valid_class,
-            y_pred=pred_probs[:, self.encoded_pos_class_label],
+            y_pred=pos_probs,
             fig_size=(6, 6),
         )
         self.tracker.log_figure(
@@ -753,7 +807,9 @@ class BinaryClassificationEvaluator(ModelEvaluator):
         bin_uppers = bin_boundaries[1:]
 
         # Keep predicted "probabilities" as is for binary classifier
-        _confidences = pred_probs[:, self.encoded_pos_class_label]
+        _confidences = self._safe_extract_pos_probs(
+            pred_probs, self.encoded_pos_class_label
+        )
 
         # Get binary predictions from confidences
         pred_label = (_confidences > decision_thresh_val).astype(float)

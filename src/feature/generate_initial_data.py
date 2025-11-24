@@ -16,15 +16,14 @@ from pathlib import PosixPath
 from typing import Tuple
 
 import pandas as pd
-from ucimlrepo import fetch_ucirepo
 
-from src.feature_store.utils.config import (
+from src.feature.utils.config import (
     Config,
     DataConfig,
     FilesConfig,
     build_feature_store_config,
 )
-from src.feature_store.utils.prep import (
+from src.feature.utils.prep import (
     DataSplitter,
     RandomSplitStrategy,
     TimeBasedSplitStrategy,
@@ -34,25 +33,18 @@ from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR
 
 
-def import_data(data_config: DataConfig) -> pd.DataFrame:
-    """Import data from UCI repository.
+def import_data(data_config: DataConfig, files_config: FilesConfig) -> pd.DataFrame:
+    """Import data from existing parquet file.
 
     Args:
         data_config: Data configuration parameters.
+        files_config: Files configuration parameters.
 
     Returns:
         pd.DataFrame: Raw dataset.
     """
-    raw_data = fetch_ucirepo(id=data_config.uci_raw_data_num)
-
-    # Extract features, ids, and targets
-    raw_dataset = raw_data.data.features.copy()
-    raw_dataset[data_config.pk_col_name] = raw_data.data.ids.loc[
-        :, [data_config.pk_col_name]
-    ]
-    raw_dataset[data_config.class_col_name] = raw_data.data.targets.loc[
-        :, [data_config.class_col_name]
-    ]
+    # Read from existing parquet file
+    raw_dataset = pd.read_parquet(DATA_DIR / files_config.raw_dataset_file_name)
 
     # Select required columns
     required_columns = (
@@ -169,8 +161,8 @@ def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> 
         config_path=config_yaml_path,
     )
 
-    raw_dataset = import_data(config.data)
-    logger.info("Raw dataset imported from UCI repository.")
+    raw_dataset = import_data(config.data, config.files)
+    logger.info("Raw dataset imported from existing parquet file.")
 
     raw_dataset, inference_set = split_data(raw_dataset, config.data)
     logger.info("Raw dataset was split into training and inference sets.")
