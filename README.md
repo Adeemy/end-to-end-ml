@@ -45,7 +45,6 @@ Below is the repo structure.
         ├── LICENSE
         ├── Makefile
         ├── README.md
-        ├── __init__.py
         ├── dist
         │   ├── end_to_end_ml-0.1.0-py3-none-any.whl
         │   └── end_to_end_ml-0.1.0.tar.gz
@@ -62,7 +61,6 @@ Below is the repo structure.
         ├── src
         │   ├── __init__.py
         │   ├── config
-        │   │   ├── __init__.py
         │   │   ├── feature-store-config.yml
         │   │   ├── logging.conf
         │   │   └── training-config.yml
@@ -74,6 +72,7 @@ Below is the repo structure.
         │   │   └── top_level.txt
         │   ├── feature
         │   │   ├── README.md
+        │   │   ├── __init__.py
         │   │   ├── feature_repo
         │   │   │   ├── data
         │   │   │   │   ├── historical_data.parquet
@@ -90,14 +89,15 @@ Below is the repo structure.
         │   │   │   └── feature_store.yaml
         │   │   ├── generate_initial_data.py
         │   │   ├── prep_data.py
+        │   │   ├── schemas.py
         │   │   └── utils
         │   │       ├── __init__.py
-        │   │       ├── config.py
         │   │       ├── data.py
         │   │       └── prep.py
         │   ├── inference
         │   │   ├── Dockerfile
         │   │   ├── README.md
+        │   │   ├── __init__.py
         │   │   ├── main.py
         │   │   ├── predict.py
         │   │   └── utils
@@ -105,30 +105,31 @@ Below is the repo structure.
         │   │       └── model.py
         │   ├── training
         │   │   ├── README.md
+        │   │   ├── __init__.py
         │   │   ├── artifacts
-        │   │   │   ├── lightgbm.pkl
+        │   │   │   ├── champion_model.pkl
         │   │   │   └── study_LGBMClassifier.csv
+        │   │   ├── core
+        │   │   │   ├── __init__.py
+        │   │   │   ├── ensemble.py
+        │   │   │   ├── optimizer.py
+        │   │   │   └── trainer.py
         │   │   ├── evaluate.py
+        │   │   ├── evaluation
+        │   │   │   ├── __init__.py
+        │   │   │   ├── champion.py
+        │   │   │   ├── evaluator.py
+        │   │   │   ├── orchestrator.py
+        │   │   │   ├── selector.py
+        │   │   │   └── visualizer.py
+        │   │   ├── schemas.py
         │   │   ├── split_data.py
-        │   │   ├── train.py
-        │   │   └── utils
-        │   │       ├── __init__.py
-        │   │       ├── config
-        │   │       │   └── config.py
-        │   │       ├── core
-        │   │       │   ├── ensemble.py
-        │   │       │   ├── optimizer.py
-        │   │       │   └── trainer.py
-        │   │       ├── evaluation
-        │   │       │   ├── champion.py
-        │   │       │   ├── evaluator.py
-        │   │       │   ├── orchestrator.py
-        │   │       │   ├── selector.py
-        │   │       │   └── visualizer.py
-        │   │       └── tracking
-        │   │           ├── experiment.py
-        │   │           ├── experiment_tracker.py
-        │   │           └── study_logger.py
+        │   │   ├── tracking
+        │   │   │   ├── __init__.py
+        │   │   │   ├── experiment.py
+        │   │   │   ├── experiment_tracker.py
+        │   │   │   └── study_logger.py
+        │   │   └── train.py
         │   └── utils
         │       ├── README.md
         │       ├── __init__.py
