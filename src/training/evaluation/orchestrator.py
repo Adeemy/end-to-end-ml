@@ -3,6 +3,7 @@ Test set evaluation orchestration - evaluates models on held-out test data.
 """
 
 import os
+from datetime import datetime
 from pathlib import PosixPath
 from typing import Any, Callable, Optional
 
@@ -295,7 +296,19 @@ class TestSetEvaluationOrchestrator:
             pipeline=calibrated_pipeline,
         )
 
-        logger.info("Registered champion model: %s", model_name)
+        try:
+            evaluation_exp_name = (
+                self.tracker.experiment.get_name()
+                if hasattr(self.tracker, "experiment")
+                else "unknown"
+            )
+        except AttributeError:
+            evaluation_exp_name = "unknown"
+        logger.info(
+            "Registered champion model: %s in evaluation experiment: %s",
+            model_name,
+            evaluation_exp_name,
+        )
 
         # Save champion model locally
         champion_model_path = (
@@ -362,6 +375,7 @@ class TestSetEvaluationOrchestrator:
         deployment_threshold: float,
         cv_folds: int = 5,
         experiment_keys: Optional[pd.DataFrame] = None,
+        max_eval_experiments: int = 50,
         **experiment_kwargs,
     ) -> tuple[str, dict]:
         """Runs complete evaluation workflow: select, evaluate, calibrate, register.
@@ -376,6 +390,7 @@ class TestSetEvaluationOrchestrator:
             cv_folds: Number of CV folds for calibration.
             experiment_keys: Optional DataFrame with model names and experiment keys.
                            If None, ModelSelector will query Comet ML directly.
+            max_eval_experiments: Maximum number of recent experiments to consider.
             **experiment_kwargs: Additional arguments for experiment setup (e.g., api_key, experiment_key).
 
         Returns:
@@ -386,7 +401,7 @@ class TestSetEvaluationOrchestrator:
         """
         # Select best model
         best_model_name, best_experiment_key = model_selector.select_best_model(
-            experiment_keys=experiment_keys
+            experiment_keys=experiment_keys, max_experiments=max_eval_experiments
         )
 
         # Try to load model locally, if not found download from Comet ML
@@ -453,12 +468,16 @@ class TestSetEvaluationOrchestrator:
 
                 self.tracker.set_experiment(**evaluation_kwargs)
                 logger.info(
-                    "Creating child/linked evaluation experiment for: %s",
+                    "Creating child/linked evaluation experiment for model: %s (parent: %s)",
                     best_model_name,
+                    best_experiment_key,
                 )
             else:
                 # Running standalone - create independent evaluation experiment
-                evaluation_experiment_name = f"eval_{best_model_name.replace('-', '_')}"
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                evaluation_experiment_name = (
+                    f"eval_{best_model_name.replace('-', '_')}_{timestamp}"
+                )
                 evaluation_kwargs = self._create_standalone_evaluation_kwargs(
                     experiment_kwargs, evaluation_experiment_name
                 )
@@ -475,7 +494,21 @@ class TestSetEvaluationOrchestrator:
             model_name=best_model_name,
         )
 
-        # Log test metrics
+        # Log test metrics with evaluation experiment context
+        try:
+            evaluation_exp_name = (
+                self.tracker.experiment.get_name()
+                if hasattr(self.tracker, "experiment")
+                else "unknown"
+            )
+        except AttributeError:
+            evaluation_exp_name = "unknown"
+        logger.info(
+            "Evaluated %s on test set in experiment: %s. Test metrics: %s",
+            best_model_name,
+            evaluation_exp_name,
+            test_metrics,
+        )
         self.tracker.log_metrics(test_metrics)
 
         # Check deployment threshold
@@ -490,14 +523,29 @@ class TestSetEvaluationOrchestrator:
             )
 
         test_score = float(test_score)
+        try:
+            evaluation_exp_name = (
+                self.tracker.experiment.get_name()
+                if hasattr(self.tracker, "experiment")
+                else "unknown"
+            )
+        except AttributeError:
+            evaluation_exp_name = "unknown"
         if test_score < deployment_threshold:
+            logger.error(
+                "Deployment check failed in experiment %s: Best model score (%.4f) is below threshold (%.4f). Model not deployed.",
+                evaluation_exp_name,
+                test_score,
+                deployment_threshold,
+            )
             raise ValueError(
                 f"Best model score ({test_score:.4f}) is below deployment "
                 f"threshold ({deployment_threshold:.4f}). Model not deployed."
             )
 
         logger.info(
-            "Test score (%s: %.4f) meets deployment threshold (%.4f)",
+            "Deployment check passed in experiment %s: Test score (%s: %.4f) meets threshold (%.4f)",
+            evaluation_exp_name,
             comparison_metric_name,
             test_score,
             deployment_threshold,

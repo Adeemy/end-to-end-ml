@@ -199,6 +199,7 @@ class CometExperimentTracker(ExperimentTracker):
                 )
         elif "api_key" in kwargs:
             # Create new experiment
+            experiment_name = kwargs.pop("experiment_name", None)
             self.experiment = Experiment(
                 api_key=kwargs["api_key"],
                 **{
@@ -207,6 +208,10 @@ class CometExperimentTracker(ExperimentTracker):
                     if k not in ["api_key", "is_child_experiment"]
                 },
             )
+
+            # Set the experiment display name if provided
+            if experiment_name:
+                self.experiment.set_name(experiment_name)
         # If no api_key provided, assume experiment is already set
 
     def log_metric(self, name: str, value: float, step: Optional[int] = None) -> None:

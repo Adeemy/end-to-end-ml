@@ -123,6 +123,7 @@ def main(
 
     # Run evaluation workflow
     deployment_threshold = float(training_config.train_params.deployment_score_thresh)
+    max_eval_experiments = int(training_config.train_params.max_eval_experiments)
 
     # Setup experiment kwargs for evaluation tracking
     experiment_tracker_type = training_config.train_params.experiment_tracker
@@ -153,6 +154,7 @@ def main(
         deployment_threshold=deployment_threshold,
         cv_folds=training_config.train_params.cross_val_folds,
         experiment_keys=experiment_keys,
+        max_eval_experiments=max_eval_experiments,
         **experiment_kwargs,
     )
 
