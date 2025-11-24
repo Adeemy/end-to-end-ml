@@ -1,102 +1,42 @@
 # Training Module
 
-This module handles the complete machine learning training workflow including hyperparameter optimization, model training, experiment tracking, and model evaluation.
+Automated machine learning training with hyperparameter optimization and experiment tracking.
 
-## Overview
+## Quick Commands
 
-The training module provides:
-- Automated hyperparameter optimization using Optuna
-- Multi-model training (Logistic Regression, Random Forest, LightGBM, XGBoost)
-- Experiment tracking with Comet ML
-- Model evaluation and selection
-- Champion model registration and deployment
-
-## Workflow
-
-### 1. Data Splitting
 ```bash
-python src/training/split_data.py
+make split_data    # Create train/validation/test splits
+make train         # Train models with hyperparameter optimization
+make evaluate      # Evaluate models and select and calibrates champion before registering it ML workspace
 ```
 
-**Purpose**: Creates train/validation/test splits from feature store data.
-- Loads processed data from feature store
-- Creates stratified splits maintaining class balance
-- Saves training, validation, and testing data splits as parquet files for training pipeline
+## Pipeline Overview
 
-### 2. Model Training
-```bash
-make train
-# OR
-python src/training/train.py --config_yaml_path ./src/config/training-config.yml
-```
+1. **Data Splitting** → Load from feature store, create stratified splits
+2. **Training** → Hyperparameter optimization + model training with Optuna
+3. **Evaluation** → Test evaluation + champion model registration
 
-**Purpose**: Trains multiple models with hyperparameter optimization.
-- Loads train/validation splits
-- Optimizes hyperparameters using Optuna
-- Trains models: Logistic Regression, Random Forest, LightGBM, XGBoost
-- Logs experiments to Comet ML
-- Saves trained models as pickle files
-- Generates study results and artifacts
+## Supported Models
 
-**Process Flow**:
-1. Load and preprocess data using `TrainingDataPrep`
-2. Create data transformation pipeline (scaling, encoding, feature selection)
-3. For each model type:
-   - Initialize Comet ML experiment
-   - Run hyperparameter optimization (Optuna)
-   - Train model with best parameters
-   - Log metrics, parameters, and artifacts
-   - Save model to artifacts directory
+- **Logistic Regression**: Linear baseline with regularization
+- **Random Forest**: Ensemble method with feature importance
+- **LightGBM**: Gradient boosting with categorical feature support
+- **XGBoost**: High-performance gradient boosting
+- **Voting Ensemble**: Combination of models
 
-### 3. Model Evaluation
-```bash
-make evaluate
-# OR
-python src/training/evaluate.py --config_yaml_path ./src/config/training-config.yml
-```
+## Key Features
 
-**Purpose**: Evaluates trained models and selects champion.
-- Queries Comet ML for recent experiments
-- Selects best model based on validation metrics
-- Evaluates champion model on test set
-- Registers champion model for deployment
+- **Automated Hyperparameter Tuning**: Optuna-based optimization
+- **Experiment Tracking**: Complete logging with Comet ML
+- **Model Evaluation**: F-beta score optimization with configurable beta
+- **Champion Selection**: Automatic best model selection and registration
+- **Reproducibility**: Deterministic training with seed management
 
-**Process Flow**:
-1. Query Comet ML for recent experiments
-2. Compare models using validation scores
-3. Load best performing model
-4. Evaluate on test set with comprehensive metrics
-5. Check deployment threshold
-6. Register as champion model if threshold met
+## Core Scripts
 
-### 4. Ensemble Training (Optional)
-The training pipeline also supports ensemble methods:
-- Voting ensemble of top-performing models
-- Automatic ensemble creation and evaluation
-- Integration with single model workflow
-
-## Directory Structure
-
-```
-training/
-├── README.md                 # This file
-├── train.py                 # Main training script
-├── evaluate.py              # Model evaluation script
-├── split_data.py            # Data splitting script
-├── artifacts/               # Model artifacts and results
-│   ├── *.pkl               # Trained model files
-│   ├── experiment_keys.csv # Experiment tracking
-│   └── study_*.csv         # Hyperparameter optimization results
-└── utils/                  # Training utilities
-    ├── config/             # Configuration management
-    ├── core/              # Core training components
-    ├── evaluation/        # Model evaluation utilities
-    └── tracking/          # Experiment tracking
-```
-
-## Key Components
-
-### Core Training (`utils/core/`)
+- **`split_data.py`**: Creates stratified train/validation/test splits from feature store
+- **`train.py`**: Runs hyperparameter optimization and model training
+- **`evaluate.py`**: Evaluates trained models and registers champion
 
 #### `TrainingOrchestrator` (trainer.py)
 Orchestrates the complete training workflow.
@@ -111,6 +51,8 @@ Handles hyperparameter optimization using Optuna.
 - Logs optimization progress to Comet ML
 
 ### Experiment Tracking (`utils/tracking/`)
+Sets up experiment tracking system. Currently, it uses comet for experiemnt tracking
+but it can be extended to other ML experiment trackers.
 
 #### `CometExperimentManager` (experiment.py)
 Manages Comet ML experiment lifecycle.
@@ -165,13 +107,37 @@ train:
 ## Usage Examples
 
 ### Basic Training
-```python
-from src.training.train import main as train_main
+```bash
+# Recommended: Use makefile
+make train
 
-# Run complete training pipeline
-experiment_keys = train_main(
-    config_yaml_path="./src/config/training-config.yml"
+# Or run directly with Python
+python ./src/training/train.py --config_yaml_path ./src/config/training-config.yml
+```
+
+### Programmatic Training
+```python
+import os
+from pathlib import Path
+from src.training.train import main
+from src.utils.logger import get_console_logger
+from src.utils.path import DATA_DIR, ARTIFACTS_DIR
+
+# Set up environment
+os.environ["COMET_API_KEY"] = "your_api_key"
+logger = get_console_logger("training")
+
+# Run training pipeline
+experiment_keys = main(
+    config_yaml_path="./src/config/training-config.yml",
+    api_key=os.environ["COMET_API_KEY"],
+    data_dir=DATA_DIR,
+    artifacts_dir=ARTIFACTS_DIR,
+    logger=logger,
+    run_evaluation=False  # Set to True to run evaluation after training
 )
+
+print(f"Completed {len(experiment_keys)} experiments")
 ```
 
 ### Custom Model Training
@@ -261,7 +227,7 @@ Each model has optimized search spaces defined in the configuration:
 
 ### Evaluation
 1. **Holdout Test Set**: Never use test data during training or validation
-2. **Metric Selection**: Choose metrics appropriate for your problem
+2. **Metric Selection**: Choose metrics appropriate for the problem at hand
 3. **Threshold Setting**: Set realistic deployment thresholds
 4. **Monitoring**: Track model performance over time
 

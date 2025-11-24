@@ -1,56 +1,69 @@
 # Utils Module
 
-This module provides shared utilities and common functionality used across the entire ML pipeline. It includes configuration management, logging, path utilities, and other cross-cutting concerns.
+Shared utilities and configuration management for the entire ML pipeline.
 
-## Overview
-
-The utils module provides:
-- Configuration loading and management
-- Centralized logging configuration
-- Path and file utilities
-- Common data structures and helpers
-- Shared constants and enums
-
-## Directory Structure
-
-```
-utils/
-├── README.md          # This file
-├── __init__.py        # Module initialization
-├── config_loader.py   # Configuration loading utilities
-├── logger.py          # Logging configuration and setup
-└── path.py            # Path constants and utilities
-```
-
-## Key Components
+## Core Components
 
 ### Configuration Management (`config_loader.py`)
 
-Provides a centralized system for loading and validating configuration files using dataclasses and type hints.
+Type-safe YAML configuration loading with validation.
 
-**Key Features**:
-- Type-safe configuration loading
-- YAML configuration file support
-- Environment variable override support
-- Configuration validation and error handling
-- Builder pattern for complex configurations
-
-**Usage Example**:
 ```python
 from src.utils.config_loader import load_config
-from src.training.utils.config.config import Config, build_training_config
 
-# Load training configuration
 config = load_config(
     config_class=Config,
     builder_func=build_training_config,
     config_path="./src/config/training-config.yml"
 )
-
-# Access configuration values
-print(config.train_params.max_search_iters)
-print(config.data.class_col_name)
 ```
+
+**Features**:
+
+- Type-safe configuration with dataclasses
+- YAML file support with validation
+- Environment variable overrides
+- Builder pattern for complex configurations
+
+### Logging System (`logger.py`)
+
+Centralized logging configuration for consistent output across modules.
+
+```python
+from src.utils.logger import get_console_logger
+
+logger = get_console_logger("module_name")
+logger.info("Processing started")
+```
+
+**Features**:
+
+- Module-specific loggers with consistent formatting
+- Console and file output support
+- Configurable log levels
+- Integration with training experiments
+
+### Path Management (`path.py`)
+
+Centralized path constants for data and artifact directories.
+
+```python
+from src.utils.path import DATA_DIR, FEATURE_REPO_DIR
+
+# Access standardized paths
+train_data = DATA_DIR / "train.parquet"
+features = FEATURE_REPO_DIR / "features"
+```
+
+**Benefits**:
+
+- Single source of truth for file paths
+- Cross-platform path handling
+- Easier path management and updates
+  print(config.train_params.max_search_iters)
+  print(config.data.class_col_name)
+
+````
 
 **Configuration Structure**:
 ```python
@@ -60,13 +73,14 @@ class Config:
     data: DataConfig
     files: FilesConfig
     modelregistry: ModelRegistryConfig
-```
+````
 
 ### Logging System (`logger.py`)
 
 Provides standardized logging configuration across the entire application with support for different log levels, formats, and outputs.
 
 **Key Features**:
+
 - Console and file logging support
 - Structured log formatting
 - Log level configuration
@@ -74,6 +88,7 @@ Provides standardized logging configuration across the entire application with s
 - Performance-optimized logging
 
 **Usage Example**:
+
 ```python
 from src.utils.logger import get_console_logger
 
@@ -89,6 +104,7 @@ logger.error("Error occurred", exc_info=True)
 ```
 
 **Logger Configuration**:
+
 ```python
 # Default console logger with formatted output
 logger = get_console_logger("module_name")
@@ -102,12 +118,14 @@ logger = get_console_logger("module_name")
 Defines centralized path constants and utilities for consistent file and directory management across the project.
 
 **Key Features**:
+
 - Centralized path definitions
 - Cross-platform path handling
 - Environment-aware path resolution
 - Path validation utilities
 
 **Path Constants**:
+
 ```python
 from src.utils.path import (
     PROJECT_ROOT,
@@ -124,6 +142,7 @@ config_file = CONFIG_DIR / "training-config.yml"
 ```
 
 **Defined Paths**:
+
 - `PROJECT_ROOT`: Root directory of the project
 - `DATA_DIR`: Directory for data files (train/validation/test sets)
 - `ARTIFACTS_DIR`: Directory for model artifacts and outputs
@@ -198,6 +217,7 @@ files:
 ## Logging Best Practices
 
 ### Module-Level Logging
+
 ```python
 from pathlib import PosixPath
 from src.utils.logger import get_console_logger
@@ -219,6 +239,7 @@ def process_data():
 ```
 
 ### Structured Logging
+
 ```python
 # Log with additional context
 logger.info(
@@ -241,6 +262,7 @@ logger.info(
 ```
 
 ### Log Levels
+
 - **DEBUG**: Detailed diagnostic information
 - **INFO**: General information about program execution
 - **WARNING**: Something unexpected happened but the program continues
@@ -250,6 +272,7 @@ logger.info(
 ## Path Utilities
 
 ### Working with Paths
+
 ```python
 from src.utils.path import DATA_DIR, ARTIFACTS_DIR
 import pandas as pd
@@ -268,6 +291,7 @@ experiment_dir.mkdir(parents=True, exist_ok=True)
 ```
 
 ### Environment-Specific Paths
+
 ```python
 import os
 from pathlib import Path
@@ -284,6 +308,7 @@ ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 ## Common Utilities
 
 ### Error Handling
+
 ```python
 from src.utils.logger import get_console_logger
 
@@ -306,6 +331,7 @@ def safe_operation(func, *args, **kwargs):
 ```
 
 ### Configuration Validation
+
 ```python
 from typing import Union, List
 
@@ -326,6 +352,7 @@ def validate_config_value(
 ```
 
 ### File Operations
+
 ```python
 from pathlib import Path
 import json
@@ -345,6 +372,7 @@ def load_yaml(file_path: Path) -> dict:
 ## Integration Examples
 
 ### Training Pipeline Integration
+
 ```python
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
@@ -362,6 +390,7 @@ model_save_path = ARTIFACTS_DIR / "model.pkl"
 ```
 
 ### Feature Store Integration
+
 ```python
 from src.utils.path import DATA_DIR
 from src.utils.logger import get_console_logger
@@ -381,6 +410,7 @@ def process_features():
 ```
 
 ### Inference Integration
+
 ```python
 from src.utils.path import ARTIFACTS_DIR
 from src.utils.logger import get_console_logger
@@ -400,6 +430,7 @@ def load_model():
 ## Best Practices
 
 ### Configuration Management
+
 1. **Type Safety**: Use dataclasses with type hints for configuration
 2. **Validation**: Validate configuration values at load time
 3. **Defaults**: Provide sensible defaults for optional parameters
@@ -407,6 +438,7 @@ def load_model():
 5. **Environment Overrides**: Support environment variable overrides for deployment
 
 ### Logging Guidelines
+
 1. **Consistent Format**: Use the same logging format across modules
 2. **Appropriate Levels**: Choose correct log levels for different messages
 3. **Context Information**: Include relevant context in log messages
@@ -414,6 +446,7 @@ def load_model():
 5. **Security**: Never log sensitive information like API keys
 
 ### Path Management
+
 1. **Centralization**: Define all paths in one place
 2. **Cross-Platform**: Use Path objects for cross-platform compatibility
 3. **Validation**: Check path existence and permissions
@@ -423,12 +456,14 @@ def load_model():
 ## Troubleshooting
 
 ### Common Issues
+
 1. **Configuration Not Found**: Check file paths and working directory
 2. **Import Errors**: Ensure proper Python path configuration
 3. **Permission Errors**: Check file and directory permissions
 4. **Type Errors**: Validate configuration types and formats
 
 ### Debugging Tips
+
 - Enable debug logging to see detailed execution flow
 - Use absolute paths when relative paths fail
 - Validate configuration files with YAML linters

@@ -42,7 +42,7 @@ all: install isort format test lint
 
 
 # Import raw dataset from source
-get_init_data:
+gen_init_data:
 	python ./src/feature/generate_initial_data.py --config_yaml_path ./src/config/feature-store-config.yml --logger_path ./src/config/logging.conf
 
 # Preprocess and transform data before ingestion by feature store
