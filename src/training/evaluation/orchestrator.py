@@ -13,6 +13,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder
 
 from src.training.evaluation.champion import ModelChampionManager
 from src.training.evaluation.evaluator import create_model_evaluator
@@ -246,8 +247,14 @@ class TestSetEvaluationOrchestrator:
             is_voting_ensemble=is_voting_ensemble,
         )
 
-        # Evaluate on test set - get test scores directly
-        _, test_scores = evaluator.evaluate_model_perf(class_encoder=None)
+        # Create class encoder for confusion matrix logging
+        # Fit on combined train and test class labels to ensure all labels are known
+        class_encoder = LabelEncoder()
+        all_class_labels = np.concatenate([self.train_class, self.test_class])
+        class_encoder.fit(all_class_labels)
+
+        # Use the public method for test-only evaluation to avoid accessing protected members
+        test_scores = evaluator.evaluate_test_set_only(class_encoder=class_encoder)
 
         test_metrics = evaluator.convert_metrics_from_df_to_dict(
             scores=test_scores, prefix="test_"
