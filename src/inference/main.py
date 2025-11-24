@@ -48,7 +48,7 @@ load_model = ModelLoader(comet_api_key=os.environ["COMET_API_KEY"])
     champ_model_name,
     *_,
 ) = load_model.get_config_params(
-    config_yaml_abs_path=f"{str(PARENT_DIR.parent)}/src/config/training/config.yml"
+    config_yaml_abs_path=f"{str(PARENT_DIR.parent)}/src/config/training-config.yml"
 )
 
 # Download champion model

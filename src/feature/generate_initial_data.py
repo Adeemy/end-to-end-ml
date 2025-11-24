@@ -1,6 +1,8 @@
 """
-Imports original dataset from UCI data repository and stores it locally.
-Also, 5% of the original dataset is reserved as an inference set, which simulates
+Splits the original dataset, imported from UCI data repository and stored locally,
+into raw dataset for model development and inference dataset. The raw dataset is used for
+training and testing machine learning models. Meanwhile, approximately
+5% of the original dataset is reserved as an inference set, which simulates
 production data that will be scored by the deployed model in the inference pipeline.
 
 The raw dataset was released by the CDC and imported from the following
@@ -165,7 +167,9 @@ def main(config_yaml_path: str, data_dir: PosixPath, logger: logging.Logger) -> 
     logger.info("Raw dataset imported from existing parquet file.")
 
     raw_dataset, inference_set = split_data(raw_dataset, config.data)
-    logger.info("Raw dataset was split into training and inference sets.")
+    logger.info(
+        "Raw dataset was split into raw dataset for training and inference dataset to simulate production data."
+    )
 
     save_datasets(raw_dataset, inference_set, config.files, data_dir)
     logger.info("Datasets saved to disk.")

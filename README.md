@@ -5,70 +5,39 @@
 
 # End-to-end ML
 
-This is an end-to-end ML project for tabular data that incorporates software engineering principles in machine learning. It spans the whole lifecycle of a ML model, from data exploration, preprocessing, feature engineering, model selection, training, evaluation, to deployment.
+An end-to-end ML project for tabular data that incorporates software engineering principles in machine learning. It spans the whole lifecycle of a ML model, from data exploration, preprocessing, feature engineering, model selection, training, evaluation, to deployment.
 
-The project leverages the Diabetes Health Indicators public dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), which was originally sourced from CDC. The dataset comprises various information about patients, such as demographics, lab results, and self-reported health history. The goal is to develop a classifier that can discern whether a patient has diabetes, is pre-diabetic, or healthy.
+The project leverages the Diabetes Health Indicators public dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators). The dataset comprises various information about patients, such as demographics, lab results, and self-reported health history. The goal is to develop a classifier that can discern whether a patient has diabetes, is pre-diabetic, or healthy.
 
 The project adheres to best practices of machine learning engineering, such as modular code, documentation, testing, logging, configuration, and version control. The project also demonstrates how to utilize various tools and frameworks, such as pandas, scikit-learn, [feast](https://feast.dev), [optuna](https://optuna.org), experiment tracking using [Comet](https://www.comet.com/site/), and Docker, to facilitate the ML workflow and enhance the model performance.
 
-Some of the notable features of the project are:
+## Key Features
 
-1. The repo is **configurable** using config files, which allow the user to easily change the dataset, hyperparameters, and other settings without modifying the code.
+- **Configurable Pipeline**: YAML-based configuration for easy parameter tuning
+- **Hyperparameter Optimization**: Automated tuning using Optuna
+- **Experiment Tracking**: Complete experiment management with Comet ML
+- **Feature Engineering**: Feast-based feature store for consistent data processing
+- **Model Evaluation**: F-beta score optimization with configurable precision/recall weighting
+- **Containerized Deployment**: Docker-based model serving with REST API
+- **CI/CD Integration**: GitHub Actions for automated testing and deployment
+- **Reproducible Environment**: Dev containers and dependency management with uv
 
-2. The project uses **hyperparameters optimization** using optuna, which is a hyperparameters optimization framework that offers several advantages, such as efficient search algorithms, parallel and distributed optimization.
+## Project Structure
 
-3. The project uses **f_beta score** as the optimization metric, which is a generalization of f1 score (i.e., beta = 1) that can be adjusted to give more weights to precision or recall. The use of f_beta score is appropriate in many practical use cases, as in reality precision and recall are rarely equally important.
+- **`notebooks/`**: Exploratory data analysis and baseline model development (only directory for notebooks)
+- **`src/config/`**: YAML configuration files for data processing and training
+- **`src/feature/`**: Data ingestion, preprocessing, and feature engineering
+- **`src/training/`**: Model training, hyperparameter optimization, and evaluation
+- **`src/inference/`**: REST API for model serving and predictions and can be extended for batch inference
+- **`src/utils/`**: Shared utilities, logging, and configuration management
+- **`tests/`**: Unit tests for ML components and pipeline validation
 
-4. The project ensures **reproducibility** using Docker, which is a tool that creates isolated environments for running applications. The project containerizes the champion model with its dependencies, and provides a devcontainer configuration that allows the user to recreate the dev environment in VS code.
+### ML Pipeline Flow
 
-5. The project uses **experiment tracking and logging** using Comet, which is a platform for managing and comparing ML experiments. The project logs model performance, hyperparameters, and artifacts to Comet, which can be accessed through a web dashboard. The user can also visualize and compare different experiments using Comet.
-
-6. This project uses a makefile to provide convenient CLI commands to improve the efficiency, reliability, and quality of development, testing, and deployment. For instance, running the command `make prep_data` will transform the raw data into features and stores them in local file to be ingested by feature store, whereas running `make setup_feast` will setup feature store and apply its feature definitions.
-
-### Project structure
-
-The project consists of the following folders and files:
-
-- `notebooks`: contains a notebook (eda.ipynb) that conducts exploratory data analysis (EDA) on the dataset, such as descriptive statistics, data visualization, and correlation analysis. It also establishes a baseline model (logistic regression) using scikit-learn, which achieves high precision and recall scores (above 0.80) on the test set. This project, however, does not focus on achieving higher accuracy, as that is beyond the scope of this project. Other notebooks can be added to this folder if needed.
-
-- `src/config`: contains configuration files that includes parameters for data preprocessing and transformation, and model training.
-
-- `src/feature`: contains the scripts for data ingestion and transformation. The script (generate_initial_data.py) imports the original dataset from the source [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators), and creates inference set (5% of the original dataset). The inference set is used to simulate production data, which is scored using the deployed model via a REST API call. The script (prep_data.py) preprocesses and transforms the raw dataset before ingesting it by feature store. For more details about feature store setup, see README.md in the feature folder.
-
-- `src/training`: contains the scripts for data splitting, model training, evaluation, and selection.
-
-  **Training Flow:**
-
-  1. **split_data.py**: Imports preprocessed features from the feature store using Feast's `get_historical_features()`, then splits into train/validation/test sets and saves as parquet files in `src/feature/feature_repo/data/`. The class labels at this stage are raw values stored from the feature store.
-  2. **train.py**: Loads the parquet files created by split_data.py, then calls `prepare_data()` which:
-     - Encodes class labels using `LabelEncoder` (handles both string and integer class labels in config)
-     - Creates data transformation pipeline (imputation, scaling, encoding, feature selection)
-     - Returns preprocessed features and encoded class labels for model training
-  3. **Hyperparameter optimization**: Uses Optuna to optimize models (Logistic Regression, Random Forest, LightGBM, XGBoost)
-  4. **Model tracking**: All experiments tracked using Comet.ml for metrics, parameters, and artifacts
-  5. **evaluate.py**: Selects best model, calibrates it, and registers as champion model in Comet workspace if test score meets threshold
-
-  **Evaluation Workflows:**
-
-  The project supports two evaluation workflows:
-
-  - **Integrated workflow**: `train.py` directly calls `evaluate.py` and passes experiment data in-memory
-  - **Standalone workflow**: `evaluate.py` can be run independently (via `make evaluate`) and automatically discovers experiments from Comet ML
-
-  **Automatic Experiment Discovery**: The evaluation system queries Comet ML directly to find recent experiments
-  based on naming patterns (e.g., 'lightgbm*', 'random_forest*'), eliminating the need for any intermediate files. This enables:
-
-  - Simplified evaluation without file dependencies
-  - Automatic discovery of experiments from any training session
-  - Better integration with CI/CD pipelines
-  - Reduced storage and maintenance overhead
-  - Direct leveraging of Comet ML's experiment management capabilities
-
-- `src/inference`: contains the script for scoring new data via REST API using containerized model, which is deployed using GitHub Actions CI/CD pipeline.
-
-- `src/utils`: contains utility modules used throughout the project, including logger class that redirects printed messages in addition to some select events that need to be logged to logger objects and constans that defines paths to to data and training artifacts directories.
-
-- `tests`: contains test scripts to validate the functionality of the ML components in the project. By having a dedicated tests folder, it promotes code quality, reliability, and helps in identifying and fixing issues early in the development process.
+1. **Data Preparation** (`split_data.py`): Load from feature store → create train/validation/test splits
+2. **Training** (`train.py`): Hyperparameter optimization → model training → experiment tracking
+3. **Evaluation** (`evaluate.py`): Model selection based on validation set → testign set evaluation → champion registration if meets deployment criteria
+4. **Deployment**: Containerized model serving via REST API
 
 Below is the repo structure.
 
@@ -193,9 +162,9 @@ This project uses [uv](https://github.com/astral-sh/uv) to manage dependencies, 
 
 The training and deployment pipelines can be run in GitHub Actions. You can also run the following commands in CLI to implement all steps from generating raw dataset to pulling packaged model:
 
-- Import raw dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators)
+- Import raw dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators) and generate raw dataset for training and inference set (5% holdout) to simulate production data
 
-        make get_init_data
+        make gen_init_data
 
 - Preprocess data before ingesting it by feature store
 
