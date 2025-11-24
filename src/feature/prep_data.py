@@ -10,7 +10,7 @@ from typing import Tuple
 
 import pandas as pd
 
-from src.feature.utils.config import (
+from src.feature.schemas import (
     Config,
     DataConfig,
     FeatureMappingsConfig,

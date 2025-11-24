@@ -23,10 +23,10 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 
-from src.training.utils.config.config import Config, build_training_config
-from src.training.utils.evaluation.champion import ModelChampionManager
-from src.training.utils.evaluation.orchestrator import create_evaluation_orchestrator
-from src.training.utils.evaluation.selector import ModelSelector
+from src.training.evaluation.champion import ModelChampionManager
+from src.training.evaluation.orchestrator import create_evaluation_orchestrator
+from src.training.evaluation.selector import ModelSelector
+from src.training.schemas import Config, build_training_config
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR

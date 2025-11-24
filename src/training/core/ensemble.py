@@ -12,10 +12,10 @@ from sklearn.ensemble import VotingClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
-from src.training.utils.config.config import SupportedModelsConfig
-from src.training.utils.evaluation.evaluator import create_model_evaluator
-from src.training.utils.tracking.experiment import ExperimentManager
-from src.training.utils.tracking.experiment_tracker import ExperimentTracker
+from src.training.evaluation.evaluator import create_model_evaluator
+from src.training.schemas import SupportedModelsConfig
+from src.training.tracking.experiment import ExperimentManager
+from src.training.tracking.experiment_tracker import ExperimentTracker
 from src.utils.logger import get_console_logger
 
 module_name: str = PosixPath(__file__).stem
