@@ -1,20 +1,19 @@
 """
 Experiment management utilities for creating and managing experiments.
 
-This module defines an abstract base class `ExperimentManager` and a concrete implementation
-`CometExperimentManager` for handling experiment tracking. Other experiment tracking backends
-can be implemented by inheriting from `ExperimentManager`.
+This module defines an abstract base class `ExperimentManager` and concrete implementations
+for handling experiment tracking. Supports both MLflow and Comet ML backends.
 
 Classes:
     ExperimentManager: Abstract base class defining the interface for experiment management.
+    MLflowExperimentManager: Concrete implementation using MLflow (default).
     CometExperimentManager: Concrete implementation using Comet ML.
 
 Design Decision:
-    `ExperimentManager` is implemented as an Abstract Base Class (ABC) to enforce explicit
-    intent and stronger runtime safety. By inheriting from `ExperimentManager`, subclasses
-    explicitly declare their role as experiment managers, and instantiation is prevented if
-    abstract methods are missing. This fits the "Strategy" pattern where we want to ensure
-    strict adherence to the experiment tracking interface.
+    `ExperimentManager` is implemented as based on "Strategy" pattern via Abstract Base Class (ABC)
+    to enforce explicit intent and stronger runtime safety. By inheriting from `ExperimentManager`,
+    subclasses explicitly declare their role as experiment managers, and instantiation is prevented
+    if abstract methods are missing.
 """
 
 import os

@@ -1,5 +1,8 @@
 """
 Study logging utilities for Optuna hyperparameter optimization studies.
+
+It defines the `StudyLogger` class responsible for logging Optuna study results
+to experiment tracking backends like mlflow or Comet ML.
 """
 
 import re
@@ -15,7 +18,7 @@ logger = get_console_logger(module_name)
 
 
 class StudyLogger:
-    """Logs Optuna study results to Comet experiment.
+    """Logs Optuna study results to experiment tracking backends.
 
     Single Responsibility: Handle logging of hyperparameter optimization studies.
     """

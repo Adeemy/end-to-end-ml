@@ -1,5 +1,20 @@
 """
-Preprocesses and transforms raw data before saving it in the feature store.
+Data preprocessing pipeline for feature store ingestion.
+
+This module handles the transformation and preparation of raw data before ingestion
+into the feature store. It applies data cleaning, type conversions, validation,
+and formatting to ensure data quality and consistency.
+
+Workflow:
+    1. Load raw data from source
+    2. Apply preprocessing transformations (cleaning, validation)
+    3. Transform data into feature store schema format
+    4. Save preprocessed data in parquet file to be ingested by the feature store
+
+The processed data serves as input for the feature store, which then provides
+consistent, versioned features for both training and inference pipelines. The
+preprocessed data is saved to disk and can be ingested into the feature store
+via CI/CD pipelines using make setup_feast
 """
 
 import argparse

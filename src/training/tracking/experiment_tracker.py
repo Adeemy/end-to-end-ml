@@ -1,5 +1,9 @@
 """
 Abstract experiment tracking interface and concrete implementations.
+
+It defines an abstract base class `ExperimentTracker` and concrete implementations
+for Comet ML and MLflow experiment tracking backends. Other tracking backends can be
+implemented by inheriting from `ExperimentTracker`.
 """
 
 import json

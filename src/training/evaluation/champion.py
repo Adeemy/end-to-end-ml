@@ -1,5 +1,11 @@
 """
-Champion model management utilities.
+Champion model management utilities. It selects, calibrates, logs, and registers the
+best performing model from candidate models.
+
+The best candidate is selected based on validation performance using experiment trackers.
+The selected model is then calibrated using validation data and registered as the champion
+model in the experiment tracking backend after evaluating it on the test set to ensure it
+meets deployment criteria.
 """
 
 import os

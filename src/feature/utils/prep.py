@@ -1,5 +1,19 @@
 """
-Data preprocessing and transformation classes.
+Data preprocessing and dataset splitting strategy implementations.
+
+This module provides extensible classes for data preprocessing and dataset splitting
+using the Strategy pattern. Supports multiple splitting strategies (random, time-based)
+and comprehensive data transformation capabilities.
+
+Classes:
+    SplitStrategy: Abstract base for dataset splitting strategies
+    RandomSplitStrategy: Random train/validation/test splitting
+    TimeBasedSplitStrategy: Temporal data splitting for time-series
+    DataSplitter: Orchestrates splitting with configurable strategies
+    DataPreprocessor: Handles data cleaning and transformation
+    DataTransformer: Feature engineering and data type conversions
+
+Used by: feature store preparation and training data pipeline.
 """
 
 from datetime import datetime

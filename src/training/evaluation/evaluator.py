@@ -1,5 +1,6 @@
 """
-Model evaluation utilities.
+Model evaluation utilities. It defines an abstract base class for model evaluation
+and a concrete implementation for classification model evaluation.
 """
 
 from abc import ABC, abstractmethod

@@ -1,10 +1,10 @@
 """
 Model selection utilities - selects best performing model from candidates.
 
-This module queries Comet ML directly to retrieve recent experiments and their
-validation metrics, eliminating the need for experiment_keys.csv files.
-It automatically discovers experiments based on naming patterns and selects
-the best performing model.
+This module queries experiment tracking backends to retrieve recent experiments and
+their validation metrics. It automatically discovers experiments based on naming
+patterns and selects the best performing model. Supports both MLflow (default) and
+Comet ML backends.
 """
 
 from pathlib import PosixPath

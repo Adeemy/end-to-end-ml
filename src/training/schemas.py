@@ -1,5 +1,7 @@
-"""Defines a class that loads parameters from config.yml file and
-dataclasses for configuration sections.
+"""
+Defines a class that loads parameters from config.yml file and dataclasses for
+configuration sections. It includes validation logic to ensure required parameters
+are present and correctly typed.
 """
 
 from dataclasses import dataclass

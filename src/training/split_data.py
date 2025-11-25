@@ -1,6 +1,6 @@
 """
 Extracts preprocessed data from feature store, i.e., features and
-class labels, and creates data splits for model training.
+class labels, and creates data (train/valid/test) splits for model training.
 """
 
 import argparse
