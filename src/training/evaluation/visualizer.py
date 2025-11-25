@@ -5,6 +5,8 @@ It includes functions to plot feature importance, ROC curve, precision-recall cu
 cumulative gains, and lift curve for classification models.
 """
 
+from pathlib import PosixPath
+
 import kds
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +18,11 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
+
+from src.utils.logger import get_console_logger
+
+module_name: str = PosixPath(__file__).stem
+logger = get_console_logger(module_name)
 
 
 class ModelVisualizer:

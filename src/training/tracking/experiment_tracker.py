@@ -7,10 +7,9 @@ implemented by inheriting from `ExperimentTracker`.
 """
 
 import json
-import logging
 import tempfile
 from abc import ABC, abstractmethod
-from pathlib import Path
+from pathlib import Path, PosixPath
 from typing import Any, Dict, Optional, Union
 
 import mlflow
@@ -18,7 +17,10 @@ import numpy as np
 from comet_ml import ExistingExperiment, Experiment
 from matplotlib.figure import Figure
 
-logger = logging.getLogger(__name__)
+from src.utils.logger import get_console_logger
+
+module_name: str = PosixPath(__file__).stem
+logger = get_console_logger(module_name)
 
 
 class ExperimentTracker(ABC):

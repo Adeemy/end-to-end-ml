@@ -6,12 +6,16 @@ are present and correctly typed.
 
 from dataclasses import dataclass
 from datetime import date
+from pathlib import PosixPath
 from typing import Any, Dict, List, Union
 
 import yaml
 
 from src.utils.config_loader import map_to_dataclass
-from src.utils.logger import LoggerConfig
+from src.utils.logger import LoggerConfig, get_console_logger
+
+module_name: str = PosixPath(__file__).stem
+logger = get_console_logger(module_name)
 
 
 class PrettySafeLoader(yaml.SafeLoader):

@@ -39,6 +39,9 @@ from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import DATA_DIR
 
+module_name: str = PosixPath(__file__).stem
+console_logger = get_console_logger(module_name)
+
 
 def import_data(data_config: DataConfig, files_config: FilesConfig) -> pd.DataFrame:
     """Import data from existing parquet file.
@@ -200,10 +203,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Get the console logger object
-    module_name: str = PosixPath(__file__).stem
-
-    console_logger = get_console_logger(module_name)
     console_logger.info("Generating raw dataset starts ...")
 
     main(
