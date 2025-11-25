@@ -161,6 +161,22 @@ This project uses [uv](https://github.com/astral-sh/uv) to manage dependencies, 
     source .venv/bin/activate
     make install
 
+#### Environment Variables
+
+When using **Comet ML as the experiment tracker**, set these environment variables:
+
+    COMET_API_KEY=your_comet_api_key
+    ENABLE_COMET_LOGGING=true
+
+The `ENABLE_COMET_LOGGING` variable ensures proper import order for automatic logging. For MLflow, these variables are not needed.
+
+Copy `.env_template` to `.env` and add your API keys:
+
+    cp .env_template .env
+    # Edit .env with your actual API keys
+
+#### Pipeline Commands
+
 The training and deployment pipelines can be run in GitHub Actions. You can also run the following commands in CLI to implement all steps from generating raw dataset to pulling packaged model:
 
 - Import raw dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators) and generate raw dataset for training and inference set (5% holdout) to simulate production data

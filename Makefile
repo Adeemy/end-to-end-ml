@@ -69,6 +69,7 @@ setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 
 
 # Submit train experiment
+# NOTE: If using Comet ML tracker, set ENABLE_COMET_LOGGING=true in environment
 split_data:
 	python ./src/training/split_data.py --config_yaml_path ./src/config/training-config.yml --logger_path ./src/config/logging.conf
 

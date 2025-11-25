@@ -8,7 +8,7 @@ from pathlib import PosixPath
 from typing import Any, Callable, Optional
 
 # Load comet_ml early to avoid issues with sklearn auto-logging
-import comet_ml  # noqa: F401 # pylint: disable=unused-import
+import comet_ml  # pylint: disable=unused-import
 import joblib
 import numpy as np
 import pandas as pd
