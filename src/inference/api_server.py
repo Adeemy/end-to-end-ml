@@ -17,6 +17,7 @@ from tracking system Model Registry, with a local fallback to the path
 """
 
 import os
+from pathlib import PosixPath
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -24,9 +25,14 @@ from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse
 
 from src.inference.utils.model import ModelLoaderManager
+from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, PARENT_DIR
 
 load_dotenv()
+
+
+module_name: str = PosixPath(__file__).stem
+logger = get_console_logger(module_name)
 
 ########################################################
 # # Sample of prod data for testing
