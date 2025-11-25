@@ -1,5 +1,8 @@
 """
 Model visualization utilities for plotting performance metrics.
+
+It includes functions to plot feature importance, ROC curve, precision-recall curve,
+cumulative gains, and lift curve for classification models.
 """
 
 import kds

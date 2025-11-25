@@ -1,15 +1,15 @@
 """
-Runs training experiments to perform hyperparameters optimization
-for multiple models. It tracks the experiments using Comet.ml.
+Hyperparameter optimization and model training pipeline.
 
 This script handles the complete training pipeline:
 1. Loads and preprocesses data from feature store
-2. Trains multiple models (LR, RF, LightGBM, XGBoost) with Optuna optimization
-3. Logs experiments to Comet ML for tracking
+2. Trains models (e.g., LR, RF, LightGBM, XGBoost) selected in training-config.yml with Optuna optimization
+3. Logs experiments using MLflow (default) or Comet ML for tracking
 4. Saves trained models as pickle files
 5. Optionally runs evaluation workflow
 
-Experiments are automatically discoverable via Comet ML API.
+Experiments are automatically discoverable via the configured tracking backend.
+The pipeline supports both MLflow and Comet ML for experiment tracking.
 
 Data Prep Flow:
 1. split_data.py imports data from feature store and creates train/valid/test splits

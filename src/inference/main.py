@@ -1,6 +1,19 @@
 """
-This script wraps an API endpoint around a model to score
-production data via API calls.
+FastAPI-based model serving service for real-time predictions.
+
+This module provides a REST API service that loads trained ML models from
+experiment tracking backends (MLflow/Comet ML) and serves predictions via
+HTTP endpoints. Supports both champion model loading and direct model
+specification for production inference.
+
+Endpoints:
+    GET /: Health check and service information
+    POST /predict: Generate predictions from input features
+
+The service automatically handles model loading, feature preprocessing,
+and returns JSON-formatted prediction results. The champion model is loaded
+from tracking system Model Registry, with a local fallback to the path
+./src/training/artifacts/champion_model.pkl only if the registry is unavailable.
 """
 
 import os

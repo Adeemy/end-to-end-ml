@@ -1,15 +1,20 @@
 """
-Splits the original dataset, imported from UCI data repository and stored locally,
-into raw dataset for model development and inference dataset. The raw dataset is used for
-training and testing machine learning models. Meanwhile, approximately
-5% of the original dataset is reserved as an inference set, which simulates
-production data that will be scored by the deployed model in the inference pipeline.
+Initial dataset preparation from UCI diabetes health indicators data.
 
-The raw dataset was released by the CDC and imported from the following
-UCI repo: https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators.
+This module performs the one-time setup task of splitting the original CDC diabetes
+dataset into development and inference sets. The development set is used for model
+training and evaluation, while ~5% is reserved as an inference set to simulate
+production data.
 
-Note: This script is only used at the beginning of this project to generate
-data for the project and is not part of feature or inference pipelines.
+Data Source:
+    CDC Diabetes Health Indicators from UCI Repository
+    https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators
+
+Output:
+    - Raw dataset: For model development (train/validation/test splits)
+    - Inference dataset: Simulates production data for model serving
+
+Note: This is a one-time data setup script, not part of the regular ML pipeline.
 """
 
 import argparse

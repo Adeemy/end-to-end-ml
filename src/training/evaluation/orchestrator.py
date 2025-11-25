@@ -1,5 +1,7 @@
 """
 Test set evaluation orchestration - evaluates models on held-out test data.
+The selected model is then calibrated using validation data and registered as the champion
+if it meets deployment criteria based on its performance on the test set.
 """
 
 import os
@@ -396,7 +398,7 @@ class TestSetEvaluationOrchestrator:
             deployment_threshold: Minimum score required for deployment.
             cv_folds: Number of CV folds for calibration.
             experiment_keys: Optional DataFrame with model names and experiment keys.
-                           If None, ModelSelector will query Comet ML directly.
+                           If None, ModelSelector will query the tracking backend directly.
             max_eval_experiments: Maximum number of recent experiments to consider.
             **experiment_kwargs: Additional arguments for experiment setup (e.g., api_key, experiment_key).
 
@@ -411,7 +413,7 @@ class TestSetEvaluationOrchestrator:
             experiment_keys=experiment_keys, max_experiments=max_eval_experiments
         )
 
-        # Try to load model locally, if not found download from Comet ML
+        # Try to load model locally, if not found download from tracking backend
         model_path = f"{self.artifacts_path}/{best_model_name}.pkl"
 
         model_pipeline = None

@@ -1,6 +1,18 @@
 """
-This utility module includes functions to download a model and
-its config params for scoring prod data.
+Model loading utilities with support for multiple experiment tracking backends.
+
+This module implements a registry pattern for loading trained models from
+different experiment tracking systems (MLflow, Comet ML). The ModelLoaderManager
+provides a unified interface while concrete implementations handle tracker-specific
+model loading logic.
+
+Classes:
+    ModelLoader: Abstract base class for model loading implementations
+    MLflowModelLoader: Loads models from MLflow registry
+    CometModelLoader: Loads models from Comet ML registry
+    ModelLoaderManager: Factory and unified interface for model loading
+
+Supports both champion model loading and direct model specification.
 """
 
 from abc import ABC, abstractmethod

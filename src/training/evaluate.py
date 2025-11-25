@@ -1,15 +1,20 @@
 """
-Evaluates trained models on test set and registers champion model.
+Model selection and champion evaluation pipeline.
 
-This script supports two evaluation workflows:
-1. Integrated workflow: Called directly from train.py with experiment keys passed in-memory
-2. Standalone workflow: Run independently with automatic Comet ML experiment discovery
+This script implements proper ML evaluation practices by separating model selection
+from final performance assessment:
 
-For standalone evaluation, the script queries Comet ML directly to discover recent experiments
-based on naming patterns (e.g., 'lightgbm_', 'random_forest_').
+1. **Model Selection**: Ranks all trained models based on validation set performance
+2. **Test Evaluation**: Evaluates ONLY the best selected model on the held-out test set to determine final performance
+3. **Champion Registration**: Registers the model as champion if it meets deployment threshold based on test performance
 
-The script selects the best model based on validation performance, evaluates it on the
-testing set, and registers it as the champion model if it meets the deployment threshold.
+Workflow Details:
+- Integrated workflow: Called from train.py with experiment keys passed in-memory
+- Standalone workflow: Discovers experiments automatically via tracking backend
+- Selection Criteria: Uses validation metrics (e.g., 'valid_f1_score') to avoid test contamination
+- Final Assessment: Single test evaluation on the selected model only
+
+Supports both MLflow (default) and Comet ML experiment discovery.
 """
 
 import argparse
@@ -49,7 +54,7 @@ def main(
 ) -> tuple[str, dict]:
     """Evaluates best model on test set and registers as champion.
 
-    Note: This script requires trained models to exist in Comet ML.
+    Note: This script requires trained models to exist in the configured tracking backend.
     If no experiments are found, run training first: 'make train'
 
     Args:
@@ -58,7 +63,7 @@ def main(
         artifacts_dir: Path to artifacts directory.
         logger: Logger object.
         experiment_keys: Optional DataFrame with experiment keys from training.
-                        If None, will query Comet ML directly.
+                        If None, will query the tracking backend directly.
 
     Returns:
         Tuple of (champion_model_name, test_metrics).
@@ -75,7 +80,7 @@ def main(
         config_path=config_yaml_path,
     )
 
-    # Use experiment keys passed from training or query Comet ML directly
+    # Use experiment keys passed from training or query tracking backend directly
     if experiment_keys is not None:
         logger.info("Using experiment keys passed from training.")
 
@@ -187,7 +192,7 @@ if __name__ == "__main__":
     console_logger = get_console_logger(module_name)
     console_logger.info("Model Evaluation on Test Set Starts ...")
 
-    # Run evaluation (without experiment_keys will query Comet ML directly)
+    # Run evaluation (without experiment_keys will query tracking backend directly)
     champ_name, metrics = main(
         config_yaml_path=args.config_yaml_path,
         data_dir=DATA_DIR,

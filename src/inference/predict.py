@@ -1,6 +1,15 @@
 """
-This script wraps an API endpoint around a model to score
-production data via API calls.
+Command-line interface for model predictions on individual data samples.
+
+This script provides a CLI wrapper for making predictions using trained models
+stored in experiment tracking backends. Unlike the FastAPI service, this is
+designed for batch processing or individual prediction requests from the
+command line.
+
+Usage:
+    python predict.py --config_yaml_path path/to/config.yml --input_data '{...}'
+
+Supports both MLflow and Comet ML model registries for loading trained models.
 """
 
 import argparse

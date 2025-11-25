@@ -9,13 +9,13 @@ An end-to-end ML project for tabular data that incorporates software engineering
 
 The project leverages the Diabetes Health Indicators public dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators). The dataset comprises various information about patients, such as demographics, lab results, and self-reported health history. The goal is to develop a classifier that can discern whether a patient has diabetes, is pre-diabetic, or healthy.
 
-The project adheres to best practices of machine learning engineering, such as modular code, documentation, testing, logging, configuration, and version control. The project also demonstrates how to utilize various tools and frameworks, such as pandas, scikit-learn, [feast](https://feast.dev), [optuna](https://optuna.org), experiment tracking using [Comet](https://www.comet.com/site/), and Docker, to facilitate the ML workflow and enhance the model performance.
+The project adheres to best practices of machine learning engineering, such as modular code, documentation, testing, logging, configuration, and version control. The project also demonstrates how to utilize various tools and frameworks, such as pandas, scikit-learn, [feast](https://feast.dev), [optuna](https://optuna.org), experiment tracking using [MLflow](https://mlflow.org) (default) and [Comet](https://www.comet.com/site/), and Docker, to facilitate the ML workflow and enhance the model performance.
 
 ## Key Features
 
 - **Configurable Pipeline**: YAML-based configuration for easy parameter tuning
 - **Hyperparameter Optimization**: Automated tuning using Optuna
-- **Experiment Tracking**: Complete experiment management with Comet ML and MLflow support
+- **Experiment Tracking**: Complete experiment management with MLflow (default) and Comet ML support
 - **Feature Engineering**: Feast-based feature store for consistent data processing
 - **Model Evaluation**: F-beta score optimization with configurable precision/recall weighting
 - **Containerized Deployment**: Docker-based model serving with REST API
@@ -162,6 +162,8 @@ This project uses [uv](https://github.com/astral-sh/uv) to manage dependencies, 
     make install
 
 #### Environment Variables
+
+**MLflow** is used as the default experiment tracker and requires no additional configuration.
 
 When using **Comet ML as the experiment tracker**, set these environment variables:
 
