@@ -498,7 +498,7 @@ class MLflowExperimentManager(ExperimentManager):
             file_name: Name for the asset.
         """
         logger.info("Logging assets to experiment ID: %s", experiment.info.run_id)
-        mlflow.log_artifact(file_path, artifact_path=f"assets/{file_name}")
+        mlflow.log_artifact(file_path, f"assets/{file_name}")
 
     def register_model(
         self,

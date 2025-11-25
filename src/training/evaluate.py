@@ -14,14 +14,21 @@ testing set, and registers it as the champion model if it meets the deployment t
 
 import argparse
 import logging
+import os
 from pathlib import PosixPath
 from typing import Optional
 
-# IMPORTANT: Import comet_ml before sklearn to enable auto-logging
-import comet_ml  # noqa: F401 # pylint: disable=unused-import
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# IMPORTANT: Set ENABLE_COMET_LOGGING=true in environment if using Comet ML tracker
+# This ensures comet_ml is imported before other ML libraries for proper auto-logging
+if os.getenv("ENABLE_COMET_LOGGING", "false").lower() == "true":
+    import comet_ml  # pylint: disable=unused-import
+
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
 
 from src.training.evaluation.champion import ModelChampionManager
 from src.training.evaluation.orchestrator import create_evaluation_orchestrator
@@ -31,8 +38,6 @@ from src.training.tracking.experiment import get_tracker_credentials
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
-
-load_dotenv()
 
 
 def main(

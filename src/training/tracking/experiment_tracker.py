@@ -358,9 +358,7 @@ class MLflowExperimentTracker(ExperimentTracker):
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             figure.savefig(tmp.name, bbox_inches="tight")
-            self.mlflow.log_artifact(
-                tmp.name, artifact_path=f"figures/{figure_name}.png"
-            )
+            self.mlflow.log_artifact(tmp.name, f"figures/{figure_name}.png")
 
     def log_confusion_matrix(
         self,
@@ -385,9 +383,7 @@ class MLflowExperimentTracker(ExperimentTracker):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
             json.dump(cm_data, tmp)
             artifact_name = file_name if file_name else f"{title}.json"
-            self.mlflow.log_artifact(
-                tmp.name, artifact_path=f"confusion_matrices/{artifact_name}"
-            )
+            self.mlflow.log_artifact(tmp.name, f"confusion_matrices/{artifact_name}")
 
     def log_model(
         self,
@@ -417,9 +413,7 @@ class MLflowExperimentTracker(ExperimentTracker):
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to load and log model %s: %s", name, e)
             # Fallback to just logging as artifact
-            self.mlflow.log_artifact(
-                str(file_or_folder), artifact_path=f"models/{name}"
-            )
+            self.mlflow.log_artifact(str(file_or_folder), f"models/{name}")
             logger.warning("Fell back to logging model as artifact only")
 
     def log_asset(self, file_path: str, file_name: str, **kwargs) -> None:
@@ -430,7 +424,7 @@ class MLflowExperimentTracker(ExperimentTracker):
             file_name: Name for the asset.
             **kwargs: Additional arguments (unused for MLflow).
         """
-        self.mlflow.log_artifact(file_path, artifact_path=f"assets/{file_name}")
+        self.mlflow.log_artifact(file_path, f"assets/{file_name}")
 
     def register_model(self, model_name: str, **kwargs) -> None:
         """Register a model in MLflow's model registry."""

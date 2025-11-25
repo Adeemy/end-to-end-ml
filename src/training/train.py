@@ -22,12 +22,21 @@ Data Prep Flow:
 
 import argparse
 import logging
+import os
 from datetime import datetime
 from pathlib import PosixPath
 from typing import List, Tuple
 
-import pandas as pd
 from dotenv import load_dotenv
+
+load_dotenv()
+
+# IMPORTANT: Set ENABLE_COMET_LOGGING=true in environment if using Comet ML tracker
+# This ensures comet_ml is imported before other ML libraries for proper auto-logging
+if os.getenv("ENABLE_COMET_LOGGING", "false").lower() == "true":
+    import comet_ml  # pylint: disable=unused-import
+
+import pandas as pd
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -52,8 +61,6 @@ from src.training.tracking.experiment import (
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR
-
-load_dotenv()
 
 
 def prepare_data(
