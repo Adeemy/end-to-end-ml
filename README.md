@@ -15,7 +15,7 @@ The project adheres to best practices of machine learning engineering, such as m
 
 - **Configurable Pipeline**: YAML-based configuration for easy parameter tuning
 - **Hyperparameter Optimization**: Automated tuning using Optuna
-- **Experiment Tracking**: Complete experiment management with Comet ML
+- **Experiment Tracking**: Complete experiment management with Comet ML and MLflow support
 - **Feature Engineering**: Feast-based feature store for consistent data processing
 - **Model Evaluation**: F-beta score optimization with configurable precision/recall weighting
 - **Containerized Deployment**: Docker-based model serving with REST API
@@ -187,6 +187,16 @@ The training and deployment pipelines can be run in GitHub Actions. You can also
 
         make evaluate
 
+**Champion Model Registration:**
+The evaluation process automatically:
+- Selects the best performing model based on validation metrics from both training and evaluation runs
+- Registers it as "champion_model" in the experiment tracker's model registry with complete artifacts
+- Saves it locally as `src/training/artifacts/champion_model.pkl` for deployment
+- Includes all necessary files: model.pkl, MLmodel metadata, environment specs, and dependencies
+- Ensures the model meets deployment criteria before registration
+- Provides production-ready model accessible via `models:/champion_model/latest`
+- Both training and evaluation runs log complete model artifacts for full traceability
+
 - Test champion model
 
         make test_model
@@ -194,3 +204,54 @@ The training and deployment pipelines can be run in GitHub Actions. You can also
 - Pull containerized model
 
         docker pull ghcr.io/adeemy/end-to-end-ml:c35fb9610651e155d7a3799644e6ff64c1a5a2db
+
+## Experiment Tracking
+
+This project supports both Comet ML and MLflow for experiment tracking. You can switch between them by modifying the `experiment_tracker` parameter in `src/config/training-config.yml`.
+
+### Using Comet ML
+
+Set `experiment_tracker: "comet"` in the training configuration. Experiments will be tracked in your Comet workspace with the configured project name.
+
+### Using MLflow
+
+Set `experiment_tracker: "mlflow"` in the training configuration.
+
+#### Viewing MLflow Dashboard
+
+To view the MLflow web interface and track your experiments:
+
+1. **Start MLflow UI server:**
+   ```bash
+   mlflow ui --host 0.0.0.0 --port 8080
+   ```
+
+2. **If the dashboard appears blank, try with additional security options:**
+   ```bash
+   mlflow ui --host 0.0.0.0 --port 8080 --allowed-hosts "*"
+   ```
+
+3. **For persistent background running:**
+   ```bash
+   nohup mlflow ui --host 0.0.0.0 --port 8080 --allowed-hosts "*" > mlflow.log 2>&1 &
+   ```
+
+4. **Access the dashboard:**
+   - **Local development:** Open http://localhost:8080 in your browser
+   - **Dev container/Codespaces:** Use VS Code's port forwarding or `"$BROWSER" http://localhost:8080`
+   - **Remote server:** Replace `localhost` with your server's IP address
+
+5. **Dashboard features:**
+   - View all experiments and runs
+   - Compare metrics and parameters across runs
+   - Download model artifacts
+   - Visualize experiment results and trends
+
+**Troubleshooting blank dashboard:**
+- **Check if server is running**: `curl -I http://localhost:8080` should return HTTP 200
+- **JavaScript issues**: Ensure JavaScript is enabled in your browser
+- **Browser compatibility**: Try different browsers (Chrome, Firefox, Edge)
+- **Port forwarding**: In VS Code dev containers, use the "Ports" tab to forward port 8080
+- **Try different port**: Use `--port 8088` if port 8080 has conflicts
+
+The MLflow tracking server will automatically detect experiments logged to the default `./mlruns` directory.

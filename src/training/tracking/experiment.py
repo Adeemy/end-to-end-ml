@@ -439,16 +439,9 @@ class MLflowExperimentManager(ExperimentManager):
         """
 
         try:
-            # Set experiment (creates if doesn't exist)
+            # Set experiment and start run with proper context
             mlflow.set_experiment(project_name)
-
-            # Start a new run with the specified name
             run = mlflow.start_run(run_name=experiment_name)
-            logger.info(
-                "Created MLflow run: %s in experiment: %s",
-                experiment_name,
-                project_name,
-            )
             return run
         except Exception as e:
             raise ValueError(f"MLflow experiment creation error --> {e}") from e
@@ -512,17 +505,24 @@ class MLflowExperimentManager(ExperimentManager):
         """
 
         # Log the model to MLflow
-        logger.info(
-            "Registering model: %s to MLflow for experiment ID: %s",
-            registered_model_name,
-            experiment.info.run_id,
-        )
-        mlflow.sklearn.log_model(
-            sk_model=pipeline,
-            artifact_path=artifacts_path,
-            registered_model_name=registered_model_name,
-        )
-        logger.info("Registered model: %s", registered_model_name)
+        try:
+            mlflow.sklearn.log_model(
+                sk_model=pipeline,
+                artifact_path=registered_model_name,
+                registered_model_name=registered_model_name,
+            )
+
+            # Also save model locally for consistency with Comet implementation
+            artifacts_dir = Path(artifacts_path)
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            model_path = artifacts_dir / f"{registered_model_name}.pkl"
+            joblib.dump(pipeline, str(model_path))
+            logger.info("Model also saved locally to: %s", model_path)
+
+        except Exception as e:
+            logger.error("Failed to log model to MLflow: %s", e)
+            raise
+        logger.info("Model registration completed: %s", registered_model_name)
 
     def end_experiment(self, experiment: Any) -> None:
         """Ends an MLflow run.
