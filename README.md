@@ -28,7 +28,7 @@ The project adheres to best practices of machine learning engineering, such as m
 - **`src/config/`**: YAML configuration files for data processing and training
 - **`src/feature/`**: Data ingestion, preprocessing, and feature engineering
 - **`src/training/`**: Model training, hyperparameter optimization, and evaluation
-- **`src/inference/`**: REST API for model serving and predictions and can be extended for batch inference
+- **`src/inference/`**: Model serving with CLI batch scoring (`predict.py`) and REST API service (`api_server.py`)
 - **`src/utils/`**: Shared utilities, logging, and configuration management
 - **`tests/`**: Unit tests for ML components and pipeline validation
 
@@ -98,7 +98,7 @@ Below is the repo structure.
         │   │   ├── Dockerfile
         │   │   ├── README.md
         │   │   ├── __init__.py
-        │   │   ├── main.py
+        │   │   ├── api_server.py
         │   │   ├── predict.py
         │   │   └── utils
         │   │       ├── __init__.py
@@ -215,11 +215,27 @@ The evaluation process automatically:
 - Provides production-ready model accessible via `models:/champion_model/latest`
 - Both training and evaluation runs log complete model artifacts for full traceability
 
-- Test champion model
+- **Test champion model via CLI (batch scoring)**
 
-        make test_model
+        make test_model_cli
 
-- Pull containerized model
+- **Start REST API server for real-time predictions**
+
+        make start_api_server
+        # Then visit http://localhost:8000/docs to test the API
+
+- **Test API server with sample data**
+
+        # Option 1: Test against running server
+        make test_api_with_sample
+
+        # Option 2: Full end-to-end test (start → test → stop)
+        make test_api_full
+
+        # Show all API testing options
+        make help_api
+
+- **Pull containerized model**
 
         docker pull ghcr.io/adeemy/end-to-end-ml:c35fb9610651e155d7a3799644e6ff64c1a5a2db
 
