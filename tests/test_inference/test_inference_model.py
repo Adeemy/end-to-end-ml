@@ -8,14 +8,14 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.inference.utils.model import ModelLoader, predict
+from src.inference.utils.model import ModelLoaderManager, predict
 from src.training.schemas import Config
 from src.utils.path import PARENT_DIR
 
 
 @pytest.fixture
 def model_loader():
-    return ModelLoader()
+    return ModelLoaderManager()
 
 
 def test_get_config_params(model_loader):  # pylint: disable=redefined-outer-name
@@ -24,7 +24,12 @@ def test_get_config_params(model_loader):  # pylint: disable=redefined-outer-nam
     config_yaml_abs_path = f"{str(PARENT_DIR)}/config/training-config.yml"
 
     config = Config(config_path=config_yaml_abs_path)
-    workspace_name = config.params["train"]["workspace_name"]
+    tracker_type = config.params["train"]["experiment_tracker"]
+    workspace_name = (
+        config.params["train"]["workspace_name"]
+        if tracker_type.lower() == "comet"
+        else None
+    )
     model_name = config.params["modelregistry"]["champion_model_name"]
     hf_data_source = config.params["data"]["raw_dataset_source"]
 
@@ -34,6 +39,7 @@ def test_get_config_params(model_loader):  # pylint: disable=redefined-outer-nam
     result = model_loader.get_config_params(config_yaml_abs_path)
 
     assert result == (
+        tracker_type,
         workspace_name,
         model_name,
         num_col_names,
@@ -42,42 +48,74 @@ def test_get_config_params(model_loader):  # pylint: disable=redefined-outer-nam
     )
 
 
-def test_download_model(mocker, model_loader):  # pylint: disable=redefined-outer-name
-    """Tests that download_model returns a registered model."""
+def test_load_model_comet(mocker, model_loader):  # pylint: disable=redefined-outer-name
+    """Tests that load_model returns a registered model from Comet ML."""
 
     # Mock the API class and its methods
     mock_api = mocker.MagicMock()
+    mock_api.get_registry_model_versions.return_value = ["1.0.0"]
+
+    # Mock comet model download
+    mock_model = mocker.MagicMock()
+    mock_api.get_model.return_value = mock_model
 
     # Set the mock api to the model_loader api attribute
-    model_loader.comet_api = mock_api
+    model_loader.comet_api_key = "fake_key"
 
     # Mock joblib and its methods
     mocker.patch("joblib.load", return_value="trained_model")
 
+    # Mock the create_model_loader to return a CometModelLoader with our mock API
+    mock_comet_loader = mocker.MagicMock()
+    mock_comet_loader.load_model.return_value = "trained_model"
+    mocker.patch(
+        "src.inference.utils.model.create_model_loader", return_value=mock_comet_loader
+    )
+
     # Define the test parameters
+    tracker_type = "comet"
     comet_workspace = "workspace"
     model_name = "model"
     artifacts_path = Path("/path/to/artifacts")
 
-    # Call the download_model method
-    result = model_loader.download_model(
-        comet_workspace,
-        model_name,
-        artifacts_path,
+    # Call the load_model method
+    result = model_loader.load_model(
+        tracker_type=tracker_type,
+        model_name=model_name,
+        artifacts_path=artifacts_path,
+        workspace_name=comet_workspace,
     )
 
     # Check the result
     assert result == "trained_model"
 
-    # Check that the API methods were called with the correct arguments
-    mock_api.get_model.assert_called_once_with(
-        workspace=comet_workspace,
+
+def test_load_model_mlflow(
+    mocker, model_loader
+):  # pylint: disable=redefined-outer-name
+    """Tests that load_model returns a registered model from MLflow."""
+
+    # Mock the MLflow model loader
+    mock_mlflow_loader = mocker.MagicMock()
+    mock_mlflow_loader.load_model.return_value = "trained_mlflow_model"
+    mocker.patch(
+        "src.inference.utils.model.create_model_loader", return_value=mock_mlflow_loader
+    )
+
+    # Define the test parameters
+    tracker_type = "mlflow"
+    model_name = "model"
+    artifacts_path = Path("/path/to/artifacts")
+
+    # Call the load_model method
+    result = model_loader.load_model(
+        tracker_type=tracker_type,
         model_name=model_name,
+        artifacts_path=artifacts_path,
     )
-    mock_api.get_registry_model_versions.assert_called_once_with(
-        workspace=comet_workspace,
-        registry_name=model_name,
-    )
+
+    # Check the result
+    assert result == "trained_mlflow_model"
 
 
 def test_predict():

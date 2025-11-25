@@ -409,7 +409,7 @@ class MLflowExperimentTracker(ExperimentTracker):
             # This creates a proper MLflow model with all artifacts and metadata
             self.mlflow.sklearn.log_model(
                 sk_model=model,
-                artifact_path=name,  # This will be the path in the MLflow run
+                name=name,  # This will be the path in the MLflow run
                 registered_model_name=None,  # Don't register here, do it separately
             )
             logger.info("Successfully logged model %s to MLflow", name)
