@@ -3,6 +3,7 @@ Abstract experiment tracking interface and concrete implementations.
 """
 
 import json
+import logging
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -12,6 +13,8 @@ import mlflow
 import numpy as np
 from comet_ml import ExistingExperiment, Experiment
 from matplotlib.figure import Figure
+
+logger = logging.getLogger(__name__)
 
 
 class ExperimentTracker(ABC):
@@ -370,10 +373,13 @@ class MLflowExperimentTracker(ExperimentTracker):
         """Log a confusion matrix to MLflow."""
 
         # Save confusion matrix as JSON artifact
+        # Convert numpy types to native Python types to avoid JSON serialization issues
         cm_data = {
-            "matrix": matrix.tolist(),
-            "title": title,
-            "labels": labels if labels else [],
+            "matrix": matrix.astype(
+                int
+            ).tolist(),  # Convert to int to avoid int64 JSON serialization issues
+            "title": str(title),
+            "labels": [str(label) for label in labels] if labels else [],
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
@@ -391,8 +397,30 @@ class MLflowExperimentTracker(ExperimentTracker):
         **kwargs,
     ) -> None:
         """Log a model artifact to MLflow."""
-        # Note: overwrite parameter not used in MLflow as it handles versioning differently
-        self.mlflow.log_artifact(str(file_or_folder), artifact_path=f"models/{name}")
+        # For MLflow, we need to log the actual model object, not just the file
+        # Load the model from the pickle file and log it properly
+        import joblib
+
+        try:
+            # Load the model from the pickle file
+            model = joblib.load(str(file_or_folder))
+
+            # Log the model using MLflow's sklearn integration
+            # This creates a proper MLflow model with all artifacts and metadata
+            self.mlflow.sklearn.log_model(
+                sk_model=model,
+                artifact_path=name,  # This will be the path in the MLflow run
+                registered_model_name=None,  # Don't register here, do it separately
+            )
+            logger.info("Successfully logged model %s to MLflow", name)
+
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to load and log model %s: %s", name, e)
+            # Fallback to just logging as artifact
+            self.mlflow.log_artifact(
+                str(file_or_folder), artifact_path=f"models/{name}"
+            )
+            logger.warning("Fell back to logging model as artifact only")
 
     def log_asset(self, file_path: str, file_name: str, **kwargs) -> None:
         """Log an asset file to MLflow.
@@ -406,10 +434,28 @@ class MLflowExperimentTracker(ExperimentTracker):
 
     def register_model(self, model_name: str, **kwargs) -> None:
         """Register a model in MLflow's model registry."""
-        # Get the current run to construct the model URI
-        run_id = self.run_id or self.mlflow.active_run().info.run_id
-        model_uri = f"runs:/{run_id}/model"
-        self.mlflow.register_model(model_uri, model_name)
+        try:
+            # Get the current run to construct the model URI
+            run_id = self.run_id or self.mlflow.active_run().info.run_id
+
+            # Use the artifact path that was used in log_model
+            # The champion model is logged with the model name as artifact path
+            model_uri = f"runs:/{run_id}/{model_name}"
+
+            # Register the model in the MLflow model registry
+            registered_model = self.mlflow.register_model(model_uri, model_name)
+            logger.info(
+                "Successfully registered model '%s' in MLflow registry. Version: %s",
+                model_name,
+                registered_model.version,
+            )
+
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to register model '%s' in MLflow: %s", model_name, e)
+            # Don't raise the exception to avoid breaking the workflow
+            logger.warning(
+                "MLflow model registration failed, but local model file is available for deployment"
+            )
 
     def get_metric(self, metric_name: str) -> Optional[float]:
         """Retrieve a logged metric value from MLflow."""

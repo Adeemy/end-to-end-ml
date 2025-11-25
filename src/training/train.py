@@ -521,7 +521,18 @@ def main(
     for i in range(len(exp_objects)):
         exp_key = list(exp_objects.keys())[i]
         exp_value = list(exp_objects.values())[i]
-        exp_names_keys.update(**{f"{exp_key}": exp_value.get_key()})
+
+        # Handle different tracker types for getting experiment key/id
+        if training_config.train_params.experiment_tracker.lower() == "comet":
+            exp_id = exp_value.get_key()
+        elif training_config.train_params.experiment_tracker.lower() == "mlflow":
+            exp_id = exp_value.info.run_id
+        else:
+            raise ValueError(
+                f"Unsupported tracker type: {training_config.train_params.experiment_tracker}"
+            )
+
+        exp_names_keys.update(**{f"{exp_key}": exp_id})
 
     successful_exp = pd.DataFrame(exp_names_keys.items())
 

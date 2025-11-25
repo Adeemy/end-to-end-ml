@@ -78,7 +78,7 @@ preprocessing:
 
 train:
   initiate_comet_project: False # Should be True if new Comet project should be created
-  experiment_tracker: "comet" # Type of experiment tracker to use (e.g., "comet", "mlflow")
+  experiment_tracker: "mlflow" # Type of experiment tracker to use (e.g., "comet", "mlflow")
   project_name: "end-to-end-ml"
   workspace_name: "6bmod5d8"
   search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization
@@ -88,7 +88,7 @@ train:
   fbeta_score_beta_val: 0.5 # Value of beta in f_beta_score, which is a metric used for hyperparams optimization
   comparison_metric: "fbeta_score" # Metric name to compare models. Must be: recall, precision, roc_auc, f1, or fbeta_score
   voting_rule: "soft" # Voting strategy in voting ensemble
-  deployment_score_thresh: 0.8 # Min. score for the best model acheive to be deployed in production
+  deployment_score_thresh: 0.3 # Min. score for the best model acheive to be deployed in production
   max_eval_experiments: 50 # Max. no. of recent experiments to consider for evaluation
 
 logisticregression:
