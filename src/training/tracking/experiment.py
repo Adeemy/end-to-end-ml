@@ -439,6 +439,18 @@ class MLflowExperimentManager(ExperimentManager):
         """
 
         try:
+            # Enable autologging for automatic tracing and logging
+            # This captures model artifacts, parameters, metrics, and traces automatically
+            mlflow.autolog(
+                log_input_examples=False,
+                log_model_signatures=True,
+                log_models=True,
+                disable=False,
+                exclusive=False,
+                disable_for_unsupported_versions=False,
+                silent=False,
+            )
+
             # Set experiment and start run with proper context
             mlflow.set_experiment(project_name)
             run = mlflow.start_run(run_name=experiment_name)
@@ -508,7 +520,7 @@ class MLflowExperimentManager(ExperimentManager):
         try:
             mlflow.sklearn.log_model(
                 sk_model=pipeline,
-                artifact_path=registered_model_name,
+                name=registered_model_name,
                 registered_model_name=registered_model_name,
             )
 

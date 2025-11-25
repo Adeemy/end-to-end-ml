@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse
 
-from src.inference.utils.model import ModelLoader
+from src.inference.utils.model import ModelLoaderManager
 from src.utils.path import ARTIFACTS_DIR, PARENT_DIR
 
 load_dotenv()
@@ -42,8 +42,9 @@ load_dotenv()
 # }
 
 # Extracts config params
-load_model = ModelLoader(comet_api_key=os.environ["COMET_API_KEY"])
+load_model = ModelLoaderManager(comet_api_key=os.environ["COMET_API_KEY"])
 (
+    tracker_type,
     comet_ws,
     champ_model_name,
     *_,
@@ -51,11 +52,12 @@ load_model = ModelLoader(comet_api_key=os.environ["COMET_API_KEY"])
     config_yaml_abs_path=f"{str(PARENT_DIR.parent)}/src/config/training-config.yml"
 )
 
-# Download champion model
-model = load_model.download_model(
-    comet_workspace=comet_ws,
+# Load champion model
+model = load_model.load_model(
+    tracker_type=tracker_type,
     model_name=champ_model_name,
     artifacts_path=ARTIFACTS_DIR,
+    workspace_name=comet_ws,
 )
 
 # Root to ./src/inference and run "uvicorn --host 0.0.0.0 main:app"

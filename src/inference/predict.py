@@ -9,7 +9,7 @@ import os
 
 from dotenv import load_dotenv
 
-from src.inference.utils.model import ModelLoader, predict
+from src.inference.utils.model import ModelLoaderManager, predict
 from src.utils.logger import get_console_logger
 from src.utils.path import ARTIFACTS_DIR
 
@@ -18,31 +18,33 @@ load_dotenv()
 ########################################################
 
 
-def main(
-    config_yaml_path: str, api_key: str, input_data: dict, logger: logging.Logger
-) -> None:
+def main(config_yaml_path: str, input_data: dict, logger: logging.Logger) -> None:
     """Loads the champion model and scores the input data.
 
     Args:
         config_yaml_path (str): path to the config yaml file.
-        api_key (str): Comet API key.
         input_data (dict): dictionary containing the input data.
         logger (logging.Logger): logger object.
     """
 
-    # Extracts config params
-    load_model = ModelLoader(comet_api_key=api_key)
+    # Initialize ModelLoader with environment variables
+    comet_api_key = os.environ.get("COMET_API_KEY")
+    load_model = ModelLoaderManager(comet_api_key=comet_api_key)
+
+    # Extract config params including tracker type
     (
-        comet_ws,
+        tracker_type,
+        workspace_name,
         champ_model_name,
         *_,
     ) = load_model.get_config_params(config_yaml_abs_path=config_yaml_path)
 
-    # Download champion model
-    model = load_model.download_model(
-        comet_workspace=comet_ws,
+    # Load champion model from the appropriate registry
+    model = load_model.load_model(
+        tracker_type=tracker_type,
         model_name=champ_model_name,
         artifacts_path=ARTIFACTS_DIR,
+        workspace_name=workspace_name,
     )
 
     prediction = predict(model, input_data)
@@ -96,7 +98,6 @@ if __name__ == "__main__":
 
     main(
         config_yaml_path=args.config_yaml_path,
-        api_key=os.environ["COMET_API_KEY"],
         input_data=sample_data,
         logger=console_logger,
     )
