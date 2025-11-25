@@ -46,11 +46,12 @@
   "remoteEnv": {
     "PATH": "${containerEnv:PATH}:."
   },
-  // Features to add to the dev container. More info: https://containers.dev/features.
-  "features": {
-    "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/mikaello/devcontainer-features/modern-shell-utils:2": {}
-  },
+  // // Features to add to the dev container. More info: https://containers.dev/features.
+  // // Commented out to allow installing devcontainer without ""self signed certificate in certificate chain" error.
+  // "features": {
+  //   "ghcr.io/devcontainers/features/github-cli:1": {},
+  //   "ghcr.io/mikaello/devcontainer-features/modern-shell-utils:2": {}
+  // },
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   "forwardPorts": [
     8080
