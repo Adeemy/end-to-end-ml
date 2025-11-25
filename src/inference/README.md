@@ -9,7 +9,7 @@ REST API for serving trained ML models with real-time predictions.
 ```bash
 # Local development (run from project root)
 export COMET_API_KEY=your_api_key
-uvicorn src.inference.main:app --host 0.0.0.0 --port 8000
+uvicorn src.inference.api_server:app --host 0.0.0.0 --port 8000
 
 # Test
 curl http://localhost:8000/

@@ -81,13 +81,47 @@ evaluate:
 
 submit_train: prep_data split_data train evaluate
 
-# Test model locally
-test_model:
+# Test champion model via CLI (batch scoring)
+test_model_cli:
 	python ./src/inference/predict.py --config_yaml_path ./src/config/training-config.yml --logger_path ./src/config/logging.conf
 
-# Test model via API (go to http://localhost:8000/docs page to test sample)
-test_packaged_model:
-	cd ./src/inference && uvicorn --host 0.0.0.0 main:app
+# Start REST API server for real-time predictions (go to http://localhost:8000/docs to test)
+start_api_server:
+	cd ./src/inference && uvicorn --host 0.0.0.0 api_server:app
+
+# Test API server with sample data (requires server to be running)
+test_api_with_sample:
+	curl -X POST http://localhost:8000/predict \
+	  -H "Content-Type: application/json" \
+	  -d '{"BMI": 29.0, "PhysHlth": 0, "Age": "65 to 69", "HighBP": "0", "HighChol": "1", "CholCheck": "0", "Smoker": "1", "Stroke": "1", "HeartDiseaseorAttack": "0", "PhysActivity": "1", "Fruits": "1", "Veggies": "1", "HvyAlcoholConsump": "1", "AnyHealthcare": "1", "NoDocbcCost": "1", "GenHlth": "Poor", "MentHlth": "1", "DiffWalk": "1", "Sex": "1", "Education": "1", "Income": "7"}'
+
+# Test API server end-to-end (start server in background, test, then stop)
+test_api_full:
+	@echo "Starting API server in background..."
+	@cd ./src/inference && uvicorn --host 0.0.0.0 api_server:app & echo $$! > /tmp/api_server.pid
+	@echo "Waiting for server to start..."
+	@sleep 5
+	@echo "Testing health endpoint..."
+	@curl -s http://localhost:8000/ || true
+	@echo "\nTesting prediction endpoint with sample data..."
+	@curl -X POST http://localhost:8000/predict \
+	  -H "Content-Type: application/json" \
+	  -d '{"BMI": 29.0, "PhysHlth": 0, "Age": "65 to 69", "HighBP": "0", "HighChol": "1", "CholCheck": "0", "Smoker": "1", "Stroke": "1", "HeartDiseaseorAttack": "0", "PhysActivity": "1", "Fruits": "1", "Veggies": "1", "HvyAlcoholConsump": "1", "AnyHealthcare": "1", "NoDocbcCost": "1", "GenHlth": "Poor", "MentHlth": "1", "DiffWalk": "1", "Sex": "1", "Education": "1", "Income": "7"}' || true
+	@echo "\nStopping API server..."
+	@kill `cat /tmp/api_server.pid` 2>/dev/null || true
+	@rm -f /tmp/api_server.pid
+	@echo "API test completed."
+
+# Show available API testing commands
+help_api:
+	@echo "API Testing Commands:"
+	@echo "  make start_api_server     - Start FastAPI server (visit http://localhost:8000/docs)"
+	@echo "  make test_api_with_sample - Send sample data to running API server"
+	@echo "  make test_api_full        - End-to-end test (start→test→stop server)"
+	@echo ""
+	@echo "CLI Testing Commands:"
+	@echo "  make test_model_cli       - Test model via CLI with sample data"
+	@echo "  make test_model           - Alias for test_model_cli"
 
 # Print recent directory structure
 print_tree:
