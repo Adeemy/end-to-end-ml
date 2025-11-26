@@ -173,3 +173,9 @@ includedmodels:
   include_lightgbm: true # Should LightGBM model be included in training
   include_xgboost: false # Should XGBoost model be included in training
   include_voting_ensemble: false # Should Voting Ensemble model be included in training
+
+# Inference config included in training config to ensure model's config during training and inference is the same
+inference:
+  batch_prediction:
+    input_file: "./src/feature/feature_repo/data/inference.parquet" # Input file for batch prediction
+    output_file: "./src/inference/artifacts/batch_predictions.parquet" # Output file for batch prediction results

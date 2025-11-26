@@ -81,9 +81,31 @@ evaluate:
 
 submit_train: prep_data split_data train evaluate
 
+view_mlflow:
+	mlflow ui --host 0.0.0.0 --port 8080
+
 # Test champion model via CLI (batch scoring)
 test_model_cli:
 	python ./src/inference/predict.py --config_yaml_path ./src/config/training-config.yml --logger_path ./src/config/logging.conf
+
+# Batch prediction on parquet file
+predict_batch:
+	@echo "Running batch prediction on inference.parquet..."
+	python ./src/inference/predict.py \
+		--config_yaml_path ./src/config/training-config.yml \
+		--logger_path ./src/config/logging.conf \
+		--input_file ./src/feature/feature_repo/data/inference.parquet \
+		--output_file ./src/inference/artifacts/batch_predictions.parquet
+
+# Batch prediction with custom input/output files (uses config defaults if not specified)
+predict_batch_custom:
+	@echo "Usage: make predict_batch_custom [INPUT_FILE=path/to/input.parquet] [OUTPUT_FILE=path/to/output.parquet]"
+	@echo "Note: If INPUT_FILE/OUTPUT_FILE not specified, uses paths from training-config.yml"
+	python ./src/inference/predict.py \
+		--config_yaml_path ./src/config/training-config.yml \
+		--logger_path ./src/config/logging.conf \
+		$(if $(INPUT_FILE),--input_file $(INPUT_FILE),) \
+		$(if $(OUTPUT_FILE),--output_file $(OUTPUT_FILE),)
 
 # Start REST API server for real-time predictions (go to http://localhost:8000/docs to test)
 start_api_server:
@@ -122,6 +144,11 @@ help_api:
 	@echo "CLI Testing Commands:"
 	@echo "  make test_model_cli       - Test model via CLI with sample data"
 	@echo "  make test_model           - Alias for test_model_cli"
+	@echo ""
+	@echo "Batch Prediction Commands:"
+	@echo "  make predict_batch        - Predict on inference.parquet file"
+	@echo "  make predict_batch_custom INPUT_FILE=input.parquet OUTPUT_FILE=output.parquet"
+	@echo "                            - Predict on custom parquet file"
 
 # Print recent directory structure
 print_tree:
