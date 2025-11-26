@@ -164,7 +164,6 @@ class TrainFeaturesConfig:
     train_test_split_curoff_date: str
     train_valid_split_curoff_date: date
     split_date_col_format: str
-    cat_features_nan_replacement: str
     train_set_size: float
     pk_col_name: str
     class_col_name: str
@@ -186,6 +185,7 @@ class TrainPreprocessingConfig:
     cat_features_imputer: str = "most_frequent"
     cat_features_ohe_handle_unknown: str = "error"
     cat_features_nans_replacement: str = "Unknown"
+    cat_features_min_frequency: float = 0.01
     var_thresh_val: float = 0.0
 
 
