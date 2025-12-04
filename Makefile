@@ -84,7 +84,7 @@ submit_train: prep_data split_data train evaluate
 view_mlflow:
 	mlflow ui --host 0.0.0.0 --port 8080
 
-# Test champion model via CLI (batch scoring)
+# Test champion model via CLI (batch scoring requires inference.parquet file)
 test_model_cli:
 	python ./src/inference/predict.py --config_yaml_path ./src/config/training-config.yml --logger_path ./src/config/logging.conf
 
@@ -107,15 +107,20 @@ predict_batch_custom:
 		$(if $(INPUT_FILE),--input_file $(INPUT_FILE),) \
 		$(if $(OUTPUT_FILE),--output_file $(OUTPUT_FILE),)
 
+# Test API prediction logic directly via CLI (no HTTP server needed)
+test_api_cli:
+	python ./src/inference/api_server.py --input_data '[{"BMI": 29.0, "PhysHlth": 0, "Age": "65 to 69", "HighBP": "0", "HighChol": "1", "CholCheck": "0", "Smoker": "1", "Stroke": "1", "HeartDiseaseorAttack": "0", "PhysActivity": "1", "Fruits": "1", "Veggies": "1", "HvyAlcoholConsump": "1", "AnyHealthcare": "1", "NoDocbcCost": "1", "GenHlth": "Poor", "MentHlth": "1", "DiffWalk": "1", "Sex": "1", "Education": "1", "Income": "7"}, {"BMI": 25.0, "PhysHlth": 2, "Age": "35 to 39", "HighBP": "1", "HighChol": "0", "CholCheck": "1", "Smoker": "0", "Stroke": "0", "HeartDiseaseorAttack": "0", "PhysActivity": "1", "Fruits": "1", "Veggies": "1", "HvyAlcoholConsump": "0", "AnyHealthcare": "1", "NoDocbcCost": "0", "GenHlth": "Very Good", "MentHlth": "0", "DiffWalk": "0", "Sex": "0", "Education": "6", "Income": "8"}]'
+
 # Start REST API server for real-time predictions (go to http://localhost:8000/docs to test)
 start_api_server:
 	cd ./src/inference && uvicorn --host 0.0.0.0 api_server:app
 
-# Test API server with sample data (requires server to be running)
+# Test API server with two data samples (requires server to be running)
 test_api_with_sample:
-	curl -X POST http://localhost:8000/predict \
+	@echo "Testing API server with multiple sample data points..."
+	@curl -X POST http://localhost:8000/predict \
 	  -H "Content-Type: application/json" \
-	  -d '{"BMI": 29.0, "PhysHlth": 0, "Age": "65 to 69", "HighBP": "0", "HighChol": "1", "CholCheck": "0", "Smoker": "1", "Stroke": "1", "HeartDiseaseorAttack": "0", "PhysActivity": "1", "Fruits": "1", "Veggies": "1", "HvyAlcoholConsump": "1", "AnyHealthcare": "1", "NoDocbcCost": "1", "GenHlth": "Poor", "MentHlth": "1", "DiffWalk": "1", "Sex": "1", "Education": "1", "Income": "7"}'
+	  -d '[{"BMI": 29.0, "PhysHlth": 0, "Age": "65 to 69", "HighBP": "0", "HighChol": "1", "CholCheck": "0", "Smoker": "1", "Stroke": "1", "HeartDiseaseorAttack": "0", "PhysActivity": "1", "Fruits": "1", "Veggies": "1", "HvyAlcoholConsump": "1", "AnyHealthcare": "1", "NoDocbcCost": "1", "GenHlth": "Poor", "MentHlth": "1", "DiffWalk": "1", "Sex": "1", "Education": "1", "Income": "7"}, {"BMI": 25.0, "PhysHlth": 2, "Age": "35 to 39", "HighBP": "1", "HighChol": "0", "CholCheck": "1", "Smoker": "0", "Stroke": "0", "HeartDiseaseorAttack": "0", "PhysActivity": "1", "Fruits": "1", "Veggies": "1", "HvyAlcoholConsump": "0", "AnyHealthcare": "1", "NoDocbcCost": "0", "GenHlth": "Very Good", "MentHlth": "0", "DiffWalk": "0", "Sex": "0", "Education": "6", "Income": "8"}]' || true
 
 # Test API server end-to-end (start server in background, test, then stop)
 test_api_full:

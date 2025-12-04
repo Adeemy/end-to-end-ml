@@ -81,7 +81,7 @@ train:
   experiment_tracker: "mlflow" # Type of experiment tracker to use (e.g., "comet", "mlflow"). You must set ENABLE_COMET_LOGGING=true in .env if comet is used.
   project_name: "end-to-end-ml"
   workspace_name: "6bmod5d8"
-  search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization
+  search_max_iters: 100 # Max. no. of iterations for optuna hyperparams optimization
   parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
   exp_timout_secs: 3600 # Experiment timeout
   cross_val_folds: 5 # No. of folds used for cross-validation for model calibration
