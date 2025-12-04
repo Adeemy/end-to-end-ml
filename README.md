@@ -214,10 +214,11 @@ The evaluation process automatically:
 - Ensures the model meets deployment criteria before registration
 - Provides production-ready model accessible via `models:/champion_model/latest`
 - Both training and evaluation runs log complete model artifacts for full traceability
+- The packaged model includes the complete preprocessing pipeline to ensure consistent feature transformations during inference
 
-- **Test champion model via CLI (batch scoring)**
+- **Test champion model via API (batch scoring)**
 
-        make test_model_cli
+        make test_api_cli
 
 - **Batch prediction on parquet files**
 
