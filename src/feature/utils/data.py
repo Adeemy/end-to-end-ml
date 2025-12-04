@@ -60,6 +60,7 @@ class DataPipelineCreator:
             "error", "ignore", "infrequent_if_exist"
         ] = "infrequent_if_exist",
         cat_features_nans_replacement: str = np.nan,
+        cat_features_min_frequency: float = 0.01,
     ):
         """Initializes an instance for data preprocessing pipeline using sklearn."""
 
@@ -68,6 +69,7 @@ class DataPipelineCreator:
         self.cat_features_imputer = cat_features_imputer
         self.cat_features_ohe_handle_unknown = cat_features_ohe_handle_unknown
         self.cat_features_nans_replacement = cat_features_nans_replacement
+        self.cat_features_min_frequency = cat_features_min_frequency
 
     def create_num_features_transformer(
         self,
@@ -92,7 +94,7 @@ class DataPipelineCreator:
     ) -> Pipeline:
         """Creates sklearn pipeline for categorical features.
 
-        Attributes:
+        Returns:
             cat_transformer (Pipeline): sklearn pipeline for categorical features.
         """
         cat_transformer = Pipeline(
@@ -111,6 +113,7 @@ class DataPipelineCreator:
                         categories="auto",
                         drop="first",
                         sparse_output=False,
+                        min_frequency=self.cat_features_min_frequency,
                     ),
                 ),
             ]
@@ -242,10 +245,14 @@ class DataPipelineCreator:
                 selector=selector,
                 data_pipeline=data_pipeline,
             )
-        except ValueError as e:
-            raise ValueError(
-                f"An error occurred while extracting feature names after preprocessing: {e}"
-            ) from e
+        except (ValueError, IndexError) as e:
+            # Fallback for when feature names extraction fails (e.g. due to empty selection)
+            logger.warning(
+                "Could not extract feature names: %s. Using generic names.", e
+            )
+            transformed_data.columns = [
+                f"feature_{i}" for i in range(transformed_data.shape[1])
+            ]
 
         logger.info("Data transformation pipeline created successfully.")
 
@@ -532,6 +539,7 @@ class TrainingDataPrep:
             "error", "ignore", "infrequent_if_exist"
         ] = "infrequent_if_exist",
         cat_features_nans_replacement: str = np.nan,
+        cat_features_min_frequency: float = 0.01,
         var_thresh_val: float = 0.05,
     ) -> Pipeline:
         """Creates a data transformation pipeline and fit it on training set.
@@ -546,6 +554,7 @@ class TrainingDataPrep:
             cat_features_ohe_handle_unknown (Literal["error", "ignore", "infrequent_if_exist"], optional): strategy
                 to handle unknown categories in categorical features. Defaults to "infrequent_if_exist".
             cat_features_nans_replacement (str, optional): value to replace NaNs in categorical features. Defaults to np.nan.
+            cat_features_min_frequency (float, optional): minimum frequency for a category to be considered frequent. Defaults to 0.01.
             var_thresh_val (float, optional): variance threshold value. Defaults to 0.05.
 
         Returns:
@@ -558,6 +567,7 @@ class TrainingDataPrep:
             cat_features_imputer=cat_features_imputer,
             cat_features_ohe_handle_unknown=cat_features_ohe_handle_unknown,
             cat_features_nans_replacement=cat_features_nans_replacement,
+            cat_features_min_frequency=cat_features_min_frequency,
         )
         (
             self.train_features_preprocessed,

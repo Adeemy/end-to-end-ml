@@ -130,6 +130,9 @@ def prepare_data(
     cat_features_nans_replacement = config.params["preprocessing"][
         "cat_features_nans_replacement"
     ]
+    cat_features_min_frequency = config.params["preprocessing"].get(
+        "cat_features_min_frequency", 0.01
+    )
     var_thresh_val = config.params["preprocessing"]["var_thresh_val"]
 
     # Prepare data for training
@@ -179,6 +182,7 @@ def prepare_data(
         cat_features_imputer=cat_features_imputer,
         cat_features_ohe_handle_unknown=cat_features_ohe_handle_unknown,
         cat_features_nans_replacement=cat_features_nans_replacement,
+        cat_features_min_frequency=cat_features_min_frequency,
         var_thresh_val=var_thresh_val,
     )
     data_prep.clean_up_feature_names()

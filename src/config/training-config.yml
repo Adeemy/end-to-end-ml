@@ -11,7 +11,6 @@ data:
   train_test_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is test set)
   train_valid_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is validation set)
   split_date_col_format: "%Y-%m-%d %H:%M:%S"
-  cat_features_nan_replacement: "Unspecified"
   train_set_size: 0.8 # % of train set when splitting data imported from feature store
   pk_col_name: "ID" # Primary key that uniquely identifies every row in dataset
   class_col_name: "Diabetes_binary"
@@ -73,7 +72,8 @@ preprocessing:
     - with_scaling: true
   cat_features_imputer: "constant" # Can be "most_frequent", "constant"
   cat_features_ohe_handle_unknown: "infrequent_if_exist" # Can be "error", "ignore", "infrequent_if_exist"
-  cat_features_nans_replacement: np.nan # Value to replace NaNs in categorical features
+  cat_features_nans_replacement: "Unspecified" # Value to replace NaNs in categorical features
+  cat_features_min_frequency: 0.01 # Minimum frequency for a category to be considered frequent
   var_thresh_val: 0.05 # Thresh. value to remove low variance features in VarianceThreshold
 
 train:
@@ -81,7 +81,7 @@ train:
   experiment_tracker: "mlflow" # Type of experiment tracker to use (e.g., "comet", "mlflow"). You must set ENABLE_COMET_LOGGING=true in .env if comet is used.
   project_name: "end-to-end-ml"
   workspace_name: "6bmod5d8"
-  search_max_iters: 2 # Max. no. of iterations for optuna hyperparams optimization
+  search_max_iters: 100 # Max. no. of iterations for optuna hyperparams optimization
   parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
   exp_timout_secs: 3600 # Experiment timeout
   cross_val_folds: 5 # No. of folds used for cross-validation for model calibration
@@ -173,3 +173,9 @@ includedmodels:
   include_lightgbm: true # Should LightGBM model be included in training
   include_xgboost: false # Should XGBoost model be included in training
   include_voting_ensemble: false # Should Voting Ensemble model be included in training
+
+# Inference config included in training config to ensure model's config during training and inference is the same
+inference:
+  batch_prediction:
+    input_file: "./src/feature/feature_repo/data/inference.parquet" # Input file for batch prediction
+    output_file: "./src/inference/artifacts/batch_predictions.parquet" # Output file for batch prediction results

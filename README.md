@@ -219,6 +219,14 @@ The evaluation process automatically:
 
         make test_model_cli
 
+- **Batch prediction on parquet files**
+
+        # Predict on inference.parquet file
+        make predict_batch
+
+        # Predict on custom parquet files
+        make predict_batch_custom INPUT_FILE=./src/feature/feature_repo/data/inference.parquet OUTPUT_FILE=./src/inference/artifacts/batch_predictions.parquet
+
 - **Start REST API server for real-time predictions**
 
         make start_api_server

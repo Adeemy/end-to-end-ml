@@ -2,31 +2,48 @@
 FastAPI-based model serving service for real-time predictions.
 
 This module provides a REST API service that loads trained ML models from
-experiment tracking backends (MLflow/Comet ML) and serves predictions via
+experiment tracking backends (e.g., MLflow/Comet ML) and serves predictions via
 HTTP endpoints. Supports both champion model loading and direct model
 specification for production inference.
 
 Endpoints:
     GET /: Health check and service information
-    POST /predict: Generate predictions from input features
+    POST /predict: Generate predictions from input features (single sample or batch)
 
 The service automatically handles model loading, feature preprocessing,
-and returns JSON-formatted prediction results. The champion model is loaded
-from tracking system Model Registry, with a local fallback to the path
-./src/training/artifacts/champion_model.pkl only if the registry is unavailable.
+and returns JSON-formatted prediction results. Accepts both single samples
+and batch data in JSON format.
+
+Usage Examples:
+    # Single sample via CLI
+    python api_server.py --input_data '{"BMI": 29.0, "Age": "65 to 69", ...}'
+
+    # Batch samples via CLI
+    python api_server.py --input_data '[{"BMI": 29.0, ...}, {"BMI": 25.0, ...}]'
+
+    # API endpoint
+    curl -X POST http://localhost:8000/predict -d '{"BMI": 29.0, "Age": "65 to 69", ...}'
 """
 
+import argparse
+import json
 import os
 from pathlib import PosixPath
+from typing import List, Union
 
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse
 
-from src.inference.utils.model import ModelLoaderManager
+from src.inference.utils.helpers import (
+    LocalModelLoader,
+    ModelLoadingContext,
+    RegistryModelLoader,
+    extract_model_config,
+)
 from src.utils.logger import get_console_logger
-from src.utils.path import ARTIFACTS_DIR, PARENT_DIR
+from src.utils.path import PARENT_DIR
 
 load_dotenv()
 
@@ -34,52 +51,27 @@ load_dotenv()
 module_name: str = PosixPath(__file__).stem
 logger = get_console_logger(module_name)
 
-########################################################
-# # Sample of prod data for testing
-# data = {
-#     "BMI": 29.0,
-#     "PhysHlth": 0,
-#     "Age": "65 to 69",
-#     "HighBP": "0",
-#     "HighChol": "1",
-#     "CholCheck": "0",
-#     "Smoker": "1",
-#     "Stroke": "1",
-#     "HeartDiseaseorAttack": "0",
-#     "PhysActivity": "1",
-#     "Fruits": "1",
-#     "Veggies": "1",
-#     "HvyAlcoholConsump": "1",
-#     "AnyHealthcare": "1",
-#     "NoDocbcCost": "1",
-#     "GenHlth": "Poor",
-#     "MentHlth": "1",
-#     "DiffWalk": "1",
-#     "Sex": "1",
-#     "Education": "1",
-#     "Income": "7"
-# }
-
-# Extracts config params
-load_model = ModelLoaderManager(comet_api_key=os.environ["COMET_API_KEY"])
-(
-    tracker_type,
-    comet_ws,
-    champ_model_name,
-    *_,
-) = load_model.get_config_params(
-    config_yaml_abs_path=f"{str(PARENT_DIR.parent)}/src/config/training-config.yml"
+# Load champion model at startup using strategy pattern
+CONFIG_PARAMS = extract_model_config(
+    config_yaml_path=f"{str(PARENT_DIR.parent)}/src/config/training-config.yml"
 )
 
-# Load champion model
-model = load_model.load_model(
-    tracker_type=tracker_type,
-    model_name=champ_model_name,
-    artifacts_path=ARTIFACTS_DIR,
-    workspace_name=comet_ws,
+# Required API keys for model loading
+COMET_API_KEY = os.environ.get("COMET_API_KEY")
+
+# Create loading strategies with fallback
+primary_strategy = RegistryModelLoader()
+fallback_strategy = LocalModelLoader()
+loader_context = ModelLoadingContext(primary_strategy, fallback_strategy)
+
+model = loader_context.load_model(
+    model_name=CONFIG_PARAMS["model_name"],
+    config_params=CONFIG_PARAMS,
+    comet_api_key=COMET_API_KEY,
+    logger=logger,
 )
 
-# Root to ./src/inference and run "uvicorn --host 0.0.0.0 main:app"
+# FastAPI app
 app = FastAPI()
 
 
@@ -89,19 +81,81 @@ def root():
 
 
 @app.post("/predict")
-def predict(data: dict = Body(...)):
+def predict(data: Union[dict, List[dict]] = Body(...)):
     """Predicts the probability of having a heart disease or stroke.
 
     Args:
-        data (dict): dictionary containing the input data.
+        data (Union[dict, List[dict]]): Single sample dict or list of sample dicts.
 
     Returns:
-        dict: dictionary containing the predicted probability.
+        Union[dict, List[dict]]: Single prediction or list of predictions.
+    """
+    # Handle both single sample and batch processing
+    is_single_sample = isinstance(data, dict)
+
+    # Convert to list format for uniform processing
+    if is_single_sample:
+        data = [data]
+
+    # Convert input to DataFrame
+    data_df = pd.DataFrame(data)
+
+    # Generate predictions
+    predictions = model.predict_proba(data_df)
+
+    # Format results
+    results = []
+    for _, pred in enumerate(predictions):
+        result = {
+            "predicted_probability": round(pred[1], 3),
+            "prediction": 1 if pred[1] > 0.5 else 0,
+        }
+        results.append(result)
+
+    # Return single result or batch results based on input
+    return results[0] if is_single_sample else results
+
+
+def cli_predict(input_data: Union[str, dict, List[dict]]) -> Union[dict, List[dict]]:
+    """CLI interface for predictions.
+
+    Args:
+        input_data: JSON string, single dict, or list of dicts containing sample data.
+
+    Returns:
+        Prediction results.
     """
 
-    # Convert input dictionary to data frame required by the model
-    data_df = pd.json_normalize(data)
+    # Parse input data if it's a JSON string
+    if isinstance(input_data, str):
+        try:
+            input_data = json.loads(input_data)
+        except json.JSONDecodeError as e:
+            logger.error("Invalid JSON input: %s", e)
+            raise ValueError(f"Invalid JSON input: {e}") from e
 
-    # Predict the probability using the model
-    preds = model.predict_proba(data_df)[0]
-    return {"Predicted Probability": round(preds[1], 3)}
+    # Process prediction
+    results = predict(input_data)
+
+    logger.info("Input Data: %s", input_data)
+    logger.info("Prediction Results: %s", results)
+
+    return results
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Model serving API or CLI prediction")
+    parser.add_argument(
+        "--input_data",
+        type=str,
+        required=True,
+        help="JSON string containing input data (single sample or array of samples).",
+    )
+
+    args = parser.parse_args()
+
+    # Run CLI prediction and print formatted results
+    preds = cli_predict(args.input_data)
+    print("\nPrediction Results:")
+    print("=" * 50)
+    print(json.dumps(preds, indent=2))
