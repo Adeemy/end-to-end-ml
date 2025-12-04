@@ -6,8 +6,14 @@ stored in experiment tracking backends. Requires a configuration YAML file and
 input data in parquet format.
 
 Usage:
-    # Batch prediction from parquet file
-    python predict.py --config_yaml_path path/to/config.yml --logger_path path/to/logging.conf --input_file data.parquet
+    # Batch prediction from parquet file (run from project root)
+    python src/inference/predict.py --config_yaml_path ./src/config/training-config.yml --input_file data.parquet
+
+    # With custom output file
+    python src/inference/predict.py --config_yaml_path ./src/config/training-config.yml --input_file data.parquet --output_file predictions.parquet
+
+    # Using config defaults (input/output paths from config file)
+    python src/inference/predict.py --config_yaml_path ./src/config/training-config.yml
 
 Supports both MLflow and Comet ML model registries for loading trained models.
 """
@@ -42,12 +48,10 @@ def main(
 
     Args:
         config_yaml_path: Path to configuration YAML file
-        input_file: Path to input parquet file for batch prediction
-        output_file: Path to save batch predictions (optional)
         logger: Logger instance for logging
-    """
-
-    # Read inference config for default paths if not provided via CLI
+        input_file: Path to input parquet file for batch prediction (optional)
+        output_file: Path to save batch predictions (optional)
+    """  # Read inference config for default paths if not provided via CLI
     config = Config(config_path=config_yaml_path)
     inference_config = config.params.get("inference", {}).get("batch_prediction", {})
 

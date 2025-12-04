@@ -15,14 +15,20 @@ and returns JSON-formatted prediction results. Accepts both single samples
 and batch data in JSON format.
 
 Usage Examples:
-    # Single sample via CLI
-    python api_server.py --input_data '{"BMI": 29.0, "Age": "65 to 69", ...}'
+    # Single sample via CLI (run from project root)
+    python src/inference/api_server.py --input_data '{"BMI": 29.0, "PhysHlth": 0, "Age": "65 to 69", "HighBP": "0", "HighChol": "1", "CholCheck": "0", "Smoker": "1", "Stroke": "1", "HeartDiseaseorAttack": "0", "PhysActivity": "1", "Fruits": "1", "Veggies": "1", "HvyAlcoholConsump": "1", "AnyHealthcare": "1", "NoDocbcCost": "1", "GenHlth": "Poor", "MentHlth": "1", "DiffWalk": "1", "Sex": "1", "Education": "1", "Income": "7"}'
 
     # Batch samples via CLI
-    python api_server.py --input_data '[{"BMI": 29.0, ...}, {"BMI": 25.0, ...}]'
+    python src/inference/api_server.py --input_data '[{"BMI": 29.0, "PhysHlth": 0, ...}, {"BMI": 25.0, "PhysHlth": 2, ...}]'
 
-    # API endpoint
-    curl -X POST http://localhost:8000/predict -d '{"BMI": 29.0, "Age": "65 to 69", ...}'
+    # Start API server
+    uvicorn src.inference.api_server:app --host 0.0.0.0 --port 8000
+
+    # API endpoint (single sample)
+    curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '{"BMI": 29.0, "PhysHlth": 0, "Age": "65 to 69", ...}'
+
+    # API endpoint (batch samples)
+    curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '[{"BMI": 29.0, ...}, {"BMI": 25.0, ...}]'
 """
 
 import argparse
@@ -144,7 +150,9 @@ def cli_predict(input_data: Union[str, dict, List[dict]]) -> Union[dict, List[di
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Model serving API or CLI prediction")
+    parser = argparse.ArgumentParser(
+        description="FastAPI model serving with CLI prediction support. Use --input_data for direct CLI predictions, or run without arguments to start the API server."
+    )
     parser.add_argument(
         "--input_data",
         type=str,

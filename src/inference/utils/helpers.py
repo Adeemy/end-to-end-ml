@@ -1,5 +1,19 @@
 """
-Helpers for inference tasks such as loading models and generating predictions.
+Inference utility functions and model loading strategies.
+
+This module provides strategy pattern implementations for loading models from
+different sources (registry vs local files) and utilities for batch prediction
+processing. Includes fallback mechanisms for robust model loading.
+
+Classes:
+    ModelLoadingStrategy: Abstract base for model loading strategies
+    RegistryModelLoader: Loads models from experiment tracking registries (MLflow/Comet)
+    LocalModelLoader: Loads models from local filesystem
+    ModelLoadingContext: Context manager with fallback between strategies
+
+Functions:
+    extract_model_config: Extracts model configuration from config files
+    predict_from_file: Processes batch predictions from parquet files
 """
 
 import logging
