@@ -252,6 +252,8 @@ def main(
     parallel_jobs_count = config.params["train"]["parallel_jobs_count"]
     exp_timeout_in_secs = config.params["train"]["exp_timout_secs"]
     f_beta_score_beta_val = config.params["train"]["fbeta_score_beta_val"]
+    comparison_metric = config.params["train"]["comparison_metric"]
+    search_rand_seed = int(config.params["data"]["split_rand_seed"])
     ve_voting_rule = config.params["train"]["voting_rule"]
     train_file_name = config.params["files"]["train_set_file_name"]
     valid_set_file_name = config.params["files"]["valid_set_file_name"]
@@ -388,6 +390,8 @@ def main(
         cat_feature_names=cat_feature_names,
         fbeta_score_beta=f_beta_score_beta_val,
         encoded_pos_class_label=encoded_positive_class_label,
+        comparison_metric=comparison_metric,
+        random_seed=search_rand_seed,
     )
 
     #############################################

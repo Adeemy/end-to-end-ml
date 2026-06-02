@@ -20,7 +20,7 @@ Design Decision:
 """
 
 from pathlib import PosixPath
-from typing import Callable
+from typing import Callable, Optional
 
 import numpy as np
 import optuna
@@ -47,8 +47,11 @@ from src.utils.logger import get_console_logger
 module_name: str = PosixPath(__file__).stem
 logger = get_console_logger(module_name)
 
-# Specify optimization direction, e.g., "maximize" for maximizing a metric like f1-score
-OPTIMIZATION_DIRECTION: str = "maximize"
+# Metrics for which a *lower* value is better. Any metric not listed here is
+# assumed to be higher-is-better (accuracy, precision, recall, f1, fbeta, roc_auc).
+# Used to derive the Optuna study direction from the configured metric so a
+# lower-is-better metric (e.g. log_loss) is not optimized backwards.
+LOWER_IS_BETTER_METRICS: frozenset = frozenset({"log_loss", "brier_score", "brier"})
 
 
 class ModelOptimizer:
@@ -67,6 +70,8 @@ class ModelOptimizer:
         fbeta_score_beta (float): beta value for fbeta score.
         encoded_pos_class_label (int): encoded positive class label.
         is_voting_ensemble (bool): whether the model is a voting ensemble or not.
+        optimization_metric (str): metric the search optimizes (config comparison_metric).
+        random_seed (Optional[int]): seed for the sampler to make the search reproducible.
         classifier_name (str): name of the classifier.
     """
 
@@ -85,6 +90,8 @@ class ModelOptimizer:
         fbeta_score_beta: float = 1.0,
         encoded_pos_class_label: int = 1,
         is_voting_ensemble: bool = False,
+        optimization_metric: str = "fbeta_score",
+        random_seed: Optional[int] = None,
     ) -> None:
         """Creates a ModelOptimizer instance.
 
@@ -102,6 +109,9 @@ class ModelOptimizer:
             fbeta_score_beta: Beta value for fbeta score.
             encoded_pos_class_label: Encoded positive class label.
             is_voting_ensemble: Whether the model is a voting ensemble.
+            optimization_metric: Metric the search optimizes. Mirrors the config
+                ``comparison_metric`` so tuning and champion selection agree.
+            random_seed: Seed passed to the Optuna sampler for reproducible searches.
 
         Raises:
             ValueError: if the specified model name is not supported.
@@ -119,6 +129,8 @@ class ModelOptimizer:
         self.fbeta_score_beta = fbeta_score_beta
         self.encoded_pos_class_label = encoded_pos_class_label
         self.is_voting_ensemble = is_voting_ensemble
+        self.optimization_metric = optimization_metric
+        self.random_seed = random_seed
         self.classifier_name = self.model.__class__.__name__
 
         if not self.is_voting_ensemble and not self.supported_models.is_supported(
@@ -157,12 +169,15 @@ class ModelOptimizer:
         self,
         true_class: ArrayLike,
         pred_class: ArrayLike,
+        pred_proba: ArrayLike = None,
     ) -> pd.DataFrame:
         """Calculates different performance metrics for binary classification models.
 
         Args:
             true_class (ArrayLike): true class label.
             pred_class (ArrayLike): predicted class label not probability.
+            pred_proba (ArrayLike): predicted probability of the positive class. Required
+                to compute ROC-AUC correctly; if omitted, ROC-AUC is skipped.
 
         Returns:
             performance_metrics (pd.DataFrame): a dataframe with metric name and score columns.
@@ -187,22 +202,74 @@ class ModelOptimizer:
                     beta=self.fbeta_score_beta,
                 ),
             ),
-            (
-                "roc_auc",
-                roc_auc_score(true_class, pred_class, average=None),
-            ),
         ]
+
+        # ROC-AUC must be computed from positive-class probabilities, not hard
+        # labels. roc_auc_score(true, hard_labels) silently degenerates into a
+        # balanced-accuracy proxy, so only add it when probabilities are provided.
+        if pred_proba is not None:
+            cal_metrics.append(("roc_auc", roc_auc_score(true_class, pred_proba)))
 
         performance_metrics = pd.DataFrame(cal_metrics, columns=["Metric", "Score"])
 
         return performance_metrics
+
+    def _pos_class_proba(self, features: ArrayLike) -> np.ndarray:
+        """Returns the predicted probability of the positive class.
+
+        The positive-class column is located via ``model.classes_`` rather than
+        assuming index 1, so the result is correct regardless of how the label
+        encoder ordered the classes.
+
+        Args:
+            features (ArrayLike): preprocessed features to score.
+
+        Returns:
+            np.ndarray: positive-class probabilities (one value per row).
+        """
+
+        proba = self.model.predict_proba(features)
+        pos_col = int(
+            np.where(self.model.classes_ == self.encoded_pos_class_label)[0][0]
+        )
+        return proba[:, pos_col]
+
+    def _metric_row_name(self) -> str:
+        """Resolves the configured optimization metric to its row name in the
+        ``calc_perf_metrics`` output.
+
+        The config name ``fbeta_score`` maps to ``f_{beta}_score`` (matching how
+        ``evaluate.py`` and the evaluator name it); every other supported metric
+        (``recall``, ``precision``, ``f1``, ``roc_auc``, ``accuracy``) is used as-is.
+
+        Returns:
+            str: metric name as it appears in the metrics dataframe.
+        """
+
+        if self.optimization_metric == "fbeta_score":
+            return f"f_{self.fbeta_score_beta}_score"
+        return self.optimization_metric
+
+    @property
+    def optimization_direction(self) -> str:
+        """Optuna study direction derived from the configured metric.
+
+        Returns:
+            str: ``"minimize"`` for lower-is-better metrics, else ``"maximize"``.
+        """
+
+        if self.optimization_metric in LOWER_IS_BETTER_METRICS:
+            return "minimize"
+        return "maximize"
 
     def obj_func(
         self,
         trial: optuna.trial.Trial,
     ) -> float:
         """Objective function that evaluates the provided hyperparameters for a
-        specified model, where the search metric being optimized is fbeta score.
+        specified model. The metric being optimized is the configured
+        ``optimization_metric`` (defaults to fbeta score), so the search optimizes
+        the same metric champion selection later ranks on.
         A trial hyperparameters are sampled from the search space using generate_trial_params
         method and then the model is fitted on training set and evaluated on the
         validation set.
@@ -226,25 +293,29 @@ class ModelOptimizer:
         # other htreshold values can be used, which is problem-dependent.
         pred_train_preds = self.model.predict(self.train_features_preprocessed)
         pred_valid_preds = self.model.predict(self.valid_features_preprocessed)
+        pred_train_proba = self._pos_class_proba(self.train_features_preprocessed)
+        pred_valid_proba = self._pos_class_proba(self.valid_features_preprocessed)
         train_scores = self.calc_perf_metrics(
             true_class=self.train_class,
             pred_class=pred_train_preds,
+            pred_proba=pred_train_proba,
         )
         valid_scores = self.calc_perf_metrics(
             true_class=self.valid_class,
             pred_class=pred_valid_preds,
+            pred_proba=pred_valid_proba,
         )
 
+        # Optimize (and log) the configured metric so tuning and champion
+        # selection are coherent.
+        metric_name = self._metric_row_name()
         train_score = train_scores.loc[
-            train_scores["Metric"] == f"f_{self.fbeta_score_beta}_score", "Score"
+            train_scores["Metric"] == metric_name, "Score"
         ].iloc[0]
         valid_score = valid_scores.loc[
-            valid_scores["Metric"] == f"f_{self.fbeta_score_beta}_score", "Score"
+            valid_scores["Metric"] == metric_name, "Score"
         ].iloc[0]
 
-        # Log metrics with specific names that evaluation expects
-        # Use f-score naming convention: f_{beta}_score (e.g., f_0.5_score)
-        metric_name = f"f_{self.fbeta_score_beta}_score"
         self.tracker.log_metric(
             name=f"train_{metric_name}", value=float(train_score), step=trial.number
         )
@@ -304,8 +375,11 @@ class ModelOptimizer:
             warn_independent_sampling=False,
             multivariate=True,
             constant_liar=True,
+            seed=self.random_seed,  # makes the search reproducible when set
         )
-        study = optuna.create_study(sampler=sampler, direction=OPTIMIZATION_DIRECTION)
+        study = optuna.create_study(
+            sampler=sampler, direction=self.optimization_direction
+        )
 
         print(
             """\n
@@ -364,10 +438,11 @@ class ModelOptimizer:
             warn_independent_sampling=False,  # Disable warning for independent sampling
             multivariate=True,  # Enable multivariate sampling to consider interactions between hyperparameters
             constant_liar=True,  # to mitigate redundant sampling in parallel execution
+            seed=self.random_seed,  # makes the search reproducible when set
         )
         client = Client()
         study = optuna_distributed.from_study(
-            optuna.create_study(sampler=sampler, direction=OPTIMIZATION_DIRECTION),
+            optuna.create_study(sampler=sampler, direction=self.optimization_direction),
             client=client,
         )
 

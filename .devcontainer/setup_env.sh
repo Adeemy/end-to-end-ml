@@ -49,4 +49,15 @@ if ! grep -qF "$VENV_ACTIVATE_COMMAND" ~/.bashrc; then
     echo "$VENV_ACTIVATE_COMMAND" >> ~/.bashrc
 fi
 
+# Install Claude Code so it is available on every container build/rebuild,
+# and make sure its install location is on the PATH.
+echo "Installing Claude Code..."
+curl -fsSL https://claude.ai/install.sh | bash
+# shellcheck disable=SC2016  # keep $HOME literal so it expands at login, not now
+CLAUDE_PATH_COMMAND='export PATH="$HOME/.local/bin:$PATH"'
+if ! grep -qF "$CLAUDE_PATH_COMMAND" ~/.bashrc; then
+    # shellcheck disable=SC1090  # sourcing the user's .bashrc is intentional
+    echo "$CLAUDE_PATH_COMMAND" >> ~/.bashrc && source ~/.bashrc
+fi
+
 echo "Environment setup complete."

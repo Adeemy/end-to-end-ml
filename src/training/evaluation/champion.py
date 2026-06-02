@@ -8,6 +8,7 @@ model in the experiment tracking backend after evaluating it on the test set to 
 meets deployment criteria.
 """
 
+import json
 import os
 from pathlib import PosixPath
 from typing import Optional
@@ -16,6 +17,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.metrics import fbeta_score
 from sklearn.pipeline import Pipeline
 
 from src.training.tracking.experiment_tracker import ExperimentTracker
@@ -83,7 +85,6 @@ class ModelChampionManager:
         valid_features: pd.DataFrame,
         valid_class: np.ndarray,
         fitted_pipeline: Pipeline,
-        cv_folds: int = 5,
     ) -> Pipeline:
         """Takes a fitted pipeline and returns a calibrated pipeline.
 
@@ -91,7 +92,6 @@ class ModelChampionManager:
             valid_features (np.ndarray): Validation features.
             valid_class (np.ndarray): Validation class labels.
             fitted_pipeline (Pipeline): Fitted pipeline on the training set.
-            cv_folds (int): Number of cross-validation folds for calibration.
 
         Returns:
             calib_pipeline (Pipeline): Calibrated pipeline.
@@ -116,11 +116,16 @@ class ModelChampionManager:
             valid_features_transformed
         )
 
-        # Calibrate the fitted model using the transformed validation set
+        # Calibrate the already-fitted model on the held-out validation set.
+        # NOTE: cv="prefit" is required here. The `model` extracted above was
+        # fitted on the full training set during tuning; passing an integer cv
+        # would make CalibratedClassifierCV clone it and refit on cross-validation
+        # folds of the (small) validation set, discarding the trained model.
+        # "prefit" keeps the trained model and only fits the calibration map.
         calibrator = CalibratedClassifierCV(
             estimator=model,
             method=("isotonic" if len(valid_class) > 1000 else "sigmoid"),
-            cv=cv_folds,
+            cv="prefit",
         )
         calibrator.fit(valid_features_transformed, valid_class)
 
@@ -134,6 +139,67 @@ class ModelChampionManager:
         )
 
         return calib_pipeline
+
+    @staticmethod
+    def tune_decision_threshold(
+        valid_class: np.ndarray,
+        pos_class_proba: np.ndarray,
+        fbeta_beta: float = 0.5,
+        n_thresholds: int = 99,
+    ) -> float:
+        """Finds the decision threshold that maximizes F-beta on validation data.
+
+        Args:
+            valid_class (np.ndarray): validation class labels (encoded).
+            pos_class_proba (np.ndarray): positive-class probabilities for validation rows.
+            fbeta_beta (float): beta for the F-beta score being maximized.
+            n_thresholds (int): number of candidate thresholds scanned in (0, 1).
+
+        Returns:
+            best_threshold (float): threshold in (0, 1) with the highest F-beta.
+        """
+
+        candidate_thresholds = np.linspace(0.01, 0.99, n_thresholds)
+        best_threshold, best_score = 0.5, -1.0
+        for threshold in candidate_thresholds:
+            pred_class = (pos_class_proba >= threshold).astype(int)
+            score = fbeta_score(
+                valid_class, pred_class, beta=fbeta_beta, zero_division=0
+            )
+            if score > best_score:
+                best_threshold, best_score = float(threshold), float(score)
+
+        return best_threshold
+
+    def save_model_metadata(
+        self,
+        local_path: str,
+        decision_threshold: float,
+        encoded_pos_class_label: int,
+    ) -> str:
+        """Persists serving metadata (threshold, positive class) next to the model.
+
+        Args:
+            local_path: Directory where the champion model is stored.
+            decision_threshold: Operating threshold to apply at inference.
+            encoded_pos_class_label: Encoded label of the positive class.
+
+        Returns:
+            metadata_path (str): Path to the written metadata JSON file.
+        """
+
+        if not os.path.exists(local_path):
+            os.makedirs(local_path)
+
+        metadata = {
+            "decision_threshold": float(decision_threshold),
+            "encoded_pos_class_label": int(encoded_pos_class_label),
+        }
+        metadata_path = f"{local_path}/{self.champ_model_name}_metadata.json"
+        with open(metadata_path, "w", encoding="utf-8") as metadata_file:
+            json.dump(metadata, metadata_file, indent=2)
+
+        return metadata_path
 
     def log_and_register_champ_model(
         self,

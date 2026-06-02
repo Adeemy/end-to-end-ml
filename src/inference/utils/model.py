@@ -28,6 +28,27 @@ from fastapi import Body
 from sklearn.pipeline import Pipeline
 
 from src.training.schemas import Config
+from src.utils.logger import get_console_logger
+
+module_name: str = PosixPath(__file__).stem
+logger = get_console_logger(module_name)
+
+
+def _positive_class_index(model: Pipeline, pos_label: int = 1) -> int:
+    """Returns the predict_proba column index for the positive class.
+
+    Locates the column via ``model.classes_`` instead of assuming index 1, so the
+    output is correct regardless of how the label encoder ordered the classes.
+
+    Args:
+        model: Fitted model/pipeline exposing ``classes_``.
+        pos_label: Encoded label of the positive class.
+
+    Returns:
+        int: column index of the positive class (defaults to the last column).
+    """
+    classes = list(getattr(model, "classes_", [0, 1]))
+    return classes.index(pos_label) if pos_label in classes else len(classes) - 1
 
 
 class ModelLoader(ABC):
@@ -107,13 +128,20 @@ class MLflowModelLoader(ModelLoader):
             model = mlflow.sklearn.load_model(model_uri)
             return model
         except Exception as exe:  # pylint: disable=broad-except
-            # Fallback: try to load from local artifacts if MLflow fails
-            if artifacts_path and (artifacts_path / f"{model_name}.pkl").exists():
-                return joblib.load(str(artifacts_path / f"{model_name}.pkl"))
-            else:
-                raise RuntimeError(
-                    f"Could not load model '{model_name}' from MLflow registry or local artifacts"
-                ) from exe
+            # Fallback: try to load from local artifacts if MLflow fails. Log the
+            # real registry error so it is not silently masked.
+            local_pkl = artifacts_path / f"{model_name}.pkl" if artifacts_path else None
+            if local_pkl and local_pkl.exists():
+                logger.warning(
+                    "MLflow registry load failed for '%s' (%s); using local artifact %s",
+                    model_name,
+                    exe,
+                    local_pkl,
+                )
+                return joblib.load(str(local_pkl))
+            raise RuntimeError(
+                f"Could not load model '{model_name}' from MLflow registry or local artifacts"
+            ) from exe
 
 
 class CometModelLoader(ModelLoader):
@@ -177,13 +205,20 @@ class CometModelLoader(ModelLoader):
 
             return joblib.load(f"{str(artifacts_path)}/{model_name}.pkl")
         except Exception as exe:  # pylint: disable=broad-except
-            # Fallback: try to load from local artifacts if Comet fails
-            if artifacts_path and (artifacts_path / f"{model_name}.pkl").exists():
-                return joblib.load(str(artifacts_path / f"{model_name}.pkl"))
-            else:
-                raise RuntimeError(
-                    f"Could not load model '{model_name}' from Comet registry or local artifacts"
-                ) from exe
+            # Fallback: try to load from local artifacts if Comet fails. Log the
+            # real registry error so it is not silently masked.
+            local_pkl = artifacts_path / f"{model_name}.pkl" if artifacts_path else None
+            if local_pkl and local_pkl.exists():
+                logger.warning(
+                    "Comet registry load failed for '%s' (%s); using local artifact %s",
+                    model_name,
+                    exe,
+                    local_pkl,
+                )
+                return joblib.load(str(local_pkl))
+            raise RuntimeError(
+                f"Could not load model '{model_name}' from Comet registry or local artifacts"
+            ) from exe
 
 
 def create_model_loader(tracker_type: str, **kwargs) -> ModelLoader:
@@ -325,4 +360,5 @@ def predict(model: Pipeline, data: dict = Body(...)) -> dict:
     data_df = pd.json_normalize(data)
 
     preds = model.predict_proba(data_df)[0]
-    return {"Predicted Probability": round(preds[1], 3)}
+    pos_col = _positive_class_index(model)
+    return {"Predicted Probability": round(float(preds[pos_col]), 3)}
