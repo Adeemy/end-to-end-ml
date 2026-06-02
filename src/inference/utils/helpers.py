@@ -16,15 +16,70 @@ Functions:
     predict_from_file: Processes batch predictions from parquet files
 """
 
+import json
 import logging
 import os
-from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 
 from src.inference.utils.model import ModelLoaderManager
 from src.utils.path import ARTIFACTS_DIR
+
+# Defaults used when a model has no persisted serving metadata sidecar.
+DEFAULT_DECISION_THRESHOLD = 0.5
+DEFAULT_ENCODED_POS_CLASS_LABEL = 1
+
+
+def load_serving_metadata(model_name: str) -> dict:
+    """Loads the serving metadata sidecar (threshold + positive class) for a model.
+
+    Args:
+        model_name: Name of the model whose metadata to load.
+
+    Returns:
+        dict: ``{"decision_threshold": float, "encoded_pos_class_label": int}``.
+            Falls back to defaults if the sidecar is missing or unreadable.
+    """
+    metadata_path = ARTIFACTS_DIR / f"{model_name}_metadata.json"
+    metadata = {
+        "decision_threshold": DEFAULT_DECISION_THRESHOLD,
+        "encoded_pos_class_label": DEFAULT_ENCODED_POS_CLASS_LABEL,
+    }
+    if metadata_path.exists():
+        with open(metadata_path, encoding="utf-8") as metadata_file:
+            metadata.update(json.load(metadata_file))
+    return metadata
+
+
+def positive_class_predictions(
+    model: object, data_df: pd.DataFrame, model_name: str
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Computes positive-class probabilities and labels using persisted metadata.
+
+    The positive-class column is located via ``model.classes_`` (not a hardcoded
+    index) and the decision threshold comes from the model's serving metadata, so
+    inference matches the operating point chosen at registration.
+
+    Args:
+        model: Loaded model/pipeline exposing ``predict_proba`` and ``classes_``.
+        data_df: Input features.
+        model_name: Name of the model (used to locate metadata).
+
+    Returns:
+        tuple: (positive-class probabilities, integer labels, threshold applied).
+    """
+    metadata = load_serving_metadata(model_name)
+    threshold = float(metadata["decision_threshold"])
+    pos_label = metadata["encoded_pos_class_label"]
+
+    proba = model.predict_proba(data_df)
+    classes = list(getattr(model, "classes_", [0, 1]))
+    pos_col = classes.index(pos_label) if pos_label in classes else 1
+    pos_proba = np.asarray(proba)[:, pos_col]
+    pred_class = (pos_proba >= threshold).astype(int)
+    return pos_proba, pred_class, threshold
 
 
 class ModelLoadingStrategy:
@@ -101,8 +156,7 @@ class LocalModelLoader(ModelLoadingStrategy):
         logger: logging.Logger = None,
     ) -> object:
         """Load model from local path."""
-        local_artifacts_path = Path("src/training/artifacts")
-        local_model_path = local_artifacts_path / f"{model_name}.pkl"
+        local_model_path = ARTIFACTS_DIR / f"{model_name}.pkl"
 
         if not local_model_path.exists():
             raise FileNotFoundError(f"Model not found at {local_model_path}")
@@ -214,12 +268,18 @@ def predict_from_file(
         logger=logger,
     )
 
-    # Generate predictions
+    # Generate predictions using the persisted positive-class index and threshold
     try:
-        predictions = model.predict_proba(data_df)
-        data_df["predicted_probability"] = [pred[1] for pred in predictions]
-        data_df["prediction"] = (data_df["predicted_probability"] > 0.5).astype(int)
-        logger.info("Generated predictions for %d records", len(data_df))
+        pos_proba, pred_class, threshold = positive_class_predictions(
+            model, data_df, config_params["model_name"]
+        )
+        data_df["predicted_probability"] = pos_proba
+        data_df["prediction"] = pred_class
+        logger.info(
+            "Generated predictions for %d records (threshold=%.3f)",
+            len(data_df),
+            threshold,
+        )
     except (ValueError, AttributeError, KeyError) as e:
         logger.error("Prediction failed: %s", e)
         raise RuntimeError(f"Prediction failed: {e}") from e

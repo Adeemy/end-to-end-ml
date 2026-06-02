@@ -56,6 +56,10 @@ jobs:
         run: |
           make test
 
+      - name: End-to-end pipeline smoke test
+        run: |
+          python -m pytest tests/test_training/test_pipeline_smoke.py -q
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4.0.1
         with:
