@@ -52,6 +52,8 @@ class TrainingOrchestrator:
         cat_feature_names: Optional[list] = None,
         fbeta_score_beta: float = 1.0,
         encoded_pos_class_label: int = 1,
+        comparison_metric: str = "fbeta_score",
+        random_seed: Optional[int] = None,
     ):
         """Initializes the TrainingOrchestrator.
 
@@ -73,6 +75,8 @@ class TrainingOrchestrator:
             cat_feature_names: List of categorical feature names.
             fbeta_score_beta: Beta value for fbeta score.
             encoded_pos_class_label: Encoded positive class label.
+            comparison_metric: Metric the search optimizes (mirrors champion selection).
+            random_seed: Seed for the Optuna sampler for reproducible searches.
         """
         self.experiment_manager = experiment_manager
         self.train_features = train_features
@@ -91,6 +95,8 @@ class TrainingOrchestrator:
         self.cat_feature_names = cat_feature_names
         self.fbeta_score_beta = fbeta_score_beta
         self.encoded_pos_class_label = encoded_pos_class_label
+        self.comparison_metric = comparison_metric
+        self.random_seed = random_seed
 
     def optimize_model(
         self,
@@ -134,6 +140,8 @@ class TrainingOrchestrator:
             fbeta_score_beta=self.fbeta_score_beta,
             encoded_pos_class_label=self.encoded_pos_class_label,
             is_voting_ensemble=is_voting_ensemble,
+            optimization_metric=self.comparison_metric,
+            random_seed=self.random_seed,
         )
 
         if optimize_in_parallel:
