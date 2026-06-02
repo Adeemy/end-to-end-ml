@@ -39,7 +39,7 @@ from typing import List, Union
 
 import pandas as pd
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 
 from src.inference.utils.helpers import (
@@ -47,6 +47,7 @@ from src.inference.utils.helpers import (
     ModelLoadingContext,
     RegistryModelLoader,
     extract_model_config,
+    positive_class_predictions,
 )
 from src.utils.logger import get_console_logger
 from src.utils.path import PARENT_DIR
@@ -77,6 +78,12 @@ model = loader_context.load_model(
     logger=logger,
 )
 
+# Feature columns the loaded model was fitted on (when available), used to give
+# callers precise validation errors instead of cryptic sklearn failures.
+EXPECTED_FEATURES = (
+    list(model.feature_names_in_) if hasattr(model, "feature_names_in_") else None
+)
+
 # FastAPI app
 app = FastAPI()
 
@@ -84,6 +91,46 @@ app = FastAPI()
 @app.get("/")
 def root():
     return HTMLResponse("<h1>Predict pre-diabetes/diabetes.</h1>")
+
+
+def _validate_records(records: List[dict]) -> None:
+    """Validates request records, raising HTTP 422 with a clear message on errors.
+
+    Args:
+        records: List of feature dictionaries to validate.
+
+    Raises:
+        HTTPException: 422 if records are empty, not objects, or have missing/unknown
+            feature columns relative to the model's expected features.
+    """
+    if not records:
+        raise HTTPException(
+            status_code=422, detail="Request body must contain at least one record."
+        )
+
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            raise HTTPException(
+                status_code=422, detail=f"Record {index} must be a JSON object."
+            )
+
+    if EXPECTED_FEATURES is None:
+        return
+
+    expected = set(EXPECTED_FEATURES)
+    for index, record in enumerate(records):
+        keys = set(record)
+        missing = sorted(expected - keys)
+        unexpected = sorted(keys - expected)
+        if missing or unexpected:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": f"Record {index} does not match the model's feature schema.",
+                    "missing_features": missing,
+                    "unexpected_features": unexpected,
+                },
+            )
 
 
 @app.post("/predict")
@@ -95,28 +142,39 @@ def predict(data: Union[dict, List[dict]] = Body(...)):
 
     Returns:
         Union[dict, List[dict]]: Single prediction or list of predictions.
+
+    Raises:
+        HTTPException: 422 if the request body is malformed or does not match the
+            model's expected feature schema.
     """
     # Handle both single sample and batch processing
     is_single_sample = isinstance(data, dict)
 
     # Convert to list format for uniform processing
-    if is_single_sample:
-        data = [data]
+    records = [data] if is_single_sample else data
+    _validate_records(records)
 
     # Convert input to DataFrame
-    data_df = pd.DataFrame(data)
+    data_df = pd.DataFrame(records)
 
-    # Generate predictions
-    predictions = model.predict_proba(data_df)
+    # Generate predictions using the persisted positive-class index and threshold
+    try:
+        pos_proba, pred_class, _ = positive_class_predictions(
+            model, data_df, CONFIG_PARAMS["model_name"]
+        )
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(
+            status_code=422, detail=f"Prediction failed for the given input: {exc}"
+        ) from exc
 
     # Format results
-    results = []
-    for _, pred in enumerate(predictions):
-        result = {
-            "predicted_probability": round(pred[1], 3),
-            "prediction": 1 if pred[1] > 0.5 else 0,
+    results = [
+        {
+            "predicted_probability": round(float(prob), 3),
+            "prediction": int(label),
         }
-        results.append(result)
+        for prob, label in zip(pos_proba, pred_class)
+    ]
 
     # Return single result or batch results based on input
     return results[0] if is_single_sample else results
