@@ -135,6 +135,9 @@ def create_evaluation_orchestrator(
     artifacts_path: str,
     fbeta_score_beta: float = 1.0,
     voting_ensemble_name: Optional[str] = None,
+    decision_threshold: float = 0.5,
+    tune_decision_threshold: bool = False,
+    encoded_pos_class_label: int = 1,
     experiment_instance: Optional[Any] = None,
     **tracker_kwargs,
 ) -> "TestSetEvaluationOrchestrator":
@@ -149,6 +152,9 @@ def create_evaluation_orchestrator(
         artifacts_path: Path to model artifacts.
         fbeta_score_beta: Beta value for fbeta score.
         voting_ensemble_name: Name of voting ensemble model (if exists).
+        decision_threshold: Default operating threshold persisted with the champion.
+        tune_decision_threshold: If True, tune the threshold on the validation set.
+        encoded_pos_class_label: Encoded label of the positive class.
         experiment_instance: Pre-initialized experiment instance (for Comet).
         **tracker_kwargs: Additional arguments for tracker initialization.
 
@@ -175,6 +181,9 @@ def create_evaluation_orchestrator(
         artifacts_path=artifacts_path,
         fbeta_score_beta=fbeta_score_beta,
         voting_ensemble_name=voting_ensemble_name,
+        decision_threshold=decision_threshold,
+        tune_decision_threshold=tune_decision_threshold,
+        encoded_pos_class_label=encoded_pos_class_label,
     )
 
 
@@ -195,6 +204,9 @@ class TestSetEvaluationOrchestrator:
         artifacts_path: str,
         fbeta_score_beta: float = 1.0,
         voting_ensemble_name: Optional[str] = None,
+        decision_threshold: float = 0.5,
+        tune_decision_threshold: bool = False,
+        encoded_pos_class_label: int = 1,
     ):
         """Initializes the TestSetEvaluationOrchestrator.
 
@@ -207,6 +219,10 @@ class TestSetEvaluationOrchestrator:
             artifacts_path: Path to model artifacts.
             fbeta_score_beta: Beta value for fbeta score.
             voting_ensemble_name: Name of voting ensemble model (if exists).
+            decision_threshold: Default operating threshold persisted with the champion.
+            tune_decision_threshold: If True, pick the threshold maximizing F-beta
+                on the validation set instead of using ``decision_threshold``.
+            encoded_pos_class_label: Encoded label of the positive class.
         """
         self.tracker = tracker
         self.train_features = train_features
@@ -216,6 +232,9 @@ class TestSetEvaluationOrchestrator:
         self.artifacts_path = artifacts_path
         self.fbeta_score_beta = fbeta_score_beta
         self.voting_ensemble_name = voting_ensemble_name
+        self.decision_threshold = decision_threshold
+        self.tune_decision_threshold = tune_decision_threshold
+        self.encoded_pos_class_label = encoded_pos_class_label
 
     def evaluate_on_test_set(
         self,
@@ -275,7 +294,6 @@ class TestSetEvaluationOrchestrator:
         valid_features: pd.DataFrame,
         valid_class: np.ndarray,
         champion_manager: ModelChampionManager,
-        cv_folds: int = 5,
     ) -> None:
         """Calibrates and registers champion model.
 
@@ -285,17 +303,32 @@ class TestSetEvaluationOrchestrator:
             valid_features: Validation features for calibration.
             valid_class: Validation class labels for calibration.
             champion_manager: ModelChampionManager instance.
-            cv_folds: Number of cross-validation folds for calibration.
         """
         # Calibrate the champion model
         calibrated_pipeline = champion_manager.calibrate_pipeline(
             valid_features=valid_features,
             valid_class=valid_class,
             fitted_pipeline=model_pipeline,
-            cv_folds=cv_folds,
         )
 
         logger.info("Calibrated champion model: %s", model_name)
+
+        # Resolve the serving decision threshold (tuned on validation or the
+        # configured default) and persist it next to the model so inference uses
+        # the same operating point instead of a hardcoded 0.5.
+        decision_threshold = self._resolve_decision_threshold(
+            calibrated_pipeline, valid_features, valid_class
+        )
+        metadata_path = champion_manager.save_model_metadata(
+            local_path=self.artifacts_path,
+            decision_threshold=decision_threshold,
+            encoded_pos_class_label=self.encoded_pos_class_label,
+        )
+        logger.info(
+            "Champion decision threshold %.3f saved to %s",
+            decision_threshold,
+            metadata_path,
+        )
 
         # Set tracker and register
         champion_manager.tracker = self.tracker
@@ -319,13 +352,50 @@ class TestSetEvaluationOrchestrator:
             evaluation_exp_name,
         )
 
-        # Save champion model locally
+        # Save the CALIBRATED champion locally so the local artifact matches the
+        # registered one. (Dumping `model_pipeline` here would overwrite the
+        # calibrated pickle written by log_and_register_champ_model with the
+        # un-calibrated pipeline)
         champion_model_path = (
             f"{self.artifacts_path}/{champion_manager.champ_model_name}.pkl"
         )
-        joblib.dump(model_pipeline, champion_model_path)
+        joblib.dump(calibrated_pipeline, champion_model_path)
 
         logger.info("Saved champion model to: %s", champion_model_path)
+
+    def _resolve_decision_threshold(
+        self,
+        calibrated_pipeline: "Pipeline",
+        valid_features: pd.DataFrame,
+        valid_class: np.ndarray,
+    ) -> float:
+        """Returns the operating threshold to persist with the champion.
+
+        Tunes the threshold on the validation set (maximizing F-beta) when
+        ``tune_decision_threshold`` is enabled; otherwise returns the configured
+        default. Only meaningful for binary models — multiclass keeps the default.
+
+        Args:
+            calibrated_pipeline: The calibrated champion pipeline.
+            valid_features: Validation features.
+            valid_class: Validation class labels.
+
+        Returns:
+            float: decision threshold in (0, 1).
+        """
+
+        classes = list(calibrated_pipeline.classes_)
+        is_binary = len(classes) == 2
+        if not self.tune_decision_threshold or not is_binary:
+            return self.decision_threshold
+
+        pos_col = classes.index(self.encoded_pos_class_label)
+        pos_class_proba = calibrated_pipeline.predict_proba(valid_features)[:, pos_col]
+        return ModelChampionManager.tune_decision_threshold(
+            valid_class=valid_class,
+            pos_class_proba=pos_class_proba,
+            fbeta_beta=self.fbeta_score_beta,
+        )
 
     def _create_standalone_evaluation_kwargs(
         self, experiment_kwargs: dict, experiment_name: str
@@ -382,7 +452,6 @@ class TestSetEvaluationOrchestrator:
         champion_manager: ModelChampionManager,
         comparison_metric_name: str,
         deployment_threshold: float,
-        cv_folds: int = 5,
         experiment_keys: Optional[pd.DataFrame] = None,
         max_eval_experiments: int = 50,
         **experiment_kwargs,
@@ -396,7 +465,6 @@ class TestSetEvaluationOrchestrator:
             champion_manager: ModelChampionManager instance.
             comparison_metric_name: Metric name for deployment decision.
             deployment_threshold: Minimum score required for deployment.
-            cv_folds: Number of CV folds for calibration.
             experiment_keys: Optional DataFrame with model names and experiment keys.
                            If None, ModelSelector will query the tracking backend directly.
             max_eval_experiments: Maximum number of recent experiments to consider.
@@ -567,7 +635,6 @@ class TestSetEvaluationOrchestrator:
             valid_features=valid_features,
             valid_class=valid_class,
             champion_manager=champion_manager,
-            cv_folds=cv_folds,
         )
 
         # End experiment if tracker supports it

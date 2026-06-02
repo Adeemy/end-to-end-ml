@@ -206,6 +206,9 @@ class TrainParams:
     voting_rule: str = "soft"
     deployment_score_thresh: float = 0.8
     max_eval_experiments: int = 10
+    decision_threshold: float = 0.5
+    tune_decision_threshold: bool = False
+    encoded_pos_class_label: int = 1
 
 
 @dataclass(frozen=True)
