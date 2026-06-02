@@ -112,6 +112,9 @@ def main(
         artifacts_path=str(artifacts_dir),
         fbeta_score_beta=training_config.train_params.fbeta_score_beta_val,
         voting_ensemble_name=training_config.modelregistry.voting_ensemble_registered_model_name,
+        decision_threshold=training_config.train_params.decision_threshold,
+        tune_decision_threshold=training_config.train_params.tune_decision_threshold,
+        encoded_pos_class_label=training_config.train_params.encoded_pos_class_label,
     )
 
     champion_manager = ModelChampionManager(
@@ -165,7 +168,6 @@ def main(
         champion_manager=champion_manager,
         comparison_metric_name=comparison_metric,
         deployment_threshold=deployment_threshold,
-        cv_folds=training_config.train_params.cross_val_folds,
         experiment_keys=experiment_keys,
         max_eval_experiments=max_eval_experiments,
         **experiment_kwargs,
