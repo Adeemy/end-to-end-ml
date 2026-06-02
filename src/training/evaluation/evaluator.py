@@ -553,12 +553,15 @@ class BinaryClassificationEvaluator(ModelEvaluator):
         self,
         true_class: ArrayLike,
         pred_class: ArrayLike,
+        pred_proba: ArrayLike = None,
     ) -> pd.DataFrame:
         """Calculates performance metrics for binary classification models.
 
         Args:
             true_class (ArrayLike): true class label.
             pred_class (ArrayLike): predicted class label not probability.
+            pred_proba (ArrayLike): positive-class probabilities. Required to compute
+                ROC-AUC correctly; if omitted, ROC-AUC is skipped.
 
         Returns:
             performance_metrics (pd.DataFrame): a dataframe with metric name and score columns.
@@ -583,11 +586,13 @@ class BinaryClassificationEvaluator(ModelEvaluator):
                     beta=self.fbeta_score_beta,
                 ),
             ),
-            (
-                "roc_auc",
-                roc_auc_score(true_class, pred_class),
-            ),
         ]
+
+        # ROC-AUC must be computed from positive-class probabilities, not hard
+        # labels. roc_auc_score(true, hard_labels) silently degenerates into a
+        # balanced-accuracy proxy, so only add it when probabilities are provided.
+        if pred_proba is not None:
+            cal_metrics.append(("roc_auc", roc_auc_score(true_class, pred_proba)))
 
         performance_metrics = pd.DataFrame(cal_metrics, columns=["Metric", "Score"])
 
@@ -624,10 +629,16 @@ class BinaryClassificationEvaluator(ModelEvaluator):
         train_scores = self.calc_perf_metrics(
             true_class=self.train_class,
             pred_class=pred_train_class,
+            pred_proba=self._safe_extract_pos_probs(
+                pred_train_probs, self.encoded_pos_class_label
+            ),
         )
         valid_scores = self.calc_perf_metrics(
             true_class=self.valid_class,
             pred_class=pred_valid_class,
+            pred_proba=self._safe_extract_pos_probs(
+                pred_valid_probs, self.encoded_pos_class_label
+            ),
         )
 
         # Extract original class label names
@@ -892,6 +903,9 @@ class BinaryClassificationEvaluator(ModelEvaluator):
         test_scores = self.calc_perf_metrics(
             true_class=self.valid_class,  # This is actually test data
             pred_class=pred_test_class,
+            pred_proba=self._safe_extract_pos_probs(
+                pred_test_probs, self.encoded_pos_class_label
+            ),
         )
 
         # Get original class labels for confusion matrix
@@ -960,12 +974,15 @@ class MultiClassificationEvaluator(ModelEvaluator):
         self,
         true_class: ArrayLike,
         pred_class: ArrayLike,
+        pred_proba: ArrayLike = None,
     ) -> pd.DataFrame:
         """Calculates performance metrics for multi-class classification models.
 
         Args:
             true_class (ArrayLike): true class label.
             pred_class (ArrayLike): predicted class label not probability.
+            pred_proba (ArrayLike): full predict_proba matrix (n_samples, n_classes).
+                Required to compute ROC-AUC; if omitted, ROC-AUC is skipped.
 
         Returns:
             performance_metrics (pd.DataFrame): a dataframe with metric name and score columns.
@@ -1036,8 +1053,21 @@ class MultiClassificationEvaluator(ModelEvaluator):
             ),
         ]
 
-        # Note: ROC AUC for multi-class requires predict_proba, not pred_class
-        # So we don't include it here as this method only takes predicted classes
+        # ROC-AUC for multi-class needs the full probability matrix (not hard
+        # labels). Use one-vs-rest with macro averaging when probabilities are
+        # supplied; skip otherwise.
+        if pred_proba is not None:
+            cal_metrics.append(
+                (
+                    "roc_auc_macro",
+                    roc_auc_score(
+                        true_class,
+                        pred_proba,
+                        multi_class="ovr",
+                        average="macro",
+                    ),
+                )
+            )
 
         performance_metrics = pd.DataFrame(cal_metrics, columns=["Metric", "Score"])
 
@@ -1075,10 +1105,12 @@ class MultiClassificationEvaluator(ModelEvaluator):
         train_scores = self.calc_perf_metrics(
             true_class=self.train_class,
             pred_class=pred_train_class,
+            pred_proba=pred_train_probs,
         )
         valid_scores = self.calc_perf_metrics(
             true_class=self.valid_class,
             pred_class=pred_valid_class,
+            pred_proba=pred_valid_probs,
         )
 
         # Extract original class label names
@@ -1329,6 +1361,7 @@ class MultiClassificationEvaluator(ModelEvaluator):
         test_scores = self.calc_perf_metrics(
             true_class=self.valid_class,  # This is actually test data
             pred_class=pred_test_class,
+            pred_proba=pred_test_probs,
         )
 
         # Get original class labels for confusion matrix
