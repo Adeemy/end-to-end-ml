@@ -89,11 +89,8 @@ class ClassifierEnsembleOrchestrator:
         for pipeline in self.base_pipelines:
             try:
                 if "classifier" in pipeline.named_steps:
-                    name, model = (
-                        model.__class__.__name__,
-                        pipeline.named_steps["classifier"],
-                    )
-                    base_models.append((name, model))
+                    classifier = pipeline.named_steps["classifier"]
+                    base_models.append((classifier.__class__.__name__, classifier))
                 else:
                     logger.warning(
                         "Pipeline provided to ensemble does not contain a 'classifier' step."

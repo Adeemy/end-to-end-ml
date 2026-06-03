@@ -358,12 +358,12 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
         ),
         train_params=map_to_dataclass(TrainParams, params.get("train", {})),
         logistic_regression=map_to_dataclass(
-            LogisticRegressionConfig, params.get("logistic_regression", {})
+            LogisticRegressionConfig, params.get("logisticregression", {})
         ),
         random_forest=map_to_dataclass(
-            RandomForestConfig, params.get("random_forest", {})
+            RandomForestConfig, params.get("randomforest", {})
         ),
-        lightgbm=map_to_dataclass(LGBMConfig, params.get("lightgbm", {})),
+        lightgbm=map_to_dataclass(LGBMConfig, params.get("lgbm", {})),
         xgboost=map_to_dataclass(XGBoostConfig, params.get("xgboost", {})),
         files=map_to_dataclass(TrainFilesConfig, params["files"]),
         modelregistry=map_to_dataclass(
