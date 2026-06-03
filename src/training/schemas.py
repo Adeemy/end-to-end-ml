@@ -7,7 +7,7 @@ are present and correctly typed.
 from dataclasses import dataclass
 from datetime import date
 from pathlib import PosixPath
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 
@@ -173,6 +173,12 @@ class TrainFeaturesConfig:
     num_col_names: List[str]
     cat_col_names: List[str]
     historical_features: List[str]
+    # Proportion of the (post-validation) training set kept as training data; the
+    # complement becomes the dedicated calibration set used to calibrate the
+    # champion and tune its decision threshold (disjoint from selection data).
+    calibration_set_size: float = 0.8
+    # Cutoff date for carving the calibration set when split_type == "time".
+    train_calib_split_curoff_date: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -253,6 +259,7 @@ class TrainFilesConfig:
     train_set_file_name: str
     valid_set_file_name: str
     test_set_file_name: str
+    calibration_set_file_name: str = "calibration.parquet"
 
 
 @dataclass(frozen=True)

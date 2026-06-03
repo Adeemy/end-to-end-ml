@@ -90,8 +90,11 @@ def main(
     # Load datasets
     train_set = pd.read_parquet(data_dir / training_config.files.train_set_file_name)
     valid_set = pd.read_parquet(data_dir / training_config.files.valid_set_file_name)
+    calib_set = pd.read_parquet(
+        data_dir / training_config.files.calibration_set_file_name
+    )
     test_set = pd.read_parquet(data_dir / training_config.files.test_set_file_name)
-    logger.info("Loaded train, validation, and test sets")
+    logger.info("Loaded train, validation, calibration, and test sets")
 
     # Prepare data splits
     class_col = training_config.data.class_col_name
@@ -99,6 +102,8 @@ def main(
     train_class = np.array(train_set[class_col])
     valid_features = valid_set.drop(class_col, axis=1)
     valid_class = np.array(valid_set[class_col])
+    calib_features = calib_set.drop(class_col, axis=1)
+    calib_class = np.array(calib_set[class_col])
     test_features = test_set.drop(class_col, axis=1)
     test_class = np.array(test_set[class_col])
 
@@ -165,6 +170,8 @@ def main(
         model_selector=model_selector,
         valid_features=valid_features,
         valid_class=valid_class,
+        calibration_features=calib_features,
+        calibration_class=calib_class,
         champion_manager=champion_manager,
         comparison_metric_name=comparison_metric,
         deployment_threshold=deployment_threshold,

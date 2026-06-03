@@ -319,7 +319,9 @@ class TrainingDataPrep:
         self.categorical_feature_names = categorical_feature_names
         self.training_features = None
         self.valid_set = None
+        self.calib_set = None
         self.validation_features = None
+        self.calibration_features = None
         self.testing_features = None
         self.train_features_preprocessed = None
         self.valid_features_preprocessed = None
@@ -442,18 +444,91 @@ class TrainingDataPrep:
 
         self.train_set, self.valid_set = data_splitter.split_dataset(split_strategy)
 
-    def extract_features(self, valid_set: Optional[pd.DataFrame] = None) -> None:
+    def create_calibration_set(
+        self,
+        split_type: Literal["time", "random"] = "random",
+        train_set_size: float = 0.8,
+        split_random_seed: Optional[int] = None,
+        split_date_col_name: Optional[str] = None,
+        split_cutoff_date: Optional[str] = None,
+        split_date_col_format: str = "%Y-%m-%d %H:%M:%S",
+    ) -> None:
+        """Creates a calibration set by carving it out of the (post-validation)
+        training set.
+
+        The calibration set is used to calibrate the champion and tune its decision
+        threshold. It must be disjoint from both the data the model trains on and
+        the validation set used for model selection, so it is split off the training
+        set *after* the validation set has been created. Call this only after
+        ``create_validation_set``.
+
+        Args:
+            split_type (Literal["time", "random"], optional): Type of split. Defaults to "random".
+            train_set_size (float, optional): Proportion of the remaining training
+                set to keep as training data; the complement becomes the calibration
+                set. Defaults to 0.8.
+            split_random_seed (Optional[int], optional): Random seed for reproducibility. Defaults to None.
+            split_date_col_name (Optional[str], optional): Name of the date column. Defaults to None.
+            split_cutoff_date (Optional[str], optional): Date to split on. Defaults to None.
+            split_date_col_format (str, optional): Date column format. Defaults to "%Y-%m-%d %H:%M:%S".
+
+        Raises:
+            ValueError: If the calibration set already exists.
+        """
+        if self.calib_set is not None:
+            raise ValueError("Calibration set already exists!")
+
+        data_splitter = DataSplitter(
+            dataset=self.train_set,
+            primary_key_col_name=self.primary_key,
+            class_col_name=self.class_col_name,
+        )
+
+        # Select the appropriate split strategy (mirrors create_validation_set)
+        if split_type == "random":
+            split_strategy = RandomSplitStrategy(
+                class_col_name=self.class_col_name,
+                train_set_size=train_set_size,
+                random_seed=split_random_seed or 123,
+            )
+        elif split_type == "time":
+            if not split_date_col_name or not split_cutoff_date:
+                raise ValueError(
+                    "Both split_date_col_name and split_cutoff_date must be provided for time-based splitting."
+                )
+            split_strategy = TimeBasedSplitStrategy(
+                date_col_name=split_date_col_name,
+                cutoff_date=split_cutoff_date,
+                date_format=split_date_col_format,
+            )
+        else:
+            raise ValueError(f"Unsupported split type: {split_type}")
+
+        self.train_set, self.calib_set = data_splitter.split_dataset(split_strategy)
+
+    def extract_features(
+        self,
+        valid_set: Optional[pd.DataFrame] = None,
+        calib_set: Optional[pd.DataFrame] = None,
+    ) -> None:
         """Separates features and class column of testing set. The validation
         set (valid_set) can be provided in this method if to wasn't provided
         already. If validation set is provided here, it will overwrite the
         validation set created by create_validation_set.
 
+        An optional calibration set can be provided the same way as the validation
+        set. It is only required when calibrating the champion downstream, so
+        unlike valid_set it may be omitted (e.g. in the data-split pipeline that
+        instead carves it out via create_calibration_set).
+
         Args:
             valid_set (Optional[pd.DataFrame], optional): validation set. Defaults to None.
+            calib_set (Optional[pd.DataFrame], optional): calibration set. Defaults to None.
 
         Raises:
             ValueError: if validation set is provided although it was already created.
             ValueError: if validation set is neither provided nor created using create_validation_set method.
+            ValueError: if calibration set is provided although it was already created.
         """
 
         if valid_set is not None and self.valid_set is None:
@@ -467,12 +542,24 @@ class TrainingDataPrep:
                 "Validation set neither provided nor created using create_validation_set method!"
             )
 
+        if calib_set is not None and self.calib_set is not None:
+            raise ValueError(
+                "Calibration set was provided although it was already created!"
+            )
+        if calib_set is not None:
+            self.calib_set = calib_set
+
         selected_features = (
             self.numerical_feature_names + self.categorical_feature_names
         )
         self.training_features = self.train_set[selected_features]
         self.validation_features = self.valid_set[selected_features]
         self.testing_features = self.test_set[selected_features]
+
+        # Extract calibration features too when a calibration set is present, so
+        # it receives the same column selection/cleaning as the other splits.
+        if self.calib_set is not None:
+            self.calibration_features = self.calib_set[selected_features]
 
     def encode_class_labels(
         self,
@@ -618,6 +705,11 @@ class TrainingDataPrep:
         self.testing_features = self.testing_features.rename(
             columns=lambda x: re.sub("[^A-Za-z0-9]+", "_", x), inplace=False
         )
+
+        if self.calibration_features is not None:
+            self.calibration_features = self.calibration_features.rename(
+                columns=lambda x: re.sub("[^A-Za-z0-9]+", "_", x), inplace=False
+            )
 
         self.train_features_preprocessed = self.train_features_preprocessed.rename(
             columns=lambda x: re.sub("[^A-Za-z0-9]+", "_", x), inplace=False

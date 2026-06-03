@@ -291,33 +291,36 @@ class TestSetEvaluationOrchestrator:
         self,
         model_pipeline: "Pipeline",
         model_name: str,
-        valid_features: pd.DataFrame,
-        valid_class: np.ndarray,
+        calibration_features: pd.DataFrame,
+        calibration_class: np.ndarray,
         champion_manager: ModelChampionManager,
     ) -> None:
         """Calibrates and registers champion model.
 
+        Calibration and threshold tuning use the dedicated calibration split,
+        which is disjoint from the validation set used for model selection.
+
         Args:
             model_pipeline: Fitted model pipeline (Pipeline).
             model_name: Name of the champion model.
-            valid_features: Validation features for calibration.
-            valid_class: Validation class labels for calibration.
+            calibration_features: Calibration features (held-out from train/valid).
+            calibration_class: Calibration class labels.
             champion_manager: ModelChampionManager instance.
         """
-        # Calibrate the champion model
+        # Calibrate the champion model on the dedicated calibration set
         calibrated_pipeline = champion_manager.calibrate_pipeline(
-            valid_features=valid_features,
-            valid_class=valid_class,
+            valid_features=calibration_features,
+            valid_class=calibration_class,
             fitted_pipeline=model_pipeline,
         )
 
         logger.info("Calibrated champion model: %s", model_name)
 
-        # Resolve the serving decision threshold (tuned on validation or the
-        # configured default) and persist it next to the model so inference uses
-        # the same operating point instead of a hardcoded 0.5.
+        # Resolve the serving decision threshold (tuned on the calibration set or
+        # the configured default) and persist it next to the model so inference
+        # uses the same operating point instead of a hardcoded 0.5.
         decision_threshold = self._resolve_decision_threshold(
-            calibrated_pipeline, valid_features, valid_class
+            calibrated_pipeline, calibration_features, calibration_class
         )
         metadata_path = champion_manager.save_model_metadata(
             local_path=self.artifacts_path,
@@ -366,19 +369,19 @@ class TestSetEvaluationOrchestrator:
     def _resolve_decision_threshold(
         self,
         calibrated_pipeline: "Pipeline",
-        valid_features: pd.DataFrame,
-        valid_class: np.ndarray,
+        calibration_features: pd.DataFrame,
+        calibration_class: np.ndarray,
     ) -> float:
         """Returns the operating threshold to persist with the champion.
 
-        Tunes the threshold on the validation set (maximizing F-beta) when
+        Tunes the threshold on the calibration set (maximizing F-beta) when
         ``tune_decision_threshold`` is enabled; otherwise returns the configured
         default. Only meaningful for binary models — multiclass keeps the default.
 
         Args:
             calibrated_pipeline: The calibrated champion pipeline.
-            valid_features: Validation features.
-            valid_class: Validation class labels.
+            calibration_features: Calibration features.
+            calibration_class: Calibration class labels.
 
         Returns:
             float: decision threshold in (0, 1).
@@ -390,9 +393,11 @@ class TestSetEvaluationOrchestrator:
             return self.decision_threshold
 
         pos_col = classes.index(self.encoded_pos_class_label)
-        pos_class_proba = calibrated_pipeline.predict_proba(valid_features)[:, pos_col]
+        pos_class_proba = calibrated_pipeline.predict_proba(calibration_features)[
+            :, pos_col
+        ]
         return ModelChampionManager.tune_decision_threshold(
-            valid_class=valid_class,
+            valid_class=calibration_class,
             pos_class_proba=pos_class_proba,
             fbeta_beta=self.fbeta_score_beta,
         )
@@ -444,11 +449,183 @@ class TestSetEvaluationOrchestrator:
 
         return kwargs
 
+    def _resolve_candidate_models(
+        self,
+        experiment_keys: Optional[pd.DataFrame],
+        model_selector: ModelSelector,
+        max_eval_experiments: int,
+    ) -> list:
+        """Resolves the candidate (model_name, experiment_key) pairs to compare.
+
+        Uses the experiment keys passed from training when available; otherwise
+        falls back to the tracker only to *enumerate* the best candidate (the
+        selection metric is still recomputed in-process by the caller).
+
+        Args:
+            experiment_keys: Optional DataFrame of [model_name, experiment_key].
+            model_selector: ModelSelector used for the standalone discovery fallback.
+            max_eval_experiments: Max recent experiments to consider in the fallback.
+
+        Returns:
+            list: candidate (model_name, experiment_key) tuples.
+        """
+        if experiment_keys is not None and not experiment_keys.empty:
+            return [
+                (str(row[0]), str(row[1]))
+                for row in experiment_keys.itertuples(index=False)
+            ]
+
+        # Standalone fallback: let the selector enumerate the best candidate.
+        best_model_name, best_experiment_key = model_selector.select_best_model(
+            experiment_keys=experiment_keys, max_experiments=max_eval_experiments
+        )
+        return [(best_model_name, best_experiment_key)]
+
+    def _load_candidate_pipeline(
+        self, model_name: str, experiment_key: Optional[str]
+    ) -> Optional["Pipeline"]:
+        """Loads a candidate pipeline from local artifacts, else the tracker.
+
+        Args:
+            model_name: Registered model name.
+            experiment_key: Experiment key for tracker download (may be None).
+
+        Returns:
+            Optional[Pipeline]: the loaded pipeline, or None if it cannot be loaded.
+        """
+        model_path = f"{self.artifacts_path}/{model_name}.pkl"
+        if os.path.exists(model_path):
+            try:
+                pipeline = joblib.load(model_path)
+                logger.info("Loaded model from local path: %s", model_path)
+                return pipeline
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.warning(
+                    "Could not load model from local path %s: %s", model_path, exc
+                )
+                return None
+
+        if not experiment_key:
+            logger.warning("No local artifact or experiment key for %s", model_name)
+            return None
+
+        try:
+            return self._download_model_from_comet(
+                experiment_key=experiment_key,
+                model_name=model_name,
+                save_path=model_path,
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning(
+                "Could not load model %s from workspace: %s", model_name, exc
+            )
+            return None
+
+    def _score_pipeline_on_valid(
+        self,
+        pipeline: "Pipeline",
+        model_name: str,
+        valid_features: pd.DataFrame,
+        valid_class: np.ndarray,
+        comparison_metric_name: str,
+    ) -> float:
+        """Computes the comparison metric for a pipeline on the validation set.
+
+        Args:
+            pipeline: Candidate fitted pipeline.
+            model_name: Name of the candidate (used to flag the voting ensemble).
+            valid_features: Validation features.
+            valid_class: Validation class labels.
+            comparison_metric_name: Metric name as produced by calc_perf_metrics.
+
+        Returns:
+            float: the metric value, or -inf if it cannot be computed.
+        """
+        evaluator = create_model_evaluator(
+            tracker=self.tracker,
+            pipeline=pipeline,
+            train_features=self.train_features,
+            train_class=self.train_class,
+            valid_features=valid_features,
+            valid_class=valid_class,
+            fbeta_score_beta=self.fbeta_score_beta,
+            encoded_pos_class_label=self.encoded_pos_class_label,
+            is_voting_ensemble=(model_name == self.voting_ensemble_name),
+        )
+
+        proba = np.asarray(pipeline.predict_proba(valid_features))
+        pred_class = pipeline.predict(valid_features)
+        classes = list(pipeline.classes_)
+        if len(classes) == 2:
+            pos_col = (
+                classes.index(self.encoded_pos_class_label)
+                if self.encoded_pos_class_label in classes
+                else 1
+            )
+            pred_proba = proba[:, pos_col]
+        else:
+            pred_proba = proba
+
+        scores = evaluator.calc_perf_metrics(
+            true_class=valid_class, pred_class=pred_class, pred_proba=pred_proba
+        )
+        row = scores.loc[scores["Metric"] == comparison_metric_name, "Score"]
+        return float(row.iloc[0]) if not row.empty else float("-inf")
+
+    def _select_champion_in_process(
+        self,
+        candidates: list,
+        valid_features: pd.DataFrame,
+        valid_class: np.ndarray,
+        comparison_metric_name: str,
+    ) -> tuple:
+        """Selects the champion by recomputing the comparison metric on validation.
+
+        Loads each candidate pipeline and scores it in-process on the validation
+        set, so champion selection does not depend on metrics read back from the
+        experiment tracker.
+
+        Args:
+            candidates: List of (model_name, experiment_key) tuples.
+            valid_features: Validation features.
+            valid_class: Validation class labels.
+            comparison_metric_name: Metric to rank on (e.g. 'f_0.5_score', 'roc_auc').
+
+        Returns:
+            tuple: (champion_model_name, champion_pipeline_or_None).
+        """
+        best_name, best_pipeline, best_score = None, None, float("-inf")
+        for model_name, experiment_key in candidates:
+            pipeline = self._load_candidate_pipeline(model_name, experiment_key)
+            if pipeline is None:
+                continue
+            score = self._score_pipeline_on_valid(
+                pipeline,
+                model_name,
+                valid_features,
+                valid_class,
+                comparison_metric_name,
+            )
+            logger.info(
+                "Candidate %s scored %.4f on %s (valid)",
+                model_name,
+                score,
+                comparison_metric_name,
+            )
+            if score > best_score:
+                best_name, best_pipeline, best_score = model_name, pipeline, score
+
+        if best_name is None:
+            best_name = candidates[0][0] if candidates else "unknown"
+        return best_name, best_pipeline
+
     def run_evaluation_workflow(
         self,
         model_selector: ModelSelector,
         valid_features: pd.DataFrame,
         valid_class: np.ndarray,
+        calibration_features: pd.DataFrame,
+        calibration_class: np.ndarray,
         champion_manager: ModelChampionManager,
         comparison_metric_name: str,
         deployment_threshold: float,
@@ -458,10 +635,15 @@ class TestSetEvaluationOrchestrator:
     ) -> tuple[str, dict]:
         """Runs complete evaluation workflow: select, evaluate, calibrate, register.
 
+        Selection uses ``valid`` (recomputed in-process), while calibration and
+        threshold tuning use the dedicated, disjoint ``calibration`` split.
+
         Args:
             model_selector: ModelSelector instance.
-            valid_features: Validation features for calibration.
-            valid_class: Validation class labels for calibration.
+            valid_features: Validation features for in-process model selection.
+            valid_class: Validation class labels for in-process model selection.
+            calibration_features: Calibration features (calibration + threshold).
+            calibration_class: Calibration class labels (calibration + threshold).
             champion_manager: ModelChampionManager instance.
             comparison_metric_name: Metric name for deployment decision.
             deployment_threshold: Minimum score required for deployment.
@@ -476,41 +658,21 @@ class TestSetEvaluationOrchestrator:
         Raises:
             ValueError: If test score is below deployment threshold.
         """
-        # Select best model
-        best_model_name, best_experiment_key = model_selector.select_best_model(
-            experiment_keys=experiment_keys, max_experiments=max_eval_experiments
+        # Select the champion IN-PROCESS: recompute the comparison metric on the
+        # validation set for each candidate pipeline, instead of trusting the
+        # metric values read back from the experiment tracker.
+        candidates = self._resolve_candidate_models(
+            experiment_keys, model_selector, max_eval_experiments
         )
-
-        # Try to load model locally, if not found download from tracking backend
-        model_path = f"{self.artifacts_path}/{best_model_name}.pkl"
-
-        model_pipeline = None
-        if not os.path.exists(model_path):
-            logger.info("Model not found locally, downloading from workspace")
-            try:
-                model_pipeline = self._download_model_from_comet(
-                    experiment_key=best_experiment_key,
-                    model_name=best_model_name,
-                    save_path=model_path,
-                )
-            except FileNotFoundError as e:
-                logger.warning("Could not download model from workspace: %s", str(e))
-                logger.warning("Skipping evaluation for model: %s", best_model_name)
-                return best_model_name, {}
-            except Exception as e:  # pylint: disable=W0718
-                logger.warning("Error downloading model from workspace: %s", str(e))
-                logger.warning("Skipping evaluation for model: %s", best_model_name)
-                return best_model_name, {}
-        else:
-            try:
-                model_pipeline = joblib.load(model_path)
-                logger.info("Loaded model from local path: %s", model_path)
-            except Exception as e:  # pylint: disable=W0703
-                logger.warning(
-                    "Could not load model from local path %s: %s", model_path, str(e)
-                )
-                logger.warning("Skipping evaluation for model: %s", best_model_name)
-                return best_model_name, {}
+        best_model_name, model_pipeline = self._select_champion_in_process(
+            candidates=candidates,
+            valid_features=valid_features,
+            valid_class=valid_class,
+            comparison_metric_name=comparison_metric_name,
+        )
+        # Recover the champion's experiment key (used below only for tracker
+        # parent/child experiment linking, not for selection).
+        best_experiment_key = dict(candidates).get(best_model_name)
 
         if model_pipeline is None:
             logger.warning("No model pipeline available for evaluation")
@@ -628,12 +790,12 @@ class TestSetEvaluationOrchestrator:
             deployment_threshold,
         )
 
-        # Calibrate and register as champion
+        # Calibrate and register as champion (on the dedicated calibration split)
         self.calibrate_and_register_champion(
             model_pipeline=model_pipeline,
             model_name=best_model_name,
-            valid_features=valid_features,
-            valid_class=valid_class,
+            calibration_features=calibration_features,
+            calibration_class=calibration_class,
             champion_manager=champion_manager,
         )
 

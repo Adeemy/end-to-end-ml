@@ -71,8 +71,10 @@ def prepare_data(
     training_set: pd.DataFrame,
     validation_set: pd.DataFrame,
     testing_set: pd.DataFrame,
+    calibration_set: pd.DataFrame,
 ) -> Tuple[
     TrainingDataPrep,
+    pd.DataFrame,
     pd.DataFrame,
     pd.DataFrame,
     pd.DataFrame,
@@ -83,6 +85,8 @@ def prepare_data(
     List[str],
     LabelEncoder,
     int,
+    pd.DataFrame,
+    pd.Series,
 ]:
     """Prepare data for training by preprocessing training and validation sets.
 
@@ -97,6 +101,8 @@ def prepare_data(
         training_set (pd.DataFrame): training set.
         validation_set (pd.DataFrame): validation set.
         testing_set (pd.DataFrame): testing set.
+        calibration_set (pd.DataFrame): calibration set (used to calibrate the
+            champion and tune its decision threshold).
 
     Returns:
         data_prep (TrainingDataPrep): data preparation object.
@@ -111,6 +117,8 @@ def prepare_data(
         cat_feature_names (List[str]): categorical feature names.
         class_encoder (LabelEncoder): class label encoder.
         encoded_positive_class_label (int): encoded positive class label.
+        calib_features (pd.DataFrame): preprocessed calibration features.
+        calib_class (np.ndarray): encoded calibration class labels.
     """
 
     config = Config(config_path=config_yaml_path)
@@ -144,7 +152,9 @@ def prepare_data(
         numerical_feature_names=num_col_names,
         categorical_feature_names=cat_col_names,
     )
-    data_prep.extract_features(valid_set=validation_set)
+    # Pass the calibration set the same way as the validation set so it receives
+    # the same feature selection, type enforcement and name cleaning.
+    data_prep.extract_features(valid_set=validation_set, calib_set=calibration_set)
     data_prep.enforce_data_types()
 
     # Encode class labels
@@ -160,10 +170,15 @@ def prepare_data(
         pos_class_label=pos_class,
     )
 
+    # Encode the calibration class labels with the same fitted encoder so they
+    # match the model's classes at calibration time.
+    calib_class = class_encoder.transform(calibration_set[class_column_name])
+
     # Return features
     train_features = data_prep.training_features
     valid_features = data_prep.validation_features
     test_features = data_prep.testing_features
+    calib_features = data_prep.calibration_features
 
     # Define the mapping from strings to scaler classes
     scaler_mapping = {
@@ -201,6 +216,8 @@ def prepare_data(
         cat_feature_names,
         class_encoder,
         encoded_positive_class_label,
+        calib_features,
+        calib_class,
     )
 
 
@@ -258,6 +275,7 @@ def main(
     train_file_name = config.params["files"]["train_set_file_name"]
     valid_set_file_name = config.params["files"]["valid_set_file_name"]
     test_set_file_name = config.params["files"]["test_set_file_name"]
+    calib_set_file_name = config.params["files"]["calibration_set_file_name"]
     lr_registered_model_name = config.params["modelregistry"][
         "lr_registered_model_name"
     ]
@@ -297,6 +315,10 @@ def main(
         data_dir / test_set_file_name,
     )
 
+    calibration_set = pd.read_parquet(
+        data_dir / calib_set_file_name,
+    )
+
     # Ensure that columns provided in config files exists in training data
     num_col_names = [col for col in num_col_names if col in training_set.columns]
     cat_col_names = [col for col in cat_col_names if col in training_set.columns]
@@ -315,11 +337,14 @@ def main(
         cat_feature_names,
         class_encoder,
         encoded_positive_class_label,
+        calib_features,
+        calib_class,
     ) = prepare_data(
         config_yaml_path=config_yaml_path,
         training_set=training_set,
         validation_set=validation_set,
         testing_set=testing_set,
+        calibration_set=calibration_set,
     )
 
     # Preprocessed train and validation features are needed during hyperparams
@@ -347,6 +372,13 @@ def main(
     test_set[class_column_name] = test_class
     test_set.to_parquet(
         data_dir / test_set_file_name,
+        index=False,
+    )
+
+    calib_set = calib_features
+    calib_set[class_column_name] = calib_class
+    calib_set.to_parquet(
+        data_dir / calib_set_file_name,
         index=False,
     )
 

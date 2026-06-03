@@ -158,8 +158,13 @@ def prepare_data(
     training_set: pd.DataFrame,
     testing_set: pd.DataFrame,
     training_config: TrainingConfig,
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Prepares training, validation, and testing sets.
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Prepares training, validation, calibration, and testing sets.
+
+    The calibration set is carved out of the training set *after* the validation
+    set, so all four splits are disjoint: the model trains on ``train``, is
+    selected on ``valid``, is calibrated/thresholded on ``calibration``, and is
+    finally judged on ``test``.
 
     Args:
         training_set (pd.DataFrame): Training set.
@@ -167,7 +172,8 @@ def prepare_data(
         training_config (TrainingConfig): Training configuration object.
 
     Returns:
-        tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: Training, validation, and testing sets.
+        tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]: Training,
+            validation, calibration, and testing sets.
     """
 
     # Prepare data for training
@@ -192,7 +198,23 @@ def prepare_data(
         split_date_col_format=training_config.split_date_col_format,
     )
 
-    return data_prep.train_set, data_prep.valid_set, data_prep.test_set
+    # Carve a dedicated calibration set out of the remaining training set so
+    # calibration/threshold tuning never reuse the validation (selection) data.
+    data_prep.create_calibration_set(
+        split_type=training_config.split_type,
+        train_set_size=training_config.calibration_set_size,
+        split_random_seed=int(training_config.split_rand_seed),
+        split_date_col_name=training_config.split_date_col_name,
+        split_cutoff_date=training_config.train_calib_split_curoff_date,
+        split_date_col_format=training_config.split_date_col_format,
+    )
+
+    return (
+        data_prep.train_set,
+        data_prep.valid_set,
+        data_prep.calib_set,
+        data_prep.test_set,
+    )
 
 
 def main(
@@ -230,15 +252,16 @@ def main(
     training_set, testing_set = split_data(preprocessed_data, training_config)
     logger.info("Preprocessed data split into training and testing sets.")
 
-    train_set, valid_set, test_set = prepare_data(
+    train_set, valid_set, calib_set, test_set = prepare_data(
         training_set, testing_set, training_config
     )
-    logger.info("Training, validation, and testing sets prepared.")
+    logger.info("Training, validation, calibration, and testing sets prepared.")
 
     train_set.to_parquet(data_dir / files_config.train_set_file_name, index=False)
     valid_set.to_parquet(data_dir / files_config.valid_set_file_name, index=False)
+    calib_set.to_parquet(data_dir / files_config.calibration_set_file_name, index=False)
     test_set.to_parquet(data_dir / files_config.test_set_file_name, index=False)
-    logger.info("Train, validation, and test sets saved locally.")
+    logger.info("Train, validation, calibration, and test sets saved locally.")
 
 
 ###########################################################

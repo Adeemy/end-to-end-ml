@@ -10,8 +10,10 @@ data:
   split_date_col_name: null # Name of date column to split dataset based on time (e.g., datetime.strptime("2023-15-11", "%Y-%d-%m").date())
   train_test_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is test set)
   train_valid_split_curoff_date: null # Cut-off date if DATASET_SPLIT_TYPE = "time" (data after this date is validation set)
+  train_calib_split_curoff_date: null # Cut-off date if split_type = "time" (training data after this date becomes the calibration set)
   split_date_col_format: "%Y-%m-%d %H:%M:%S"
   train_set_size: 0.8 # % of train set when splitting data imported from feature store
+  calibration_set_size: 0.8 # % of the (post-validation) training set kept as train; the rest becomes the calibration set
   pk_col_name: "ID" # Primary key that uniquely identifies every row in dataset
   class_col_name: "Diabetes_binary"
   pos_class: "1"  # Positive class for binary classification (0 = no diabetes, 1 = diabetes)
@@ -160,6 +162,7 @@ files:
   preprocessed_dataset_features_file_name: "preprocessed_dataset_features.parquet"
   train_set_file_name: "train.parquet"
   valid_set_file_name: "validation.parquet"
+  calibration_set_file_name: "calibration.parquet"
   test_set_file_name: "test.parquet"
 
 modelregistry:
