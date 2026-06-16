@@ -227,6 +227,7 @@ azureml:
   acr_image_name: "end-to-end-ml-train-env"
   train_experiment_name: "end-to-end-ml-train"
   eval_experiment_name: "end-to-end-ml-eval"
+  batch_score_experiment_name: "end-to-end-ml-batch-score"
   feature_store_name: "end-to-end-ml-fs"
   feature_set_name: "diabetes_features"
   feature_set_version: "1"

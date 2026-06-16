@@ -121,6 +121,11 @@ azure_submit_train:
 azure_submit_evaluate:
 	$(AZURE_PYTHON) ./src/azureml/submit_evaluate.py --config_yaml_path ./config/training-config.yml $(if $(WAIT),--wait,)
 
+# Batch scoring as an Azure ML job. Pass the input data with INPUT_DATA=<path|uri>
+# (a data asset, azureml:// datastore path, or local file).
+azure_submit_score:
+	$(AZURE_PYTHON) ./src/azureml/submit_score.py --config_yaml_path ./config/training-config.yml --input_data $(INPUT_DATA) $(if $(WAIT),--wait,)
+
 # Test champion model via CLI (batch scoring requires inference.parquet file)
 test_model_cli:
 	$(PYTHON) ./src/inference/predict.py --config_yaml_path ./config/training-config.yml --logger_path ./config/logging.conf

@@ -358,6 +358,7 @@ class AzureMLConfig:
     acr_image_name: str = "end-to-end-ml-train-env"
     train_experiment_name: str = "end-to-end-ml-train"
     eval_experiment_name: str = "end-to-end-ml-eval"
+    batch_score_experiment_name: str = "end-to-end-ml-batch-score"
     feature_store_name: str = "end-to-end-ml-fs"
     feature_set_name: str = "diabetes_features"
     feature_set_version: str = "1"
