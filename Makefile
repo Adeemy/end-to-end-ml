@@ -91,13 +91,20 @@ split_data:
 train:
 	$(PYTHON) ./src/training/train.py --config_yaml_path ./src/config/training-config.yml
 
+# Evaluates the most recent training run by default. To evaluate a specific run:
+#   make evaluate RUN_ID=<mlflow_run_id>
 evaluate:
-	$(PYTHON) ./src/training/evaluate.py --config_yaml_path ./src/config/training-config.yml
+	$(PYTHON) ./src/training/evaluate.py --config_yaml_path ./src/config/training-config.yml $(if $(RUN_ID),--run_id $(RUN_ID),)
 
 submit_train: prep_data split_data train evaluate
 
+# Launch the MLflow UI to browse training and evaluation runs. Points at the
+# repo's local file store (./mlruns) so it shows the runs this project logs;
+# open http://localhost:8080. Override the port with PORT=...
+# MLFLOW_ALLOW_FILE_STORE opts into the file backend on MLflow 3.x (the `mlflow ui`
+# CLI doesn't import the project code that sets this automatically for training).
 view_mlflow:
-	$(VENV_BIN)/mlflow ui --host 0.0.0.0 --port 8080
+	MLFLOW_ALLOW_FILE_STORE=true $(VENV_BIN)/mlflow ui --backend-store-uri "file://$(CURDIR)/mlruns" --host 0.0.0.0 --port $(or $(PORT),8080)
 
 # Test champion model via CLI (batch scoring requires inference.parquet file)
 test_model_cli:

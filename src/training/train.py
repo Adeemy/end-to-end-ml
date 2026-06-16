@@ -60,7 +60,12 @@ from src.training.tracking.experiment import (
 )
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
-from src.utils.path import ARTIFACTS_DIR, DATA_DIR, encoded_split_path
+from src.utils.path import (
+    ARTIFACTS_DIR,
+    DATA_DIR,
+    TRAINING_EXPERIMENTS_FILE,
+    encoded_split_path,
+)
 
 module_name: str = PosixPath(__file__).stem
 console_logger = get_logger(module_name)
@@ -579,6 +584,16 @@ def main(
         exp_names_keys.update(**{f"{exp_key}": exp_id})
 
     successful_exp = pd.DataFrame(exp_names_keys.items())
+
+    # Persist the [model_name, run_id] pairs of this run so a standalone
+    # `make evaluate` can evaluate exactly these (most recent) models offline,
+    # without querying a remote tracker. evaluate.py reads this file when it is
+    # not handed the keys in-process.
+    successful_exp.to_json(artifacts_dir / TRAINING_EXPERIMENTS_FILE, orient="values")
+    logger.info(
+        "Saved experiment keys for evaluation to %s",
+        artifacts_dir / TRAINING_EXPERIMENTS_FILE,
+    )
 
     logger.info("Model Training Experiments Finished ...")
 

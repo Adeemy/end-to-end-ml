@@ -43,10 +43,59 @@ from src.training.schemas import Config, build_training_config
 from src.training.tracking.experiment import get_tracker_credentials
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
-from src.utils.path import ARTIFACTS_DIR, DATA_DIR, encoded_split_path
+from src.utils.path import (
+    ARTIFACTS_DIR,
+    DATA_DIR,
+    TRAINING_EXPERIMENTS_FILE,
+    encoded_split_path,
+)
 
 module_name: str = PosixPath(__file__).stem
 console_logger = get_logger(module_name)
+
+
+def _resolve_mlflow_run(
+    run_id: str, artifacts_dir: PosixPath, logger: logging.Logger
+) -> pd.DataFrame:
+    """Materializes the model from a specific MLflow run for evaluation.
+
+    Looks up the registered model version produced by ``run_id``, loads it, and
+    writes it to the local artifacts dir so the evaluation workflow scores that
+    exact run instead of the most recent one.
+
+    Args:
+        run_id: MLflow run id of the training run to evaluate.
+        artifacts_dir: Directory where candidate model pkls are read from.
+        logger: Logger object.
+
+    Returns:
+        pd.DataFrame: a single ``[model_name, run_id]`` row of experiment keys.
+
+    Raises:
+        ValueError: If no registered model is associated with ``run_id``.
+    """
+    import joblib  # pylint: disable=import-outside-toplevel
+    import mlflow.sklearn  # pylint: disable=import-outside-toplevel
+    from mlflow.tracking import MlflowClient  # pylint: disable=import-outside-toplevel
+
+    versions = MlflowClient().search_model_versions(f"run_id='{run_id}'")
+    if not versions:
+        raise ValueError(
+            f"No registered model found for MLflow run_id '{run_id}'. "
+            "Check the run id (browse runs with `make view_mlflow`)."
+        )
+    version = versions[0]
+    model = mlflow.sklearn.load_model(f"models:/{version.name}/{version.version}")
+    local_path = artifacts_dir / f"{version.name}.pkl"
+    joblib.dump(model, local_path)
+    logger.info(
+        "Evaluating MLflow run %s: model '%s' v%s materialized to %s",
+        run_id,
+        version.name,
+        version.version,
+        local_path,
+    )
+    return pd.DataFrame([[version.name, run_id]])
 
 
 def main(
@@ -55,19 +104,25 @@ def main(
     artifacts_dir: PosixPath,
     logger: logging.Logger,
     experiment_keys: Optional[pd.DataFrame] = None,
+    run_id: Optional[str] = None,
 ) -> tuple[str, dict]:
     """Evaluates best model on test set and registers as champion.
 
-    Note: This script requires trained models to exist in the configured tracking backend.
-    If no experiments are found, run training first: 'make train'
+    By default this evaluates the most recent training run (the models recorded
+    in the ``training_experiments.json`` written by train.py). Pass ``run_id`` to
+    evaluate a specific MLflow run instead.
 
     Args:
         config_yaml_path: Path to training config YAML file.
         data_dir: Path to data directory.
         artifacts_dir: Path to artifacts directory.
         logger: Logger object.
-        experiment_keys: Optional DataFrame with experiment keys from training.
-                        If None, will query the tracking backend directly.
+        experiment_keys: Optional DataFrame with experiment keys passed in-process
+                        from training. If None, the keys are resolved from
+                        ``run_id``, then the last-run keys file, then (Comet only)
+                        remote discovery.
+        run_id: Optional MLflow run id to evaluate a specific run instead of the
+                most recent one.
 
     Returns:
         Tuple of (champion_model_name, test_metrics).
@@ -84,9 +139,36 @@ def main(
         config_path=config_yaml_path,
     )
 
-    # Use experiment keys passed from training or query tracking backend directly
+    # Resolve which trained models to evaluate. Priority:
+    #   1. keys passed in-process from train.py (--run_evaluation),
+    #   2. the keys file written by the most recent `make train`,
+    #   3. Comet workspace discovery (only when the tracker is Comet).
+    # For MLflow with no keys file we fail fast rather than querying Comet.
+    tracker_name = training_config.train_params.experiment_tracker.lower()
     if experiment_keys is not None:
-        logger.info("Using experiment keys passed from training.")
+        logger.info("Using experiment keys passed in-process from training.")
+    elif run_id:
+        experiment_keys = _resolve_mlflow_run(run_id, artifacts_dir, logger)
+    else:
+        keys_path = artifacts_dir / TRAINING_EXPERIMENTS_FILE
+        if keys_path.exists():
+            experiment_keys = pd.read_json(keys_path, orient="values", dtype=str)
+            logger.info(
+                "Evaluating the most recent training run: loaded %d model key(s) from %s",
+                len(experiment_keys),
+                keys_path,
+            )
+        elif tracker_name == "comet":
+            logger.info(
+                "No %s found; discovering recent experiments via the Comet workspace.",
+                TRAINING_EXPERIMENTS_FILE,
+            )  # experiment_keys stays None -> ModelSelector (Comet) discovery
+        else:
+            raise ValueError(
+                f"No '{TRAINING_EXPERIMENTS_FILE}' found in {artifacts_dir}. Run "
+                f"'make train' first (experiment_tracker='{tracker_name}' evaluates "
+                "the most recent local training run; it has no remote discovery)."
+            )
 
     # Load the feature-selected, label-encoded splits written by train.py
     # (separate "*_encoded.parquet" files; the canonical splits are left intact).
@@ -164,11 +246,18 @@ def main(
     # Add valid_ prefix to ensure the model selection is based on validation set
     valid_comparison_metric = f"valid_{comparison_metric}"
 
-    model_selector = ModelSelector(
-        project_name=training_config.train_params.project_name,
-        workspace_name=training_config.train_params.workspace_name,
-        comparison_metric=valid_comparison_metric,
-    )
+    # Only build the (Comet-backed) ModelSelector when we actually need remote
+    # discovery, i.e. no experiment keys were resolved above. Constructing it
+    # calls comet_ml.login(), so creating it unconditionally would hit Comet
+    # (and fail on networks without access) even for MLflow runs that already
+    # have their keys.
+    model_selector = None
+    if experiment_keys is None:
+        model_selector = ModelSelector(
+            project_name=training_config.train_params.project_name,
+            workspace_name=training_config.train_params.workspace_name,
+            comparison_metric=valid_comparison_metric,
+        )
 
     # Run evaluation workflow
     deployment_threshold = float(training_config.train_params.deployment_score_thresh)
@@ -224,17 +313,25 @@ if __name__ == "__main__":
         default="./src/config/training-config.yml",
         help="Path to the training configuration YAML file.",
     )
+    parser.add_argument(
+        "--run_id",
+        type=str,
+        default=None,
+        help="MLflow run id to evaluate a specific run. Defaults to the most "
+        "recent training run (recorded by train.py).",
+    )
 
     args = parser.parse_args()
 
     console_logger.info("Model Evaluation on Test Set Starts ...")
 
-    # Run evaluation (without experiment_keys will query tracking backend directly)
+    # By default evaluates the most recent training run; --run_id targets a specific one.
     champ_name, metrics = main(
         config_yaml_path=args.config_yaml_path,
         data_dir=DATA_DIR,
         artifacts_dir=ARTIFACTS_DIR,
         logger=console_logger,
+        run_id=args.run_id,
     )
 
     console_logger.info("Champion model: %s", champ_name)

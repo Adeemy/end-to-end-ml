@@ -164,6 +164,7 @@ cython_debug/
 /src/feature/feature_repo/data/*.db
 /src/inference/artifacts/*.parquet
 /src/training/artifacts/*.pkl
+/src/training/artifacts/*.json
 /src/training/artifacts/*.csv
 /notebooks/.eda_figures/*.pkl
 /notebooks/.eda_figures/*.png

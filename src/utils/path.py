@@ -11,6 +11,11 @@ from typing import Union
 PARENT_DIR = Path(__file__).parent.resolve().parent
 LOG_CONF_PATH = PARENT_DIR / "config/logging.conf"
 
+# File (under ARTIFACTS_DIR) where train.py records the [model_name, run_id] pairs
+# of the models it just trained, so a standalone `make evaluate` can evaluate that
+# exact (most recent) training run without querying a remote tracker.
+TRAINING_EXPERIMENTS_FILE = "training_experiments.json"
+
 
 def encoded_split_path(data_dir: Union[str, PurePath], file_name: str) -> Path:
     """Returns the path of the label-encoded variant of a data split file.
