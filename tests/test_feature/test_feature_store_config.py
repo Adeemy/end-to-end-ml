@@ -41,7 +41,9 @@ def test_config_check_params_valid(
 
 def test_config_check_params_missing_description():
     """Tests if Config class check_params method raises ValueError when 'description' is missing."""
-    config = Config(config_path=f"{str(PARENT_DIR.parent)}/config/feature-store-config.yml")
+    config = Config(
+        config_path=f"{str(PARENT_DIR.parent)}/config/feature-store-config.yml"
+    )
     config.params.pop("description", None)  # Remove 'description' key
     with pytest.raises(KeyError, match="description is not included in config file"):
         config.check_params()
@@ -49,7 +51,9 @@ def test_config_check_params_missing_description():
 
 def test_config_check_params_missing_data():
     """Tests if Config class check_params method raises ValueError when 'data' is missing."""
-    config = Config(config_path=f"{str(PARENT_DIR.parent)}/config/feature-store-config.yml")
+    config = Config(
+        config_path=f"{str(PARENT_DIR.parent)}/config/feature-store-config.yml"
+    )
     config.params.pop("data", None)  # Remove 'data' key
     with pytest.raises(KeyError, match="data is not included in config file"):
         config.check_params()

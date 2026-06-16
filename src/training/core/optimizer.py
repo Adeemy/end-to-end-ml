@@ -456,7 +456,6 @@ class ModelOptimizer:
             n_startup_trials=int(
                 0.1 * max_search_iters
             ),  # Warm-up trials that use random sampling
-            warn_independent_sampling=False,
             multivariate=True,
             constant_liar=True,
             seed=self.random_seed,  # makes the search reproducible when set
