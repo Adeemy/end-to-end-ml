@@ -37,19 +37,16 @@ if os.getenv("ENABLE_COMET_LOGGING", "false").lower() == "true":
     import comet_ml  # pylint: disable=unused-import
 
 import pandas as pd
-from lightgbm import LGBMClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import (
     LabelEncoder,
     MinMaxScaler,
     RobustScaler,
     StandardScaler,
 )
-from xgboost import XGBClassifier
 
 from src.feature.utils.data import TrainingDataPrep
 from src.training.core.ensemble import ClassifierEnsembleOrchestrator
+from src.training.core.model_factory import build_estimator
 from src.training.core.trainer import TrainingOrchestrator
 from src.training.schemas import Config, build_training_config
 from src.training.tracking.experiment import (
@@ -276,31 +273,9 @@ def main(
     valid_set_file_name = config.params["files"]["valid_set_file_name"]
     test_set_file_name = config.params["files"]["test_set_file_name"]
     calib_set_file_name = config.params["files"]["calibration_set_file_name"]
-    lr_registered_model_name = config.params["modelregistry"][
-        "lr_registered_model_name"
-    ]
-    rf_registered_model_name = config.params["modelregistry"][
-        "rf_registered_model_name"
-    ]
-    lgbm_registered_model_name = config.params["modelregistry"][
-        "lgbm_registered_model_name"
-    ]
-    xgb_registered_model_name = config.params["modelregistry"][
-        "xgb_registered_model_name"
-    ]
     ve_registered_model_name = config.params["modelregistry"][
         "voting_ensemble_registered_model_name"
     ]
-
-    lr_params = config.params["logisticregression"]["params"]
-    rf_params = config.params["randomforest"]["params"]
-    lgbm_params = config.params["lgbm"]["params"]
-    xgb_params = config.params["xgboost"]["params"]
-
-    lr_search_space_params = config.params["logisticregression"]["search_space_params"]
-    rf_search_space_params = config.params["randomforest"]["search_space_params"]
-    lgbm_search_space_params = config.params["lgbm"]["search_space_params"]
-    xgb_search_space_params = config.params["xgboost"]["search_space_params"]
 
     # Import data splits
     training_set = pd.read_parquet(
@@ -416,108 +391,49 @@ def main(
     )
 
     #############################################
-    # Which models to train (consumed via the validated dataclass; the YAML key
-    # is `included_models`).
-    included_models = training_config.included_models
+    # Runtime values that config params can reference via "${name}" placeholders
+    # (e.g. XGBoost's class-imbalance weight, derived from the training labels).
+    # Guard the ratio so a degenerate (zero-positive) split yields 1.0 rather than
+    # inf / a divide-by-zero warning.
+    pos_count = int((train_class == 1).sum())
+    neg_count = int((train_class == 0).sum())
+    runtime_params = {
+        "scale_pos_weight": float(neg_count / pos_count) if pos_count else 1.0,
+    }
 
     #############################################
-    # Train Logistic Regression model
-    if included_models.include_logistic_regression:
-        lr_calibrated_pipeline, lr_experiment = model_trainer.run_training_experiment(
+    # Train every enabled model. The model set is the config `models:` list, so
+    # adding a model is a new YAML entry: this loop and the factory are unchanged.
+    # trained_pipelines maps registered name -> calibrated pipeline (for the
+    # ensemble); exp_objects maps registered name -> experiment object.
+    trained_pipelines = {}
+    exp_objects = {}
+    for spec in training_config.models:
+        if not spec.enabled:
+            continue
+        logger.info("Training model '%s' (%s)", spec.name, spec.estimator)
+        # Underscore-normalize the run name (registered name keeps its hyphens);
+        # the Comet experiment-discovery matcher keys off underscored names.
+        run_label = spec.name.replace("-", "_")
+        calibrated_pipeline, experiment = model_trainer.run_training_experiment(
             api_key=api_key,
             project_name=project_name,
-            experiment_name=f"train_logistic_regression_{datetime.now()}",
-            model=LogisticRegression(**lr_params),
-            search_space_params=lr_search_space_params,
+            experiment_name=f"train_{run_label}_{datetime.now()}",
+            model=build_estimator(spec.estimator, spec.params, runtime_params),
+            search_space_params=spec.search_space_params,
             max_search_iters=search_max_iters,
-            optimize_in_parallel=True if parallel_jobs_count > 1 else False,
+            optimize_in_parallel=parallel_jobs_count > 1,
             n_parallel_jobs=parallel_jobs_count,
             model_opt_timeout_secs=exp_timeout_in_secs,
-            registered_model_name=lr_registered_model_name,
+            registered_model_name=spec.name,
         )
-    else:
-        lr_calibrated_pipeline = None
-        lr_experiment = None
+        trained_pipelines[spec.name] = calibrated_pipeline
+        exp_objects[spec.name] = experiment
 
     #############################################
-    # Train Random Forest model
-    if included_models.include_random_forest:
-        rf_calibrated_pipeline, rf_experiment = model_trainer.run_training_experiment(
-            api_key=api_key,
-            project_name=project_name,
-            experiment_name=f"train_random_forest_{datetime.now()}",
-            model=RandomForestClassifier(
-                **rf_params,
-            ),
-            search_space_params=rf_search_space_params,
-            max_search_iters=search_max_iters,
-            optimize_in_parallel=True if parallel_jobs_count > 1 else False,
-            n_parallel_jobs=parallel_jobs_count,
-            model_opt_timeout_secs=exp_timeout_in_secs,
-            registered_model_name=rf_registered_model_name,
-        )
-    else:
-        rf_calibrated_pipeline = None
-        rf_experiment = None
-
-    #############################################
-    # Train LightGBM model
-    if included_models.include_lightgbm:
-        lgbm_calibrated_pipeline, lgbm_experiment = (
-            model_trainer.run_training_experiment(
-                api_key=api_key,
-                project_name=project_name,
-                experiment_name=f"train_lightgbm_{datetime.now()}",
-                model=LGBMClassifier(
-                    **lgbm_params,
-                ),
-                search_space_params=lgbm_search_space_params,
-                max_search_iters=search_max_iters,
-                optimize_in_parallel=True if parallel_jobs_count > 1 else False,
-                n_parallel_jobs=parallel_jobs_count,
-                model_opt_timeout_secs=exp_timeout_in_secs,
-                registered_model_name=lgbm_registered_model_name,
-            )
-        )
-    else:
-        lgbm_calibrated_pipeline = None
-        lgbm_experiment = None
-
-    #############################################
-    # Train XGBoost model
-    if included_models.include_xgboost:
-        xgb_calibrated_pipeline, xgb_experiment = model_trainer.run_training_experiment(
-            api_key=api_key,
-            project_name=project_name,
-            experiment_name=f"train_xgboost_{datetime.now()}",
-            model=XGBClassifier(
-                scale_pos_weight=sum(train_class == 0) / sum(train_class == 1),
-                **xgb_params,
-            ),
-            search_space_params=xgb_search_space_params,
-            max_search_iters=search_max_iters,
-            optimize_in_parallel=True if parallel_jobs_count > 1 else False,
-            n_parallel_jobs=parallel_jobs_count,
-            model_opt_timeout_secs=exp_timeout_in_secs,
-            registered_model_name=xgb_registered_model_name,
-        )
-    else:
-        xgb_calibrated_pipeline = None
-        xgb_experiment = None
-
-    #############################################
-    # Create a voting ensmble model with LR, RF, LightGBM, and XGBoost as base estimators
-    if included_models.include_voting_ensemble:
-        available_pipelines = [
-            p
-            for p in [
-                lr_calibrated_pipeline,
-                rf_calibrated_pipeline,
-                lgbm_calibrated_pipeline,
-                xgb_calibrated_pipeline,
-            ]
-            if p is not None
-        ]
+    # Create a voting ensemble over the enabled base models
+    if training_config.ensemble.enabled:
+        available_pipelines = [p for p in trained_pipelines.values() if p is not None]
         ve_orchestrator = ClassifierEnsembleOrchestrator(
             experiment_manager=create_experiment_manager(tracker_type),
             train_features=train_features,
@@ -538,19 +454,10 @@ def main(
             experiment_name=f"train_voting_ensemble_{datetime.now()}",
             registered_model_name=ve_registered_model_name,
         )
-
-    else:
-        ve_experiment = None
+        exp_objects[ve_registered_model_name] = ve_experiment
 
     #############################################
     # Select the best performer
-    exp_objects = {
-        lr_registered_model_name: lr_experiment,
-        rf_registered_model_name: rf_experiment,
-        lgbm_registered_model_name: lgbm_experiment,
-        xgb_registered_model_name: xgb_experiment,
-        ve_registered_model_name: ve_experiment,
-    }
     exp_objects = {
         key: value for key, value in exp_objects.items() if value is not None
     }

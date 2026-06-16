@@ -60,12 +60,16 @@ def test_get_base_models_uses_each_classifier_name():
 
 
 def test_config_model_sections_load():
-    """The per-model config sections actually populate (no key drift)."""
+    """The config-driven `models:` list populates (no key drift)."""
     config_path = f"{str(PARENT_DIR)}/config/training-config.yml"
     cfg = load_config(Config, build_training_config, config_path)
 
-    assert cfg.logistic_regression.params is not None
-    assert cfg.random_forest.params is not None
-    assert cfg.lightgbm.params is not None
+    specs = {spec.name: spec for spec in cfg.models}
+    # The expected base models are present and carry an importable estimator path.
+    assert {"logistic-regression", "random-forest", "lightgbm", "xgboost"} <= set(specs)
+    assert specs["lightgbm"].estimator == "lightgbm.LGBMClassifier"
+    assert specs["lightgbm"].params is not None
     # A representative value is read through, not just a non-empty dict.
-    assert cfg.lightgbm.params.get("objective") == "binary"
+    assert specs["lightgbm"].params.get("objective") == "binary"
+    # supported_models is derived from the models list, not a hardcoded tuple.
+    assert "lightgbm" in cfg.supported_models.models

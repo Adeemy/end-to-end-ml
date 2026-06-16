@@ -257,35 +257,29 @@ class TrainParams:
 
 
 @dataclass(frozen=True)
-class LogisticRegressionConfig:
-    """Configuration for Logistic Regression."""
+class ModelSpecConfig:
+    """Config-driven definition of one trainable model.
 
-    params: Dict[str, Union[int, str]] = None
-    search_space_params: Dict[str, List[Union[float, List[str], bool]]] = None
+    The set of models to train is the YAML ``models:`` list; each entry maps to
+    one of these. ``estimator`` is the importable class path (e.g.
+    ``lightgbm.LGBMClassifier``) that the model factory resolves and
+    instantiates, so adding a model is purely a new YAML entry -- no code change.
 
+    Attributes:
+        name: Registered model name and experiment key (e.g. ``lightgbm``).
+        estimator: Importable estimator class path passed to the model factory.
+        enabled: Whether this model is trained.
+        params: Fixed estimator kwargs. A value of ``"${name}"`` is replaced at
+            runtime with a data-derived value (e.g. ``scale_pos_weight``).
+        search_space_params: Optuna search space; ``[min, max, log]`` for numeric
+            or ``[[choices], false]`` for categorical params.
+    """
 
-@dataclass(frozen=True)
-class RandomForestConfig:
-    """Configuration for Random Forest."""
-
-    params: Dict[str, Union[int, str]] = None
+    name: str
+    estimator: str
+    enabled: bool = False
+    params: Dict[str, Any] = None
     search_space_params: Dict[str, List[Union[int, float, List[str], bool]]] = None
-
-
-@dataclass(frozen=True)
-class LGBMConfig:
-    """Configuration for LightGBM."""
-
-    params: Dict[str, Union[int, float, str]] = None
-    search_space_params: Dict[str, List[Union[int, float, bool]]] = None
-
-
-@dataclass(frozen=True)
-class XGBoostConfig:
-    """Configuration for XGBoost."""
-
-    params: Dict[str, str] = None
-    search_space_params: Dict[str, List[Union[int, float, bool]]] = None
 
 
 @dataclass(frozen=True)
@@ -303,22 +297,23 @@ class TrainFilesConfig:
 
 @dataclass(frozen=True)
 class ModelRegistryConfig:
-    """Configuration for model registry."""
+    """Cross-cutting model registry names.
 
-    lr_registered_model_name: str = "default-lr-model"
-    rf_registered_model_name: str = "default-rf-model"
-    lgbm_registered_model_name: str = "default-lgbm-model"
-    xgb_registered_model_name: str = "default-xgb-model"
+    Per-model registered names now come from each entry's ``name`` in the
+    ``models:`` list; only the ensemble and champion names live here.
+    """
+
     voting_ensemble_registered_model_name: str = "default-voting-ensemble-model"
     champion_model_name: str = "default-champion-model"
 
 
 @dataclass(frozen=True)
 class SupportedModelsConfig:
-    """Configuration for supported models in ModelOptimizer.
+    """Names of the models defined in the config ``models:`` list.
 
-    Note: When adding a new model, update the search space definition
-    in the ModelOptimizer.generate_trial_params method.
+    Used by ModelOptimizer to validate a ``registered_model_name``. The search
+    space is consumed generically (ModelOptimizer.generate_trial_params), so a
+    new model needs no code change here -- only a new ``models:`` entry.
     """
 
     models: tuple
@@ -336,14 +331,10 @@ class SupportedModelsConfig:
 
 
 @dataclass(frozen=True)
-class IncludedModelsConfig:
-    """Configuration for included models."""
+class EnsembleConfig:
+    """Configuration for the voting ensemble over the enabled base models."""
 
-    include_logistic_regression: bool = True
-    include_random_forest: bool = True
-    include_lightgbm: bool = True
-    include_xgboost: bool = True
-    include_voting_ensemble: bool = True
+    enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -355,13 +346,10 @@ class TrainingConfig:
     data: TrainFeaturesConfig = None
     preprocessing: TrainPreprocessingConfig = None
     train_params: TrainParams = None
-    logistic_regression: LogisticRegressionConfig = None
-    random_forest: RandomForestConfig = None
-    lightgbm: LGBMConfig = None
-    xgboost: XGBoostConfig = None
+    models: List[ModelSpecConfig] = None
     files: TrainFilesConfig = None
     modelregistry: ModelRegistryConfig = None
-    included_models: IncludedModelsConfig = None
+    ensemble: EnsembleConfig = None
     supported_models: SupportedModelsConfig = None
 
 
@@ -374,21 +362,18 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
     Returns:
         TrainingConfig: The training configuration as a dataclass instance.
     """
-    # Surface top-level section typos (e.g. the historical "includedmodels" vs
-    # "included_models" drift) instead of silently loading section defaults.
+    # Surface top-level section typos instead of silently loading section
+    # defaults.
     known_sections = {
         "description",
         "logger",
         "data",
         "preprocessing",
         "train",
-        "logisticregression",
-        "randomforest",
-        "lgbm",
-        "xgboost",
+        "models",
         "files",
         "modelregistry",
-        "included_models",
+        "ensemble",
         "inference",
     }
     unexpected_sections = set(params) - known_sections
@@ -398,19 +383,26 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
             ", ".join(sorted(unexpected_sections)),
         )
 
-    included_models_params = params.get(
-        "included_models", {}
-    )  # Fallback to an empty dictionary
-
-    # Build supported models tuple from modelregistry
-    modelregistry_params = params["modelregistry"]
-    models = (
-        modelregistry_params["lr_registered_model_name"],
-        modelregistry_params["rf_registered_model_name"],
-        modelregistry_params["lgbm_registered_model_name"],
-        modelregistry_params["xgb_registered_model_name"],
+    # Build the config-driven model list and the supported-model names from it.
+    model_specs = [
+        map_to_dataclass(ModelSpecConfig, spec) for spec in params.get("models", [])
+    ]
+    # Each entry must set a name and an importable estimator path; surface a clear
+    # error rather than failing cryptically when one is omitted (map_to_dataclass
+    # leaves required fields as a sentinel for missing keys).
+    for index, spec in enumerate(model_specs):
+        if not isinstance(spec.name, str) or not spec.name:
+            raise ValueError(
+                f"Config `models:` entry #{index} must set a string `name`."
+            )
+        if not isinstance(spec.estimator, str) or not spec.estimator:
+            raise ValueError(
+                f"Config `models:` entry '{spec.name}' must set an `estimator` "
+                "class path (e.g. 'lightgbm.LGBMClassifier')."
+            )
+    supported_models_config = SupportedModelsConfig(
+        models=tuple(spec.name for spec in model_specs)
     )
-    supported_models_config = SupportedModelsConfig(models=models)
 
     return TrainingConfig(
         description=params["description"],
@@ -420,18 +412,11 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
             TrainPreprocessingConfig, params.get("preprocessing", {})
         ),
         train_params=map_to_dataclass(TrainParams, params.get("train", {})),
-        logistic_regression=map_to_dataclass(
-            LogisticRegressionConfig, params.get("logisticregression", {})
-        ),
-        random_forest=map_to_dataclass(
-            RandomForestConfig, params.get("randomforest", {})
-        ),
-        lightgbm=map_to_dataclass(LGBMConfig, params.get("lgbm", {})),
-        xgboost=map_to_dataclass(XGBoostConfig, params.get("xgboost", {})),
+        models=model_specs,
         files=map_to_dataclass(TrainFilesConfig, params["files"]),
         modelregistry=map_to_dataclass(
             ModelRegistryConfig, params.get("modelregistry", {})
         ),
-        included_models=map_to_dataclass(IncludedModelsConfig, included_models_params),
+        ensemble=map_to_dataclass(EnsembleConfig, params.get("ensemble", {})),
         supported_models=supported_models_config,
     )

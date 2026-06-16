@@ -98,65 +98,77 @@ train:
   tune_decision_threshold: false # If true, pick the threshold that maximizes f_beta on the calibration set
   encoded_pos_class_label: 1 # Encoded label of the positive class (after label encoding)
 
-logisticregression:
-  params: # Fixed params for logistic regression
-    n_jobs: -1
-    class_weight: "balanced"
-    solver: "saga"
-    penalty: "elasticnet"
-    max_iter: 200
+# Models to train. Add a model by appending an entry here -- no code change needed.
+#   name:                registered model name + experiment key
+#   estimator:           importable estimator class path (resolved by the model factory)
+#   enabled:             whether to train this model
+#   params:              fixed estimator kwargs ("${scale_pos_weight}" -> train-set neg/pos ratio)
+#   search_space_params: Optuna search space ([min, max, log] numeric, [[choices], false] categorical)
+models:
+  - name: "logistic-regression"
+    estimator: "sklearn.linear_model.LogisticRegression"
+    enabled: false
+    params:
+      n_jobs: -1
+      class_weight: "balanced"
+      solver: "saga"
+      penalty: "elasticnet"
+      max_iter: 200
+    search_space_params:
+      C: [0.001, 1000, false]
+      l1_ratio: [0.001, 1, false]
 
-  search_space_params: # Search space parameters for hyperparams optimization
-    C: [0.001, 1000, false]
-    l1_ratio: [0.001, 1, false]
+  - name: "random-forest"
+    estimator: "sklearn.ensemble.RandomForestClassifier"
+    enabled: false
+    params:
+      n_jobs: -1
+      class_weight: "balanced"
+    search_space_params:
+      max_features: [1, 2, false]
+      min_samples_leaf: [3, 8, false]
+      min_samples_split: [2, 100, false]
+      max_depth: [3, 8, false]
+      criterion: [["gini", "entropy"], false]
+      n_estimators: [20, 100, false]
 
-randomforest:
-  params: # Fixed params for logistic regression
-    n_jobs: -1
-    class_weight: "balanced"
+  - name: "lightgbm"
+    estimator: "lightgbm.LGBMClassifier"
+    enabled: true
+    params:
+      objective: "binary"
+      n_jobs: -1 # -1 Means use all threads
+      min_data_in_leaf: 100 # Larger values speeds up training.
+      num_leaves: 80 # Lower values speeds up training.
+      min_split_gain: 1e-8 # Larger values speeds up training.
+      class_weight: "balanced" # Adjusts weights inversely proportional to class freqs
+    search_space_params:
+      max_depth: [3, 8, false]
+      max_bin: [100, 512, false]
+      min_child_weight: [1e-5, 1e2, true]
+      subsample: [0.5, 1, false]
+      colsample_bytree: [0.3, 1, false]
+      lambda_l1: [1e-8, 10.0, true]
+      lambda_l2: [1e-8, 10.0, true]
+      learning_rate: [1e-4, 1e-1, true]
+      n_estimators: [20, 100, false]
 
-  search_space_params: # Search space parameters for hyperparams optimization
-    max_features: [1, 2, false]
-    min_samples_leaf: [3, 8, false]
-    min_samples_split: [2, 100, false]
-    max_depth: [3, 8, false]
-    criterion: [["gini", "entropy"], false]
-    n_estimators: [20, 100, false]
-
-lgbm:
-  params: # Fixed params for logistic regression
-    objective: "binary"
-    n_jobs: -1 # -1 Means use all threads
-    min_data_in_leaf: 100 # Larger values speeds up training.
-    num_leaves: 80 # Lower values speeds up training.
-    min_split_gain: 1e-8 # Larger values speeds up training.
-    class_weight: "balanced" # Adjusts weights inversely proportional to class freqs
-
-  search_space_params: # Search space parameters for hyperparams optimization
-    max_depth: [3, 8, false]
-    max_bin: [100, 512, false]
-    min_child_weight: [1e-5, 1e2, true]
-    subsample: [0.5, 1, false]
-    colsample_bytree: [0.3, 1, false]
-    lambda_l1: [1e-8, 10.0, true]
-    lambda_l2: [1e-8, 10.0, true]
-    learning_rate: [1e-4, 1e-1, true]
-    n_estimators: [20, 100, false]
-
-xgboost:
-  params: # Fixed params for logistic regression
-    objective: "binary:logistic"
-
-  search_space_params: # Search space parameters for hyperparams optimization
-    max_depth: [3, 8, false]
-    min_child_weight: [1e-5, 1e2, true]
-    subsample: [0.5, 1, false]
-    colsample_bytree: [0.5, 1, false]
-    reg_alpha: [0, 10, false]
-    reg_lambda: [1, 10, false]
-    gamma: [1e-5, 1e2, true]
-    learning_rate: [1e-5, 1e2, true]
-    n_estimators: [20, 100, false]
+  - name: "xgboost"
+    estimator: "xgboost.XGBClassifier"
+    enabled: false
+    params:
+      objective: "binary:logistic"
+      scale_pos_weight: "${scale_pos_weight}" # train-set neg/pos ratio, injected at runtime
+    search_space_params:
+      max_depth: [3, 8, false]
+      min_child_weight: [1e-5, 1e2, true]
+      subsample: [0.5, 1, false]
+      colsample_bytree: [0.5, 1, false]
+      reg_alpha: [0, 10, false]
+      reg_lambda: [1, 10, false]
+      gamma: [1e-5, 1e2, true]
+      learning_rate: [1e-5, 1e2, true]
+      n_estimators: [20, 100, false]
 
 files:
   historical_data_file_name: "historical_data.parquet"
@@ -168,19 +180,12 @@ files:
   test_set_file_name: "test.parquet"
 
 modelregistry:
-  lr_registered_model_name: "logistic-regression" # Name used to register logistic regression model
-  rf_registered_model_name: "random-forest" # Name used to register random forest model
-  lgbm_registered_model_name: "lightgbm" # Name used to register lightgbm model
-  xgb_registered_model_name: "xgboost" # Name used to register xgboost model
+  # Per-model registered names come from each entry's `name` in `models:` above.
   voting_ensemble_registered_model_name: "voting-ensemble" # Name used to register voting ensemble model
   champion_model_name: "champion_model" # Name used to register champion model
 
-included_models:
-  include_logistic_regression: false # Should Logisitic Regression be included in training
-  include_random_forest: false # Should Random Forest model be included in training
-  include_lightgbm: true # Should LightGBM model be included in training
-  include_xgboost: false # Should XGBoost model be included in training
-  include_voting_ensemble: false # Should Voting Ensemble model be included in training
+ensemble:
+  enabled: false # Train a soft-voting ensemble over the enabled base models above
 
 # Inference config included in training config to ensure model's config during training and inference is the same
 inference:

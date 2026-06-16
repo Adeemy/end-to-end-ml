@@ -204,22 +204,13 @@ def main(
     #      date) of each included model -- i.e. the most recent training run,
     #      read live from the tracking store with no sidecar file.
     tracker_name = training_config.train_params.experiment_tracker.lower()
-    registry = training_config.modelregistry
-    included = training_config.included_models
     included_model_names = [
-        name
-        for include, name in (
-            (included.include_logistic_regression, registry.lr_registered_model_name),
-            (included.include_random_forest, registry.rf_registered_model_name),
-            (included.include_lightgbm, registry.lgbm_registered_model_name),
-            (included.include_xgboost, registry.xgb_registered_model_name),
-            (
-                included.include_voting_ensemble,
-                registry.voting_ensemble_registered_model_name,
-            ),
-        )
-        if include
+        spec.name for spec in training_config.models if spec.enabled
     ]
+    if training_config.ensemble.enabled:
+        included_model_names.append(
+            training_config.modelregistry.voting_ensemble_registered_model_name
+        )
 
     if experiment_keys is not None:
         logger.info("Using experiment keys passed in-process from training.")
@@ -261,14 +252,11 @@ def main(
     test_class = np.array(test_set[class_col])
 
     # Task type and the model-preference order used by the 1-SE selection rule
-    # (simplest/cheapest first, falling back to the order models are trained in).
+    # (the config `models:` order, ensemble last; ties break toward the earlier,
+    # simpler/cheaper model).
     task_type = training_config.train_params.task_type
-    model_preference = [
-        training_config.modelregistry.lr_registered_model_name,
-        training_config.modelregistry.rf_registered_model_name,
-        training_config.modelregistry.lgbm_registered_model_name,
-        training_config.modelregistry.xgb_registered_model_name,
-        training_config.modelregistry.voting_ensemble_registered_model_name,
+    model_preference = [spec.name for spec in training_config.models] + [
+        training_config.modelregistry.voting_ensemble_registered_model_name
     ]
 
     # Create orchestrators

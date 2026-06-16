@@ -70,3 +70,11 @@ analysis = [
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.black]
+# Pin the target to 3.14 so Black does not format for 3.15 (the running
+# interpreter is 3.14, and its AST safety check cannot parse 3.15-targeted code).
+target-version = ["py314"]
+
+[tool.isort]
+profile = "black"
