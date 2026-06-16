@@ -98,13 +98,16 @@ evaluate:
 
 submit_train: prep_data split_data train evaluate
 
-# Launch the MLflow UI to browse training and evaluation runs. Points at the
-# repo's local file store (./mlruns) so it shows the runs this project logs;
-# open http://localhost:8080. Override the port with PORT=...
+# Launch the MLflow UI to browse training and evaluation runs, and open it in the
+# browser once the server is up. Points at the repo's local file store (./mlruns)
+# so it shows the runs this project logs. Override the port with PORT=...
 # MLFLOW_ALLOW_FILE_STORE opts into the file backend on MLflow 3.x (the `mlflow ui`
 # CLI doesn't import the project code that sets this automatically for training).
 view_mlflow:
-	MLFLOW_ALLOW_FILE_STORE=true $(VENV_BIN)/mlflow ui --backend-store-uri "file://$(CURDIR)/mlruns" --host 0.0.0.0 --port $(or $(PORT),8080)
+	@P=$(or $(PORT),8080); \
+	( until curl -s -o /dev/null http://localhost:$$P; do sleep 1; done; \
+	  open http://localhost:$$P 2>/dev/null || xdg-open http://localhost:$$P 2>/dev/null || true ) & \
+	MLFLOW_ALLOW_FILE_STORE=true $(VENV_BIN)/mlflow ui --backend-store-uri "file://$(CURDIR)/mlruns" --host 0.0.0.0 --port $$P
 
 # Test champion model via CLI (batch scoring requires inference.parquet file)
 test_model_cli:
