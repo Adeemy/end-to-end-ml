@@ -84,7 +84,7 @@ train:
   project_name: "end-to-end-ml"
   workspace_name: "6bmod5d8"
   task_type: "binary" # ML task: "binary", "multiclass", or "regression"
-  search_max_iters: 100 # Max. no. of iterations for optuna hyperparams optimization
+  search_max_iters: 3 # Max. no. of iterations for optuna hyperparams optimization
   parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
   exp_timout_secs: 3600 # Experiment timeout
   cross_val_folds: 5 # Stratified CV folds for the search objective and champion selection. >1 enables CV; <=1 uses the single train/valid holdout
