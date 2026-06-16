@@ -121,10 +121,15 @@ Each stage is a `make` target (also wired into GitHub Actions):
 
 ### Browsing experiments
 
-Launch the MLflow UI against the local `./mlruns` store to compare training and evaluation runs:
+Launch the MLflow UI to view and compare training and evaluation runs:
 
     make view_mlflow          # serves http://localhost:8080
     make view_mlflow PORT=8088 # override the port
+
+Use this target, not a bare `mlflow ui`. MLflow 3.x refuses the local `./mlruns`
+file store in "maintenance mode" unless `MLFLOW_ALLOW_FILE_STORE=true` is set;
+`make view_mlflow` sets it and points at this repo's `mlruns`, so it works right
+after a clone and a training run.
 
 ## Champion selection and deployment gate
 
