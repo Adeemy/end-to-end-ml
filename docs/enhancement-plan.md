@@ -83,7 +83,7 @@ Cut duplication and dead weight; this is a first-class goal, not cleanup-on-the-
 
 - Evaluation/selection: `src/training/evaluation/orchestrator.py`, `src/training/evaluation/evaluator.py`, `src/training/evaluation/champion.py`, `src/training/evaluate.py`, `src/training/core/optimizer.py`, `src/training/core/trainer.py`.
 - New: `src/training/evaluation/metrics.py` (shared metrics), `RegressionEvaluator` in `evaluator.py`.
-- Config: `src/config/training-config.yml`, `src/training/schemas.py`, `src/utils/config_loader.py`.
+- Config: `config/training-config.yml`, `src/training/schemas.py`, `src/utils/config_loader.py`.
 - Data/idempotency: `src/training/train.py`, `src/training/split_data.py`.
 - Hygiene: `.gitignore`, `.github/workflows/`, `Makefile`, tracked data/artifact paths.
 - Tests: `tests/test_training/*`, `notebooks/utils.py`.

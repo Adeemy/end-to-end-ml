@@ -61,7 +61,7 @@ def test_get_base_models_uses_each_classifier_name():
 
 def test_config_model_sections_load():
     """The config-driven `models:` list populates (no key drift)."""
-    config_path = f"{str(PARENT_DIR)}/config/training-config.yml"
+    config_path = f"{str(PARENT_DIR.parent)}/config/training-config.yml"
     cfg = load_config(Config, build_training_config, config_path)
 
     specs = {spec.name: spec for spec in cfg.models}

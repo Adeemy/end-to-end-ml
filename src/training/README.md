@@ -82,7 +82,7 @@ Manages model evaluation workflow.
 
 ## Configuration
 
-Training behavior is controlled through `src/config/training-config.yml`:
+Training behavior is controlled through `config/training-config.yml`:
 
 ```yaml
 train:
@@ -150,7 +150,7 @@ export MLFLOW_TRACKING_URI=http://localhost:5000
 make train
 
 # Or run directly with Python
-python ./src/training/train.py --config_yaml_path ./src/config/training-config.yml
+python ./src/training/train.py --config_yaml_path ./config/training-config.yml
 ```
 
 ### Programmatic Training
@@ -167,7 +167,7 @@ logger = get_logger("training")
 
 # Run training pipeline
 experiment_keys = main(
-    config_yaml_path="./src/config/training-config.yml",
+    config_yaml_path="./config/training-config.yml",
     api_key=os.environ["COMET_API_KEY"],
     data_dir=DATA_DIR,
     artifacts_dir=ARTIFACTS_DIR,

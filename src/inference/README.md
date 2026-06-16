@@ -72,7 +72,7 @@ Set required environment variables:
 export COMET_API_KEY=your_comet_api_key
 ```
 
-The system loads model registry details from `./src/config/training-config.yml`.
+The system loads model registry details from `./config/training-config.yml`.
 
 ## Troubleshooting
 

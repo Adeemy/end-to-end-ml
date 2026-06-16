@@ -26,7 +26,7 @@ logger = get_logger(module_name)
 #################################
 # Specify required column names by data type
 config = Config(
-    config_path=str(Path(__file__).parent.resolve().parent.parent)
+    config_path=str(Path(__file__).parent.resolve().parent.parent.parent)
     + "/config/feature-store-config.yml"
 )
 PRIMARY_KEY = config.params["data"]["pk_col_name"]

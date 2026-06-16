@@ -14,7 +14,7 @@ from src.utils.config_loader import load_config
 config = load_config(
     config_class=Config,
     builder_func=build_training_config,
-    config_path="./src/config/training-config.yml"
+    config_path="./config/training-config.yml"
 )
 ```
 

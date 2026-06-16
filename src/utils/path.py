@@ -9,7 +9,8 @@ from typing import Union
 
 # Specify paths to data and training artifacts directories
 PARENT_DIR = Path(__file__).parent.resolve().parent
-LOG_CONF_PATH = PARENT_DIR / "config/logging.conf"
+# config/ lives at the repo root (PARENT_DIR is the src/ package dir).
+LOG_CONF_PATH = PARENT_DIR.parent / "config/logging.conf"
 
 
 def encoded_split_path(data_dir: Union[str, PurePath], file_name: str) -> Path:

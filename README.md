@@ -11,7 +11,7 @@ The project uses the Diabetes Health Indicators dataset from [UCI](https://archi
 
 ## Key Features
 
-- **Config-driven models**: add or remove a model by editing the `models:` list in `src/config/training-config.yml`; no code change.
+- **Config-driven models**: add or remove a model by editing the `models:` list in `config/training-config.yml`; no code change.
 - **Hyperparameter search**: per-model Optuna search spaces, optionally with stratified K-fold CV.
 - **Variance-aware selection**: champion chosen by a 1-SE rule over candidate scores, then calibrated and gated on a held-out test set.
 - **Experiment tracking**: MLflow (default, local file store) or Comet ML, switchable in config.
@@ -21,7 +21,7 @@ The project uses the Diabetes Health Indicators dataset from [UCI](https://archi
 ## Project Structure
 
 - **`notebooks/`**: exploratory data analysis and baseline model development.
-- **`src/config/`**: YAML configuration for the feature store and training.
+- **`config/`**: YAML configuration for the feature store and training.
 - **`src/feature/`**: data ingestion, preprocessing, and the Feast feature store.
 - **`src/training/`**: training, hyperparameter search, the model factory, evaluation, and champion selection.
 - **`src/inference/`**: serving - CLI batch scoring (`predict.py`) and the REST API (`api_server.py`).
@@ -29,15 +29,17 @@ The project uses the Diabetes Health Indicators dataset from [UCI](https://archi
 - **`tests/`**: unit tests for the feature, training, and inference components.
 
 ```
-src
-├── config/        feature-store-config.yml, training-config.yml, logging.conf
-├── feature/       generate_initial_data.py, prep_data.py, feature_repo/ (Feast)
-├── training/      train.py, evaluate.py, split_data.py
-│   ├── core/      optimizer.py, trainer.py, ensemble.py, model_factory.py
-│   ├── evaluation/  orchestrator.py, evaluator.py, champion.py, selector.py
-│   └── tracking/  experiment.py, experiment_tracker.py
-├── inference/     predict.py, api_server.py, utils/model.py, Dockerfile
-└── utils/         config_loader.py, logger.py, path.py
+.
+├── config/                feature-store-config.yml, training-config.yml, logging.conf
+├── Makefile, pyproject.toml
+└── src/
+    ├── feature/           generate_initial_data.py, prep_data.py, feature_repo/ (Feast)
+    ├── training/          train.py, evaluate.py, split_data.py
+    │   ├── core/          optimizer.py, trainer.py, ensemble.py, model_factory.py
+    │   ├── evaluation/    orchestrator.py, evaluator.py, champion.py, selector.py
+    │   └── tracking/      experiment.py, experiment_tracker.py
+    ├── inference/         predict.py, api_server.py, utils/model.py, Dockerfile
+    └── utils/             config_loader.py, logger.py, path.py
 ```
 
 ### ML pipeline flow
@@ -57,7 +59,7 @@ The project uses [uv](https://github.com/astral-sh/uv) to manage dependencies (d
 
 ### Experiment tracker credentials
 
-MLflow is the default tracker and needs no configuration; it logs to a local `./mlruns` file store. To use Comet ML instead, set `experiment_tracker: "comet"` in `src/config/training-config.yml` and provide:
+MLflow is the default tracker and needs no configuration; it logs to a local `./mlruns` file store. To use Comet ML instead, set `experiment_tracker: "comet"` in `config/training-config.yml` and provide:
 
     COMET_API_KEY=your_comet_api_key
     ENABLE_COMET_LOGGING=true
@@ -66,7 +68,7 @@ MLflow is the default tracker and needs no configuration; it logs to a local `./
 
 ## Configuring models
 
-The set of models to train is the `models:` list in `src/config/training-config.yml`. Each entry is self-contained and resolved by the model factory (`src/training/core/model_factory.py`), which imports the estimator class and instantiates it. **Adding a model is config-only** - append an entry with any scikit-learn-compatible classifier; no code change is needed.
+The set of models to train is the `models:` list in `config/training-config.yml`. Each entry is self-contained and resolved by the model factory (`src/training/core/model_factory.py`), which imports the estimator class and instantiates it. **Adding a model is config-only** - append an entry with any scikit-learn-compatible classifier; no code change is needed.
 
 ```yaml
 models:

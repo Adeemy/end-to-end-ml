@@ -361,7 +361,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config_yaml_path",
         type=str,
-        default="./src/config/training-config.yml",
+        default="./config/training-config.yml",
         help="Path to the training configuration YAML file.",
     )
     parser.add_argument(

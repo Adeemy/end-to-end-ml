@@ -58,11 +58,11 @@ all: install isort format test lint
 
 # Import raw dataset from source
 gen_init_data:
-	$(PYTHON) ./src/feature/generate_initial_data.py --config_yaml_path ./src/config/feature-store-config.yml --logger_path ./src/config/logging.conf
+	$(PYTHON) ./src/feature/generate_initial_data.py --config_yaml_path ./config/feature-store-config.yml --logger_path ./config/logging.conf
 
 # Preprocess and transform data before ingestion by feature store
 prep_data:
-	$(PYTHON) ./src/feature/prep_data.py --config_yaml_path ./src/config/feature-store-config.yml --logger_path ./src/config/logging.conf
+	$(PYTHON) ./src/feature/prep_data.py --config_yaml_path ./config/feature-store-config.yml --logger_path ./config/logging.conf
 
 # Setup feature store, view entities and feature views
 teardown_feast:
@@ -86,15 +86,15 @@ setup_feast: teardown_feast init_feast show_feast_entities show_feast_views
 # Submit train experiment
 # NOTE: If using Comet ML tracker, set ENABLE_COMET_LOGGING=true in environment
 split_data:
-	$(PYTHON) ./src/training/split_data.py --config_yaml_path ./src/config/training-config.yml --logger_path ./src/config/logging.conf
+	$(PYTHON) ./src/training/split_data.py --config_yaml_path ./config/training-config.yml --logger_path ./config/logging.conf
 
 train:
-	$(PYTHON) ./src/training/train.py --config_yaml_path ./src/config/training-config.yml
+	$(PYTHON) ./src/training/train.py --config_yaml_path ./config/training-config.yml
 
 # Evaluates the most recent training run by default. To evaluate a specific run:
 #   make evaluate RUN_ID=<mlflow_run_id>
 evaluate:
-	$(PYTHON) ./src/training/evaluate.py --config_yaml_path ./src/config/training-config.yml $(if $(RUN_ID),--run_id $(RUN_ID),)
+	$(PYTHON) ./src/training/evaluate.py --config_yaml_path ./config/training-config.yml $(if $(RUN_ID),--run_id $(RUN_ID),)
 
 submit_train: prep_data split_data train evaluate
 
@@ -108,14 +108,14 @@ view_mlflow:
 
 # Test champion model via CLI (batch scoring requires inference.parquet file)
 test_model_cli:
-	$(PYTHON) ./src/inference/predict.py --config_yaml_path ./src/config/training-config.yml --logger_path ./src/config/logging.conf
+	$(PYTHON) ./src/inference/predict.py --config_yaml_path ./config/training-config.yml --logger_path ./config/logging.conf
 
 # Batch prediction on parquet file
 predict_batch:
 	@echo "Running batch prediction on inference.parquet..."
 	$(PYTHON) ./src/inference/predict.py \
-		--config_yaml_path ./src/config/training-config.yml \
-		--logger_path ./src/config/logging.conf \
+		--config_yaml_path ./config/training-config.yml \
+		--logger_path ./config/logging.conf \
 		--input_file ./src/feature/feature_repo/data/inference.parquet \
 		--output_file ./src/inference/artifacts/batch_predictions.parquet
 
@@ -124,8 +124,8 @@ predict_batch_custom:
 	@echo "Usage: make predict_batch_custom [INPUT_FILE=path/to/input.parquet] [OUTPUT_FILE=path/to/output.parquet]"
 	@echo "Note: If INPUT_FILE/OUTPUT_FILE not specified, uses paths from training-config.yml"
 	$(PYTHON) ./src/inference/predict.py \
-		--config_yaml_path ./src/config/training-config.yml \
-		--logger_path ./src/config/logging.conf \
+		--config_yaml_path ./config/training-config.yml \
+		--logger_path ./config/logging.conf \
 		$(if $(INPUT_FILE),--input_file $(INPUT_FILE),) \
 		$(if $(OUTPUT_FILE),--output_file $(OUTPUT_FILE),)
 

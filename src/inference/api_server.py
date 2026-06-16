@@ -60,7 +60,7 @@ logger = get_logger(module_name)
 
 # Champion model configuration (cheap to read at import; no network/file load).
 CONFIG_PARAMS = extract_model_config(
-    config_yaml_path=f"{str(PARENT_DIR.parent)}/src/config/training-config.yml"
+    config_yaml_path=f"{str(PARENT_DIR.parent)}/config/training-config.yml"
 )
 
 # Required API keys for model loading
