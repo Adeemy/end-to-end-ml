@@ -60,10 +60,14 @@ def submit_command_job(
         display_name=display_name,
         # The cluster's managed identity supplies the credential; pass the
         # workspace ids so the feature-store client resolves at run time.
+        # PYTHONPATH="." puts the uploaded repo root (the job's working dir) on
+        # sys.path so `import src.*` resolves (the project isn't pip-installed in
+        # the image; only its dependencies are).
         environment_variables={
             "AZURE_SUBSCRIPTION_ID": ml_client.subscription_id,
             "AZURE_RESOURCE_GROUP": ml_client.resource_group_name,
             "AZURE_WORKSPACE_NAME": ml_client.workspace_name,
+            "PYTHONPATH": ".",
         },
     )
 

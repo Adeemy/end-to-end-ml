@@ -67,6 +67,8 @@ def main(config_yaml_path: str, input_data: str, wait: bool = False):
             "AZURE_SUBSCRIPTION_ID": ml_client.subscription_id,
             "AZURE_RESOURCE_GROUP": ml_client.resource_group_name,
             "AZURE_WORKSPACE_NAME": ml_client.workspace_name,
+            # Repo root (the job's working dir) on sys.path for `import src.*`.
+            "PYTHONPATH": ".",
         },
     )
 
