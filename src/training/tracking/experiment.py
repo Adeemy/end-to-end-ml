@@ -458,17 +458,17 @@ class MLflowExperimentManager(ExperimentManager):
         """
 
         try:
-            # Enable autologging for automatic tracing and logging
-            # This captures model artifacts, parameters, metrics, and traces automatically
-            mlflow.autolog(
-                log_input_examples=False,
-                log_model_signatures=True,
-                log_models=True,
-                disable=False,
-                exclusive=False,
-                disable_for_unsupported_versions=False,
-                silent=False,
-            )
+            # Disable MLflow autologging during training. All Optuna trials share
+            # a single MLflow run, but autolog logs each trial's fit
+            # hyperparameters as run *params*, which are immutable in MLflow: the
+            # second trial's differing value (e.g. colsample_bytree) raises
+            # "Changing param values is not allowed" and aborts autologging for
+            # every trial after the first. (Autolog also re-logs metrics on every
+            # fit and logs a model per trial via MLflow 3.x's deprecated
+            # `artifact_path` API.) Everything needed is logged explicitly: the
+            # search metric per trial, the best model's params/metrics, the study
+            # trials CSV, and champion registration.
+            mlflow.autolog(disable=True)
 
             # Set experiment and start run with proper context
             mlflow.set_experiment(project_name)
