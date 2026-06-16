@@ -115,6 +115,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+ml_env/
 .eda_venv/
 env/
 venv/
@@ -155,12 +156,20 @@ cython_debug/
 
 # data files
 *.csv
-# *.parquet   # Commented to allow importing data from local directory in GitHub Actions
-# *.pkl  # Commented to allow importing data from local directory in GitHub Actions
+# Data and model artifacts are regenerable (datasets via `make gen_init_data`,
+# models via training) and must not be committed: they bloat the repo and let
+# the deployed model drift from the registry. CI runs on synthetic test data,
+# not these files. Keep the directories via their .gitkeep placeholders.
+/src/feature/feature_repo/data/*.parquet
+/src/feature/feature_repo/data/*.db
+/src/inference/artifacts/*.parquet
+/src/training/artifacts/*.pkl
+/src/training/artifacts/*.csv
+/notebooks/.eda_figures/*.pkl
 /notebooks/.eda_figures/*.png
 /src/training/*.png
 /src/inference/*.png
 .comet.json
 .localconfig
 .DS_Store
-/mlruns
+/mlruns*

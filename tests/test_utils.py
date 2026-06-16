@@ -25,6 +25,16 @@ def test_paths_are_directories():
     assert Path(path.ARTIFACTS_DIR).is_dir()
 
 
+def test_encoded_split_path():
+    """encoded_split_path inserts an '_encoded' suffix before the extension."""
+    result = path.encoded_split_path("/data", "train.parquet")
+    assert Path(result) == Path("/data/train_encoded.parquet")
+    # Works for the other split names too.
+    assert Path(path.encoded_split_path("/d", "validation.parquet")) == Path(
+        "/d/validation_encoded.parquet"
+    )
+
+
 def test_get_console_logger(mocker):
     """Tests if the get_console_logger function returns a logger with the
     correct properties."""

@@ -83,17 +83,19 @@ train:
   experiment_tracker: "mlflow" # Type of experiment tracker to use (e.g., "comet", "mlflow"). You must set ENABLE_COMET_LOGGING=true in .env if comet is used.
   project_name: "end-to-end-ml"
   workspace_name: "6bmod5d8"
+  task_type: "binary" # ML task: "binary", "multiclass", or "regression"
   search_max_iters: 100 # Max. no. of iterations for optuna hyperparams optimization
   parallel_jobs_count: 1 # 1 if training not in parallel mode, possible value: # int(0.9 * os.cpu_count())
   exp_timout_secs: 3600 # Experiment timeout
-  cross_val_folds: 5 # No. of folds used for cross-validation for model calibration
+  cross_val_folds: 5 # Stratified CV folds for the search objective and champion selection. >1 enables CV; <=1 uses the single train/valid holdout
   fbeta_score_beta_val: 0.5 # Value of beta in f_beta_score, which is a metric used for hyperparams optimization
-  comparison_metric: "fbeta_score" # Metric name to compare models. Must be: recall, precision, roc_auc, f1, or fbeta_score
+  comparison_metric: "fbeta_score" # Optimization metric the search maximizes. Classification: recall, precision, f1, roc_auc, fbeta_score, average_precision, log_loss. Regression: mae, rmse, r2, mape
+  selection_metric: "fbeta_score" # Metric used to rank candidates for champion + deployment gate. Empty => same as comparison_metric. Set to average_precision (PR-AUC) for imbalanced data
   voting_rule: "soft" # Voting strategy in voting ensemble
   deployment_score_thresh: 0.3 # Min. score for the best model acheive to be deployed in production
   max_eval_experiments: 50 # Max. no. of recent experiments to consider for evaluation
   decision_threshold: 0.5 # Operating point for converting positive-class probability to a label
-  tune_decision_threshold: false # If true, pick the threshold that maximizes f_beta on the validation set
+  tune_decision_threshold: false # If true, pick the threshold that maximizes f_beta on the calibration set
   encoded_pos_class_label: 1 # Encoded label of the positive class (after label encoding)
 
 logisticregression:
@@ -173,7 +175,7 @@ modelregistry:
   voting_ensemble_registered_model_name: "voting-ensemble" # Name used to register voting ensemble model
   champion_model_name: "champion_model" # Name used to register champion model
 
-includedmodels:
+included_models:
   include_logistic_regression: false # Should Logisitic Regression be included in training
   include_random_forest: false # Should Random Forest model be included in training
   include_lightgbm: true # Should LightGBM model be included in training

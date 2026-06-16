@@ -54,6 +54,8 @@ class TrainingOrchestrator:
         encoded_pos_class_label: int = 1,
         comparison_metric: str = "fbeta_score",
         random_seed: Optional[int] = None,
+        task_type: str = "binary",
+        cv_folds: int = 1,
     ):
         """Initializes the TrainingOrchestrator.
 
@@ -97,6 +99,10 @@ class TrainingOrchestrator:
         self.encoded_pos_class_label = encoded_pos_class_label
         self.comparison_metric = comparison_metric
         self.random_seed = random_seed
+        # Task type drives metric selection and evaluator dispatch; cv_folds > 1
+        # enables CV inside the Optuna objective for variance-aware tuning.
+        self.task_type = task_type
+        self.cv_folds = cv_folds
 
     def optimize_model(
         self,
@@ -142,6 +148,8 @@ class TrainingOrchestrator:
             is_voting_ensemble=is_voting_ensemble,
             optimization_metric=self.comparison_metric,
             random_seed=self.random_seed,
+            task_type=self.task_type,
+            cv_folds=self.cv_folds,
         )
 
         if optimize_in_parallel:
@@ -212,7 +220,9 @@ class TrainingOrchestrator:
             valid_features=self.valid_features,
             valid_class=self.valid_class,
             fbeta_score_beta=self.fbeta_score_beta,
+            encoded_pos_class_label=self.encoded_pos_class_label,
             is_voting_ensemble=is_voting_ensemble,
+            task_type=self.task_type,
         )
 
         train_scores, valid_scores = evaluator.evaluate_model_perf(
@@ -384,8 +394,15 @@ class TrainingOrchestrator:
                 artifacts_path=self.artifacts_path,
             )
 
-        except Exception as e:  # pylint: disable=W0718
-            logger.error("Model training error --> %s", e)
+        except Exception:  # pylint: disable=W0718
+            # Isolate per-model failures (one model erroring must not abort the
+            # others) but log the full traceback loudly so failures are never
+            # silently swallowed. A total wipeout is caught downstream in
+            # train.py, which raises if no experiment succeeded.
+            logger.exception(
+                "Model training failed for '%s'; this candidate is skipped.",
+                registered_model_name,
+            )
             fitted_pipeline = None
 
         self.experiment_manager.end_experiment(experiment)

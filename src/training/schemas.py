@@ -104,37 +104,64 @@ class Config:
             raise KeyError("modelregistry is not included in config file")
 
         # Check data split params are of correct types
-        if not isinstance(int(self.params["data"]["split_rand_seed"]), int):
+        try:
+            int(self.params["data"]["split_rand_seed"])
+        except (TypeError, ValueError) as exc:
             raise ValueError(
-                f"split_rand_seed must be integer type. Got {self.params['data']['params']['split_rand_seed']}"
-            )
+                f"split_rand_seed must be integer type. Got {self.params['data']['split_rand_seed']}"
+            ) from exc
 
         if self.params["data"]["split_type"] not in ["random", "time"]:
             raise ValueError(
-                f"split_type must be either 'random' or 'time'. Got {self.params['data']['params']['split_type']}"
+                f"split_type must be either 'random' or 'time'. Got {self.params['data']['split_type']}"
             )
 
         # Check beta value (primarily used to compare models)
-        if isinstance(float(self.params["train"]["fbeta_score_beta_val"]), float):
+        try:
             fbeta_score_beta_val = float(self.params["train"]["fbeta_score_beta_val"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"fbeta_score_beta_val must be float type. Got {self.params['train']['fbeta_score_beta_val']}"
+            ) from exc
+        if fbeta_score_beta_val <= 0:
+            raise ValueError(
+                f"fbeta_score_beta_val must be > 0. Got {fbeta_score_beta_val}"
+            )
 
-            if fbeta_score_beta_val <= 0:
+        # Validate task type (optional; defaults to binary) and the metrics that
+        # are valid for it. comparison_metric is the optimization metric;
+        # selection_metric is optional and falls back to comparison_metric.
+        task_type = self.params["train"].get("task_type", "binary")
+        supported_tasks = ("binary", "multiclass", "regression")
+        if task_type not in supported_tasks:
+            raise ValueError(
+                f"task_type must be one of {supported_tasks}. Got {task_type}!"
+            )
+
+        classification_metrics = (
+            "recall",
+            "precision",
+            "f1",
+            "roc_auc",
+            "fbeta_score",
+            "average_precision",
+            "log_loss",
+            "brier_score",
+        )
+        regression_metrics = ("mae", "rmse", "r2", "mape")
+        valid_metrics = (
+            regression_metrics if task_type == "regression" else classification_metrics
+        )
+        for metric_key in ("comparison_metric", "selection_metric"):
+            metric_value = self.params["train"].get(metric_key)
+            # selection_metric is optional; empty/None means "use comparison_metric".
+            if metric_key == "selection_metric" and not metric_value:
+                continue
+            if metric_value not in valid_metrics:
                 raise ValueError(
-                    f"fbeta_score_beta_val must be > 0. Got {fbeta_score_beta_val}"
+                    f"{metric_key} must be one of {valid_metrics} for "
+                    f"task_type='{task_type}'. Got {metric_value}!"
                 )
-
-        else:
-            raise ValueError(
-                f"fbeta_score_beta_val must be float type. Got {self.params['train']['params']['fbeta_score_beta_val']}"
-            )
-
-        # Check if comparison metric is a valid value
-        comparison_metric = self.params["train"]["comparison_metric"]
-        comparison_metrics = ("recall", "precision", "f1", "roc_auc", "fbeta_score")
-        if comparison_metric not in comparison_metrics:
-            raise ValueError(
-                f"Supported metrics are {comparison_metrics}. Got {comparison_metric}!"
-            )
 
         # Check if input split cutoff date (if split_type == "time") is in proper date format
         if self.params["data"]["split_type"] == "time" and (
@@ -142,7 +169,7 @@ class Config:
             or self.params["data"]["train_valid_split_curoff_date"] == "none"
         ):
             raise ValueError(
-                f"train_test_split_curoff_date and train_valid_split_curoff_date must be a date (format {self.params['data']['params']['split_date_col_format']}) or None if split type is 'random'."
+                f"train_test_split_curoff_date and train_valid_split_curoff_date must be a date (format {self.params['data']['split_date_col_format']}) or None if split type is 'random'."
             )
 
         # Check if voting rule is a valid value
@@ -203,12 +230,24 @@ class TrainParams:
     experiment_tracker: str = "comet"
     project_name: str = "default-project"
     workspace_name: str = "comet-workspace-name"
+    # Task the pipeline solves. Drives evaluator/metric selection and which
+    # classification-only steps (label encoding, calibration, threshold tuning)
+    # run. One of "binary", "multiclass", "regression".
+    task_type: str = "binary"
     search_max_iters: int = 10
     parallel_jobs_count: int = 1
     exp_timout_secs: int = 3600
+    # Number of stratified CV folds used to estimate the metric during the
+    # search and champion selection. cross_val_folds > 1 enables CV; a value of
+    # 1 (or less) falls back to the single train/valid holdout.
     cross_val_folds: int = 5
     fbeta_score_beta_val: float = 0.5
+    # Metric the Optuna search optimizes (the "optimization metric").
     comparison_metric: str = "fbeta_score"
+    # Metric used to rank candidates for the champion and gate deployment. Kept
+    # separate from comparison_metric to break the tuning/selection circularity;
+    # empty string means "fall back to comparison_metric".
+    selection_metric: str = ""
     voting_rule: str = "soft"
     deployment_score_thresh: float = 0.8
     max_eval_experiments: int = 10
@@ -335,6 +374,30 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
     Returns:
         TrainingConfig: The training configuration as a dataclass instance.
     """
+    # Surface top-level section typos (e.g. the historical "includedmodels" vs
+    # "included_models" drift) instead of silently loading section defaults.
+    known_sections = {
+        "description",
+        "logger",
+        "data",
+        "preprocessing",
+        "train",
+        "logisticregression",
+        "randomforest",
+        "lgbm",
+        "xgboost",
+        "files",
+        "modelregistry",
+        "included_models",
+        "inference",
+    }
+    unexpected_sections = set(params) - known_sections
+    if unexpected_sections:
+        logger.warning(
+            "Unexpected top-level config section(s) (ignored): %s",
+            ", ".join(sorted(unexpected_sections)),
+        )
+
     included_models_params = params.get(
         "included_models", {}
     )  # Fallback to an empty dictionary

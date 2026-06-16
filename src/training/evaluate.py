@@ -35,6 +35,7 @@ if os.getenv("ENABLE_COMET_LOGGING", "false").lower() == "true":
 import numpy as np
 import pandas as pd
 
+from src.training.evaluation import metrics
 from src.training.evaluation.champion import ModelChampionManager
 from src.training.evaluation.orchestrator import create_evaluation_orchestrator
 from src.training.evaluation.selector import ModelSelector
@@ -42,7 +43,7 @@ from src.training.schemas import Config, build_training_config
 from src.training.tracking.experiment import get_tracker_credentials
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
-from src.utils.path import ARTIFACTS_DIR, DATA_DIR
+from src.utils.path import ARTIFACTS_DIR, DATA_DIR, encoded_split_path
 
 module_name: str = PosixPath(__file__).stem
 console_logger = get_console_logger(module_name)
@@ -87,13 +88,20 @@ def main(
     if experiment_keys is not None:
         logger.info("Using experiment keys passed from training.")
 
-    # Load datasets
-    train_set = pd.read_parquet(data_dir / training_config.files.train_set_file_name)
-    valid_set = pd.read_parquet(data_dir / training_config.files.valid_set_file_name)
-    calib_set = pd.read_parquet(
-        data_dir / training_config.files.calibration_set_file_name
+    # Load the feature-selected, label-encoded splits written by train.py
+    # (separate "*_encoded.parquet" files; the canonical splits are left intact).
+    train_set = pd.read_parquet(
+        encoded_split_path(data_dir, training_config.files.train_set_file_name)
     )
-    test_set = pd.read_parquet(data_dir / training_config.files.test_set_file_name)
+    valid_set = pd.read_parquet(
+        encoded_split_path(data_dir, training_config.files.valid_set_file_name)
+    )
+    calib_set = pd.read_parquet(
+        encoded_split_path(data_dir, training_config.files.calibration_set_file_name)
+    )
+    test_set = pd.read_parquet(
+        encoded_split_path(data_dir, training_config.files.test_set_file_name)
+    )
     logger.info("Loaded train, validation, calibration, and test sets")
 
     # Prepare data splits
@@ -106,6 +114,17 @@ def main(
     calib_class = np.array(calib_set[class_col])
     test_features = test_set.drop(class_col, axis=1)
     test_class = np.array(test_set[class_col])
+
+    # Task type and the model-preference order used by the 1-SE selection rule
+    # (simplest/cheapest first, falling back to the order models are trained in).
+    task_type = training_config.train_params.task_type
+    model_preference = [
+        training_config.modelregistry.lr_registered_model_name,
+        training_config.modelregistry.rf_registered_model_name,
+        training_config.modelregistry.lgbm_registered_model_name,
+        training_config.modelregistry.xgb_registered_model_name,
+        training_config.modelregistry.voting_ensemble_registered_model_name,
+    ]
 
     # Create orchestrators
     test_evaluator = create_evaluation_orchestrator(
@@ -120,18 +139,27 @@ def main(
         decision_threshold=training_config.train_params.decision_threshold,
         tune_decision_threshold=training_config.train_params.tune_decision_threshold,
         encoded_pos_class_label=training_config.train_params.encoded_pos_class_label,
+        task_type=task_type,
+        cv_folds=training_config.train_params.cross_val_folds,
+        model_preference=model_preference,
+        random_seed=int(training_config.data.split_rand_seed),
     )
 
     champion_manager = ModelChampionManager(
         champ_model_name=training_config.modelregistry.champion_model_name
     )
 
-    # Determine comparison metric name
-    comparison_metric = training_config.train_params.comparison_metric
-    if comparison_metric == "fbeta_score":
-        comparison_metric = (
-            f"f_{training_config.train_params.fbeta_score_beta_val}_score"
-        )
+    # Resolve the SELECTION metric (decoupled from the optimization metric). It
+    # falls back to comparison_metric when unset, and is mapped to the row name
+    # the evaluators emit (macro-averaged for multi-class) so selection and the
+    # deployment gate find the metric for every task type.
+    selection_metric = (
+        training_config.train_params.selection_metric
+        or training_config.train_params.comparison_metric
+    )
+    comparison_metric = metrics.selection_metric_row_name(
+        selection_metric, task_type, training_config.train_params.fbeta_score_beta_val
+    )
 
     # Add valid_ prefix to ensure the model selection is based on validation set
     valid_comparison_metric = f"valid_{comparison_metric}"

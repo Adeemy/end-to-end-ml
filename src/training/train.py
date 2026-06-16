@@ -60,7 +60,7 @@ from src.training.tracking.experiment import (
 )
 from src.utils.config_loader import load_config
 from src.utils.logger import get_console_logger
-from src.utils.path import ARTIFACTS_DIR, DATA_DIR
+from src.utils.path import ARTIFACTS_DIR, DATA_DIR, encoded_split_path
 
 module_name: str = PosixPath(__file__).stem
 console_logger = get_console_logger(module_name)
@@ -352,35 +352,22 @@ def main(
     train_features_preprocessed = data_prep.train_features_preprocessed
     valid_features_preprocessed = data_prep.valid_features_preprocessed
 
-    # Save data splits with encoded class to be used in models evaluation
-    # TODO: an integration test should be added to check if the saved files.
-    train_set = train_features
-    train_set[class_column_name] = train_class
-    train_set.to_parquet(
-        data_dir / train_file_name,
-        index=False,
-    )
-
-    valid_set = valid_features
-    valid_set[class_column_name] = valid_class
-    valid_set.to_parquet(
-        data_dir / valid_set_file_name,
-        index=False,
-    )
-
-    test_set = test_features
-    test_set[class_column_name] = test_class
-    test_set.to_parquet(
-        data_dir / test_set_file_name,
-        index=False,
-    )
-
-    calib_set = calib_features
-    calib_set[class_column_name] = calib_class
-    calib_set.to_parquet(
-        data_dir / calib_set_file_name,
-        index=False,
-    )
+    # Persist the feature-selected, label-encoded splits for evaluate.py to read.
+    # These are written to separate "*_encoded.parquet" files rather than
+    # overwriting the canonical splits from split_data.py, so re-running training
+    # is idempotent (it never reads back its own mutated, already-encoded input).
+    for features, class_labels, file_name in (
+        (train_features, train_class, train_file_name),
+        (valid_features, valid_class, valid_set_file_name),
+        (test_features, test_class, test_set_file_name),
+        (calib_features, calib_class, calib_set_file_name),
+    ):
+        encoded_split = features.copy()
+        encoded_split[class_column_name] = class_labels
+        encoded_split.to_parquet(
+            encoded_split_path(data_dir, file_name),
+            index=False,
+        )
 
     # Get tracker credentials and initialize project if needed
     try:
@@ -424,11 +411,18 @@ def main(
         encoded_pos_class_label=encoded_positive_class_label,
         comparison_metric=comparison_metric,
         random_seed=search_rand_seed,
+        task_type=training_config.train_params.task_type,
+        cv_folds=training_config.train_params.cross_val_folds,
     )
 
     #############################################
+    # Which models to train (consumed via the validated dataclass; the YAML key
+    # is `included_models`).
+    included_models = training_config.included_models
+
+    #############################################
     # Train Logistic Regression model
-    if config.params["includedmodels"]["include_logistic_regression"]:
+    if included_models.include_logistic_regression:
         lr_calibrated_pipeline, lr_experiment = model_trainer.run_training_experiment(
             api_key=api_key,
             project_name=project_name,
@@ -447,7 +441,7 @@ def main(
 
     #############################################
     # Train Random Forest model
-    if config.params["includedmodels"]["include_random_forest"]:
+    if included_models.include_random_forest:
         rf_calibrated_pipeline, rf_experiment = model_trainer.run_training_experiment(
             api_key=api_key,
             project_name=project_name,
@@ -468,7 +462,7 @@ def main(
 
     #############################################
     # Train LightGBM model
-    if config.params["includedmodels"]["include_lightgbm"]:
+    if included_models.include_lightgbm:
         lgbm_calibrated_pipeline, lgbm_experiment = (
             model_trainer.run_training_experiment(
                 api_key=api_key,
@@ -491,7 +485,7 @@ def main(
 
     #############################################
     # Train XGBoost model
-    if config.params["includedmodels"]["include_xgboost"]:
+    if included_models.include_xgboost:
         xgb_calibrated_pipeline, xgb_experiment = model_trainer.run_training_experiment(
             api_key=api_key,
             project_name=project_name,
@@ -513,7 +507,7 @@ def main(
 
     #############################################
     # Create a voting ensmble model with LR, RF, LightGBM, and XGBoost as base estimators
-    if config.params["includedmodels"]["include_voting_ensemble"]:
+    if included_models.include_voting_ensemble:
         available_pipelines = [
             p
             for p in [

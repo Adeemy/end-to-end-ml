@@ -24,22 +24,14 @@ from typing import Callable, Optional
 
 import numpy as np
 import optuna
-import optuna_distributed
 import pandas as pd
-from dask.distributed import Client
 from numpy.typing import ArrayLike
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    fbeta_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
+from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.pipeline import Pipeline
 
+from src.training.evaluation import metrics
 from src.training.schemas import SupportedModelsConfig
 from src.training.tracking.experiment_tracker import ExperimentTracker
 from src.utils.logger import get_console_logger
@@ -47,11 +39,10 @@ from src.utils.logger import get_console_logger
 module_name: str = PosixPath(__file__).stem
 logger = get_console_logger(module_name)
 
-# Metrics for which a *lower* value is better. Any metric not listed here is
-# assumed to be higher-is-better (accuracy, precision, recall, f1, fbeta, roc_auc).
-# Used to derive the Optuna study direction from the configured metric so a
-# lower-is-better metric (e.g. log_loss) is not optimized backwards.
-LOWER_IS_BETTER_METRICS: frozenset = frozenset({"log_loss", "brier_score", "brier"})
+# Metrics for which a *lower* value is better, used to derive the Optuna study
+# direction so a lower-is-better metric (e.g. log_loss) is not optimized
+# backwards. Sourced from the shared metrics module (single source of truth).
+LOWER_IS_BETTER_METRICS: frozenset = metrics.LOWER_IS_BETTER_METRICS
 
 
 class ModelOptimizer:
@@ -92,6 +83,8 @@ class ModelOptimizer:
         is_voting_ensemble: bool = False,
         optimization_metric: str = "fbeta_score",
         random_seed: Optional[int] = None,
+        task_type: str = "binary",
+        cv_folds: int = 1,
     ) -> None:
         """Creates a ModelOptimizer instance.
 
@@ -131,6 +124,12 @@ class ModelOptimizer:
         self.is_voting_ensemble = is_voting_ensemble
         self.optimization_metric = optimization_metric
         self.random_seed = random_seed
+        # Task type drives which metric set is used and (for classification)
+        # whether folds are stratified. cv_folds > 1 enables CV inside the
+        # objective so each trial is scored as the mean over folds rather than a
+        # single noisy holdout point.
+        self.task_type = task_type
+        self.cv_folds = cv_folds
         self.classifier_name = self.model.__class__.__name__
 
         if not self.is_voting_ensemble and not self.supported_models.is_supported(
@@ -183,36 +182,14 @@ class ModelOptimizer:
             performance_metrics (pd.DataFrame): a dataframe with metric name and score columns.
         """
 
-        cal_metrics = [
-            ("accuracy", accuracy_score(true_class, pred_class)),
-            (
-                "precision",
-                precision_score(
-                    true_class,
-                    pred_class,
-                ),
-            ),
-            ("recall", recall_score(true_class, pred_class)),
-            ("f1", f1_score(true_class, pred_class)),
-            (
-                f"f_{self.fbeta_score_beta}_score",
-                fbeta_score(
-                    true_class,
-                    pred_class,
-                    beta=self.fbeta_score_beta,
-                ),
-            ),
-        ]
-
-        # ROC-AUC must be computed from positive-class probabilities, not hard
-        # labels. roc_auc_score(true, hard_labels) silently degenerates into a
-        # balanced-accuracy proxy, so only add it when probabilities are provided.
-        if pred_proba is not None:
-            cal_metrics.append(("roc_auc", roc_auc_score(true_class, pred_proba)))
-
-        performance_metrics = pd.DataFrame(cal_metrics, columns=["Metric", "Score"])
-
-        return performance_metrics
+        rows = metrics.compute_metrics(
+            task_type=self.task_type,
+            y_true=true_class,
+            y_pred=pred_class,
+            proba=pred_proba,
+            fbeta_beta=self.fbeta_score_beta,
+        )
+        return metrics.rows_to_dataframe(rows)
 
     def _pos_class_proba(self, features: ArrayLike) -> np.ndarray:
         """Returns the predicted probability of the positive class.
@@ -234,21 +211,70 @@ class ModelOptimizer:
         )
         return proba[:, pos_col]
 
+    def _proba_for_metrics(self, features: ArrayLike) -> Optional[np.ndarray]:
+        """Returns the probabilities the metric functions expect for the task.
+
+        Binary -> positive-class probabilities (1-D); multi-class -> the full
+        ``(n_samples, n_classes)`` matrix; regression -> None.
+
+        Args:
+            features (ArrayLike): features to score.
+
+        Returns:
+            Optional[np.ndarray]: probabilities, or None when not applicable.
+        """
+        if self.task_type == metrics.REGRESSION or not hasattr(
+            self.model, "predict_proba"
+        ):
+            return None
+        if self.task_type == metrics.MULTICLASS:
+            return self.model.predict_proba(features)
+        return self._pos_class_proba(features)
+
+    def _fit_score_fold(
+        self,
+        train_features: ArrayLike,
+        train_target: np.ndarray,
+        valid_features: ArrayLike,
+        valid_target: np.ndarray,
+        metric_name: str,
+    ) -> float:
+        """Fits the model on one fold and returns the optimization metric.
+
+        Args:
+            train_features: Fold training features (preprocessed).
+            train_target: Fold training labels/targets.
+            valid_features: Fold validation features (preprocessed).
+            valid_target: Fold validation labels/targets.
+            metric_name: Metric row name to extract.
+
+        Returns:
+            float: the metric value on the fold's validation split.
+        """
+        self.model.fit(train_features, train_target)
+        pred = self.model.predict(valid_features)
+        proba = self._proba_for_metrics(valid_features)
+        scores = self.calc_perf_metrics(
+            true_class=valid_target, pred_class=pred, pred_proba=proba
+        )
+        row = scores.loc[scores["Metric"] == metric_name, "Score"]
+        return float(row.iloc[0]) if not row.empty else float("-inf")
+
     def _metric_row_name(self) -> str:
         """Resolves the configured optimization metric to its row name in the
         ``calc_perf_metrics`` output.
 
         The config name ``fbeta_score`` maps to ``f_{beta}_score`` (matching how
-        ``evaluate.py`` and the evaluator name it); every other supported metric
-        (``recall``, ``precision``, ``f1``, ``roc_auc``, ``accuracy``) is used as-is.
+        ``evaluate.py`` and the evaluator name it); for multi-class tasks the
+        resolver applies macro averaging (e.g. ``roc_auc`` -> ``roc_auc_macro``).
 
         Returns:
             str: metric name as it appears in the metrics dataframe.
         """
 
-        if self.optimization_metric == "fbeta_score":
-            return f"f_{self.fbeta_score_beta}_score"
-        return self.optimization_metric
+        return metrics.selection_metric_row_name(
+            self.optimization_metric, self.task_type, self.fbeta_score_beta
+        )
 
     @property
     def optimization_direction(self) -> str:
@@ -278,23 +304,29 @@ class ModelOptimizer:
             trial (optuna.trial.Trial): an optuna trial object.
 
         Returns:
-            valid_score (float): validation score.
+            valid_score (float): the configured optimization metric. With CV
+                enabled this is the mean across folds; otherwise it is the single
+                validation-split score.
         """
 
         # Define parameters search space
         params = self.generate_trial_params(trial=trial)
-
-        # Fit model and calculate training score
         self.model.set_params(**params)
-        self.model.fit(self.train_features_preprocessed, self.train_class)
+        metric_name = self._metric_row_name()
 
-        # Evaluate model on training and validation set
-        # Note: default threshold of 0.5 is used for positive class but
-        # other htreshold values can be used, which is problem-dependent.
+        # CV path: score the trial as the mean of the optimization metric over
+        # stratified folds of the train+valid pool, so trials are ranked on a
+        # variance-reduced estimate instead of one noisy holdout. The per-trial
+        # std is stored so champion selection can apply a 1-SE rule.
+        if self.cv_folds and self.cv_folds > 1:
+            return self._cv_objective(trial, metric_name)
+
+        # Single-holdout path (cv_folds <= 1): preserves the original behaviour.
+        self.model.fit(self.train_features_preprocessed, self.train_class)
         pred_train_preds = self.model.predict(self.train_features_preprocessed)
         pred_valid_preds = self.model.predict(self.valid_features_preprocessed)
-        pred_train_proba = self._pos_class_proba(self.train_features_preprocessed)
-        pred_valid_proba = self._pos_class_proba(self.valid_features_preprocessed)
+        pred_train_proba = self._proba_for_metrics(self.train_features_preprocessed)
+        pred_valid_proba = self._proba_for_metrics(self.valid_features_preprocessed)
         train_scores = self.calc_perf_metrics(
             true_class=self.train_class,
             pred_class=pred_train_preds,
@@ -306,9 +338,6 @@ class ModelOptimizer:
             pred_proba=pred_valid_proba,
         )
 
-        # Optimize (and log) the configured metric so tuning and champion
-        # selection are coherent.
-        metric_name = self._metric_row_name()
         train_score = train_scores.loc[
             train_scores["Metric"] == metric_name, "Score"
         ].iloc[0]
@@ -325,6 +354,61 @@ class ModelOptimizer:
 
         # Return the validation score to ensure it's used for model selection
         return valid_score
+
+    def _cv_objective(self, trial: optuna.trial.Trial, metric_name: str) -> float:
+        """Scores the current trial via stratified K-fold CV on the train+valid pool.
+
+        Args:
+            trial: The active Optuna trial (used to record the per-fold std).
+            metric_name: Optimization metric row name to average over folds.
+
+        Returns:
+            float: mean of the optimization metric across folds.
+        """
+        pool_features = pd.concat(
+            [self.train_features_preprocessed, self.valid_features_preprocessed],
+            axis=0,
+            ignore_index=True,
+        )
+        pool_target = np.concatenate(
+            [np.asarray(self.train_class), np.asarray(self.valid_class)]
+        )
+
+        if self.task_type == metrics.REGRESSION:
+            splitter = KFold(
+                n_splits=self.cv_folds, shuffle=True, random_state=self.random_seed
+            )
+            fold_iter = splitter.split(pool_features)
+        else:
+            splitter = StratifiedKFold(
+                n_splits=self.cv_folds, shuffle=True, random_state=self.random_seed
+            )
+            fold_iter = splitter.split(pool_features, pool_target)
+
+        fold_scores = [
+            self._fit_score_fold(
+                pool_features.iloc[train_idx],
+                pool_target[train_idx],
+                pool_features.iloc[valid_idx],
+                pool_target[valid_idx],
+                metric_name,
+            )
+            for train_idx, valid_idx in fold_iter
+        ]
+
+        mean_score = float(np.mean(fold_scores))
+        std_score = float(np.std(fold_scores))
+        trial.set_user_attr("cv_std", std_score)
+        trial.set_user_attr("cv_folds", int(self.cv_folds))
+
+        self.tracker.log_metric(
+            name=f"valid_{metric_name}", value=mean_score, step=trial.number
+        )
+        self.tracker.log_metric(
+            name=f"valid_{metric_name}_std", value=std_score, step=trial.number
+        )
+
+        return mean_score
 
     def tune_model(
         self,
@@ -430,6 +514,19 @@ class ModelOptimizer:
         Returns:
             study (optuna.study.Study): optuna study object.
         """
+
+        # Imported lazily so the distributed extra is optional: serial search
+        # (the default) does not require dask/optuna-distributed.
+        try:
+            import optuna_distributed  # pylint: disable=import-outside-toplevel
+            from dask.distributed import (
+                Client,  # pylint: disable=import-outside-toplevel
+            )
+        except ImportError as exc:
+            raise ImportError(
+                "Parallel optimization requires the 'distributed' extra. "
+                "Install it with: uv pip install -e '.[distributed]'"
+            ) from exc
 
         sampler = optuna.samplers.TPESampler(
             n_startup_trials=int(

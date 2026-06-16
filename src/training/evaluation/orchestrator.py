@@ -17,6 +17,7 @@ import pandas as pd
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
+from src.training.evaluation import metrics
 from src.training.evaluation.champion import ModelChampionManager
 from src.training.evaluation.evaluator import create_model_evaluator
 from src.training.evaluation.selector import ModelSelector
@@ -138,6 +139,10 @@ def create_evaluation_orchestrator(
     decision_threshold: float = 0.5,
     tune_decision_threshold: bool = False,
     encoded_pos_class_label: int = 1,
+    task_type: str = "binary",
+    cv_folds: int = 1,
+    model_preference: Optional[list] = None,
+    random_seed: Optional[int] = None,
     experiment_instance: Optional[Any] = None,
     **tracker_kwargs,
 ) -> "TestSetEvaluationOrchestrator":
@@ -153,8 +158,12 @@ def create_evaluation_orchestrator(
         fbeta_score_beta: Beta value for fbeta score.
         voting_ensemble_name: Name of voting ensemble model (if exists).
         decision_threshold: Default operating threshold persisted with the champion.
-        tune_decision_threshold: If True, tune the threshold on the validation set.
+        tune_decision_threshold: If True, tune the threshold on the calibration set.
         encoded_pos_class_label: Encoded label of the positive class.
+        task_type: ML task ("binary", "multiclass", "regression").
+        cv_folds: When > 1, champion selection uses a bootstrap SE + 1-SE rule.
+        model_preference: Model-name order (simplest first) for 1-SE tie-breaking.
+        random_seed: Seed for the selection bootstrap.
         experiment_instance: Pre-initialized experiment instance (for Comet).
         **tracker_kwargs: Additional arguments for tracker initialization.
 
@@ -184,6 +193,10 @@ def create_evaluation_orchestrator(
         decision_threshold=decision_threshold,
         tune_decision_threshold=tune_decision_threshold,
         encoded_pos_class_label=encoded_pos_class_label,
+        task_type=task_type,
+        cv_folds=cv_folds,
+        model_preference=model_preference,
+        random_seed=random_seed,
     )
 
 
@@ -207,6 +220,10 @@ class TestSetEvaluationOrchestrator:
         decision_threshold: float = 0.5,
         tune_decision_threshold: bool = False,
         encoded_pos_class_label: int = 1,
+        task_type: str = "binary",
+        cv_folds: int = 1,
+        model_preference: Optional[list] = None,
+        random_seed: Optional[int] = None,
     ):
         """Initializes the TestSetEvaluationOrchestrator.
 
@@ -221,8 +238,15 @@ class TestSetEvaluationOrchestrator:
             voting_ensemble_name: Name of voting ensemble model (if exists).
             decision_threshold: Default operating threshold persisted with the champion.
             tune_decision_threshold: If True, pick the threshold maximizing F-beta
-                on the validation set instead of using ``decision_threshold``.
+                on the calibration set instead of using ``decision_threshold``.
             encoded_pos_class_label: Encoded label of the positive class.
+            task_type: ML task ("binary", "multiclass", "regression"); drives the
+                evaluator and metric resolution.
+            cv_folds: When > 1, champion selection uses a bootstrap standard error
+                of the selection metric and applies a 1-SE rule.
+            model_preference: Optional model-name order (simplest/cheapest first)
+                used to break ties under the 1-SE rule.
+            random_seed: Seed for the selection bootstrap (reproducibility).
         """
         self.tracker = tracker
         self.train_features = train_features
@@ -235,17 +259,29 @@ class TestSetEvaluationOrchestrator:
         self.decision_threshold = decision_threshold
         self.tune_decision_threshold = tune_decision_threshold
         self.encoded_pos_class_label = encoded_pos_class_label
+        self.task_type = task_type
+        self.cv_folds = cv_folds
+        self.model_preference = model_preference
+        self.random_seed = random_seed
 
     def evaluate_on_test_set(
         self,
         model_pipeline: "Pipeline",
         model_name: str,
+        decision_threshold: float = 0.5,
     ) -> dict:
-        """Evaluates model on test set.
+        """Evaluates a model on the held-out test set.
+
+        The test metrics must reflect the artifact that is actually deployed, so
+        callers pass the *calibrated* pipeline and its persisted operating
+        threshold here (binary). The threshold is ignored for multi-class
+        (argmax) and regression.
 
         Args:
-            model_pipeline: Fitted model pipeline (Pipeline).
+            model_pipeline: Fitted model pipeline to evaluate (calibrated champion).
             model_name: Name of the model being evaluated.
+            decision_threshold: Operating threshold applied for binary tasks so
+                reported metrics match the deployed operating point.
 
         Returns:
             Dictionary of test metrics.
@@ -265,63 +301,101 @@ class TestSetEvaluationOrchestrator:
             valid_features=self.test_features,
             valid_class=self.test_class,
             fbeta_score_beta=self.fbeta_score_beta,
+            encoded_pos_class_label=self.encoded_pos_class_label,
             is_voting_ensemble=is_voting_ensemble,
+            task_type=self.task_type,
         )
 
-        # Create class encoder for confusion matrix logging
-        # Fit on combined train and test class labels to ensure all labels are known
-        class_encoder = LabelEncoder()
-        all_class_labels = np.concatenate([self.train_class, self.test_class])
-        class_encoder.fit(all_class_labels)
+        # Create class encoder for confusion matrix logging (classification only).
+        # Fit on combined train and test class labels to ensure all labels are known.
+        class_encoder = None
+        if self.task_type in metrics.CLASSIFICATION_TASKS:
+            class_encoder = LabelEncoder()
+            all_class_labels = np.concatenate([self.train_class, self.test_class])
+            class_encoder.fit(all_class_labels)
 
-        # Use the public method for test-only evaluation to avoid accessing protected members
-        test_scores = evaluator.evaluate_test_set_only(class_encoder=class_encoder)
+        # Evaluate at the deployed operating threshold so test metrics match the
+        # served model rather than a default 0.5 cut.
+        test_scores = evaluator.evaluate_test_set_only(
+            class_encoder=class_encoder,
+            pos_class_label_thresh=decision_threshold,
+        )
 
         test_metrics = evaluator.convert_metrics_from_df_to_dict(
             scores=test_scores, prefix="test_"
         )
 
         logger.info(
-            "Evaluated %s on test set. Test metrics: %s", model_name, test_metrics
+            "Evaluated %s on test set (threshold=%.3f). Test metrics: %s",
+            model_name,
+            decision_threshold,
+            test_metrics,
         )
 
         return test_metrics
 
-    def calibrate_and_register_champion(
+    def calibrate_and_resolve_threshold(
         self,
         model_pipeline: "Pipeline",
         model_name: str,
         calibration_features: pd.DataFrame,
         calibration_class: np.ndarray,
         champion_manager: ModelChampionManager,
-    ) -> None:
-        """Calibrates and registers champion model.
+    ) -> tuple["Pipeline", float]:
+        """Calibrates the champion and resolves its serving threshold.
 
-        Calibration and threshold tuning use the dedicated calibration split,
-        which is disjoint from the validation set used for model selection.
+        Runs BEFORE test evaluation so the test set is scored on the exact
+        artifact that gets deployed (calibrated pipeline at its operating
+        threshold). Calibration and threshold tuning use the dedicated
+        calibration split, disjoint from the selection (validation) data. For
+        non-classification tasks calibration is skipped.
 
         Args:
-            model_pipeline: Fitted model pipeline (Pipeline).
+            model_pipeline: Selected (uncalibrated) champion pipeline.
             model_name: Name of the champion model.
             calibration_features: Calibration features (held-out from train/valid).
             calibration_class: Calibration class labels.
             champion_manager: ModelChampionManager instance.
+
+        Returns:
+            tuple: (deployable_pipeline, decision_threshold).
         """
-        # Calibrate the champion model on the dedicated calibration set
+        if self.task_type not in metrics.CLASSIFICATION_TASKS:
+            # Regression: no probability calibration or threshold.
+            return model_pipeline, self.decision_threshold
+
         calibrated_pipeline = champion_manager.calibrate_pipeline(
             valid_features=calibration_features,
             valid_class=calibration_class,
             fitted_pipeline=model_pipeline,
         )
-
         logger.info("Calibrated champion model: %s", model_name)
 
-        # Resolve the serving decision threshold (tuned on the calibration set or
-        # the configured default) and persist it next to the model so inference
-        # uses the same operating point instead of a hardcoded 0.5.
         decision_threshold = self._resolve_decision_threshold(
             calibrated_pipeline, calibration_features, calibration_class
         )
+        return calibrated_pipeline, decision_threshold
+
+    def register_champion(
+        self,
+        calibrated_pipeline: "Pipeline",
+        model_name: str,
+        decision_threshold: float,
+        champion_manager: ModelChampionManager,
+    ) -> None:
+        """Persists serving metadata and registers the (already-calibrated) champion.
+
+        Called only after the calibrated, thresholded model passes the deployment
+        gate, so we never register a model that failed the gate.
+
+        Args:
+            calibrated_pipeline: The deployable (calibrated) champion pipeline.
+            model_name: Name of the champion model.
+            decision_threshold: Operating threshold to persist for serving.
+            champion_manager: ModelChampionManager instance.
+        """
+        # Persist the operating point next to the model so inference uses the
+        # same threshold instead of a hardcoded 0.5.
         metadata_path = champion_manager.save_model_metadata(
             local_path=self.artifacts_path,
             decision_threshold=decision_threshold,
@@ -335,7 +409,6 @@ class TestSetEvaluationOrchestrator:
 
         # Set tracker and register
         champion_manager.tracker = self.tracker
-
         champion_manager.log_and_register_champ_model(
             local_path=self.artifacts_path,
             pipeline=calibrated_pipeline,
@@ -356,14 +429,12 @@ class TestSetEvaluationOrchestrator:
         )
 
         # Save the CALIBRATED champion locally so the local artifact matches the
-        # registered one. (Dumping `model_pipeline` here would overwrite the
-        # calibrated pickle written by log_and_register_champ_model with the
-        # un-calibrated pipeline)
+        # registered one. (Dumping the un-calibrated pipeline here would overwrite
+        # the calibrated pickle written by log_and_register_champ_model.)
         champion_model_path = (
             f"{self.artifacts_path}/{champion_manager.champ_model_name}.pkl"
         )
         joblib.dump(calibrated_pipeline, champion_model_path)
-
         logger.info("Saved champion model to: %s", champion_model_path)
 
     def _resolve_decision_threshold(
@@ -386,6 +457,10 @@ class TestSetEvaluationOrchestrator:
         Returns:
             float: decision threshold in (0, 1).
         """
+
+        # Only binary classification has a single operating threshold to tune.
+        if self.task_type not in metrics.CLASSIFICATION_TASKS:
+            return self.decision_threshold
 
         classes = list(calibrated_pipeline.classes_)
         is_binary = len(classes) == 2
@@ -521,6 +596,66 @@ class TestSetEvaluationOrchestrator:
             )
             return None
 
+    def _make_evaluator(
+        self,
+        pipeline: "Pipeline",
+        model_name: str,
+        valid_features: pd.DataFrame,
+        valid_class: np.ndarray,
+    ):
+        """Builds a task-appropriate evaluator for scoring a candidate."""
+        return create_model_evaluator(
+            tracker=self.tracker,
+            pipeline=pipeline,
+            train_features=self.train_features,
+            train_class=self.train_class,
+            valid_features=valid_features,
+            valid_class=valid_class,
+            fbeta_score_beta=self.fbeta_score_beta,
+            encoded_pos_class_label=self.encoded_pos_class_label,
+            is_voting_ensemble=(model_name == self.voting_ensemble_name),
+            task_type=self.task_type,
+        )
+
+    def _predict_for_metrics(
+        self, pipeline: "Pipeline", valid_features: pd.DataFrame
+    ) -> tuple:
+        """Returns (pred_class, proba_for_metrics) for a candidate pipeline.
+
+        proba_for_metrics is the positive-class 1-D array (binary), the full
+        probability matrix (multi-class), or None (regression / no predict_proba).
+        """
+        pred_class = pipeline.predict(valid_features)
+        if self.task_type == metrics.REGRESSION or not hasattr(
+            pipeline, "predict_proba"
+        ):
+            return pred_class, None
+        proba = np.asarray(pipeline.predict_proba(valid_features))
+        classes = list(pipeline.classes_)
+        if len(classes) == 2:
+            pos_col = (
+                classes.index(self.encoded_pos_class_label)
+                if self.encoded_pos_class_label in classes
+                else 1
+            )
+            return pred_class, proba[:, pos_col]
+        return pred_class, proba
+
+    @staticmethod
+    def _metric_from_predictions(
+        evaluator,
+        y_true: np.ndarray,
+        pred_class: np.ndarray,
+        pred_proba: Optional[np.ndarray],
+        comparison_metric_name: str,
+    ) -> float:
+        """Extracts the comparison metric from precomputed predictions."""
+        scores = evaluator.calc_perf_metrics(
+            true_class=y_true, pred_class=pred_class, pred_proba=pred_proba
+        )
+        row = scores.loc[scores["Metric"] == comparison_metric_name, "Score"]
+        return float(row.iloc[0]) if not row.empty else float("-inf")
+
     def _score_pipeline_on_valid(
         self,
         pipeline: "Pipeline",
@@ -541,36 +676,67 @@ class TestSetEvaluationOrchestrator:
         Returns:
             float: the metric value, or -inf if it cannot be computed.
         """
-        evaluator = create_model_evaluator(
-            tracker=self.tracker,
-            pipeline=pipeline,
-            train_features=self.train_features,
-            train_class=self.train_class,
-            valid_features=valid_features,
-            valid_class=valid_class,
-            fbeta_score_beta=self.fbeta_score_beta,
-            encoded_pos_class_label=self.encoded_pos_class_label,
-            is_voting_ensemble=(model_name == self.voting_ensemble_name),
+        evaluator = self._make_evaluator(
+            pipeline, model_name, valid_features, valid_class
+        )
+        pred_class, pred_proba = self._predict_for_metrics(pipeline, valid_features)
+        return self._metric_from_predictions(
+            evaluator, valid_class, pred_class, pred_proba, comparison_metric_name
         )
 
-        proba = np.asarray(pipeline.predict_proba(valid_features))
-        pred_class = pipeline.predict(valid_features)
-        classes = list(pipeline.classes_)
-        if len(classes) == 2:
-            pos_col = (
-                classes.index(self.encoded_pos_class_label)
-                if self.encoded_pos_class_label in classes
-                else 1
+    def _bootstrap_metric_se(
+        self,
+        pipeline: "Pipeline",
+        model_name: str,
+        valid_features: pd.DataFrame,
+        valid_class: np.ndarray,
+        comparison_metric_name: str,
+        n_boot: int = 200,
+    ) -> tuple:
+        """Returns (point_estimate, bootstrap_SE) of the comparison metric.
+
+        Predictions are computed once on the fixed (already-trained) candidate;
+        the validation set is then resampled with replacement to estimate the
+        metric's sampling variability without refitting.
+
+        Args:
+            pipeline: Candidate fitted pipeline.
+            model_name: Candidate name (voting-ensemble flag).
+            valid_features: Validation features.
+            valid_class: Validation labels.
+            comparison_metric_name: Metric row name to bootstrap.
+            n_boot: Number of bootstrap resamples.
+
+        Returns:
+            tuple: (point_estimate, standard_error).
+        """
+        evaluator = self._make_evaluator(
+            pipeline, model_name, valid_features, valid_class
+        )
+        pred_class, pred_proba = self._predict_for_metrics(pipeline, valid_features)
+        y_true = np.asarray(valid_class)
+        pred_arr = np.asarray(pred_class)
+        point = self._metric_from_predictions(
+            evaluator, y_true, pred_arr, pred_proba, comparison_metric_name
+        )
+
+        n_samples = len(y_true)
+        if n_samples == 0:
+            return point, 0.0
+        rng = np.random.default_rng(
+            self.random_seed if self.random_seed is not None else 0
+        )
+        boot_scores = []
+        for _ in range(n_boot):
+            idx = rng.integers(0, n_samples, n_samples)
+            proba_b = None if pred_proba is None else pred_proba[idx]
+            value = self._metric_from_predictions(
+                evaluator, y_true[idx], pred_arr[idx], proba_b, comparison_metric_name
             )
-            pred_proba = proba[:, pos_col]
-        else:
-            pred_proba = proba
-
-        scores = evaluator.calc_perf_metrics(
-            true_class=valid_class, pred_class=pred_class, pred_proba=pred_proba
-        )
-        row = scores.loc[scores["Metric"] == comparison_metric_name, "Score"]
-        return float(row.iloc[0]) if not row.empty else float("-inf")
+            if np.isfinite(value):
+                boot_scores.append(value)
+        se = float(np.std(boot_scores)) if boot_scores else 0.0
+        return float(point), se
 
     def _select_champion_in_process(
         self,
@@ -583,7 +749,11 @@ class TestSetEvaluationOrchestrator:
 
         Loads each candidate pipeline and scores it in-process on the validation
         set, so champion selection does not depend on metrics read back from the
-        experiment tracker.
+        experiment tracker. When CV is enabled (``cv_folds > 1``) each candidate
+        also gets a bootstrap standard error and a 1-SE rule is applied: among
+        candidates whose mean is within one SE of the best, the most preferred
+        (simplest/cheapest per ``model_preference``) is chosen, guarding against
+        selecting on noise.
 
         Args:
             candidates: List of (model_name, experiment_key) tuples.
@@ -594,29 +764,69 @@ class TestSetEvaluationOrchestrator:
         Returns:
             tuple: (champion_model_name, champion_pipeline_or_None).
         """
-        best_name, best_pipeline, best_score = None, None, float("-inf")
+        use_se = bool(self.cv_folds and self.cv_folds > 1)
+        scored = []  # list of (model_name, pipeline, mean, se)
         for model_name, experiment_key in candidates:
             pipeline = self._load_candidate_pipeline(model_name, experiment_key)
             if pipeline is None:
                 continue
-            score = self._score_pipeline_on_valid(
-                pipeline,
-                model_name,
-                valid_features,
-                valid_class,
-                comparison_metric_name,
-            )
+            if use_se:
+                mean_score, se_score = self._bootstrap_metric_se(
+                    pipeline,
+                    model_name,
+                    valid_features,
+                    valid_class,
+                    comparison_metric_name,
+                )
+            else:
+                mean_score = self._score_pipeline_on_valid(
+                    pipeline,
+                    model_name,
+                    valid_features,
+                    valid_class,
+                    comparison_metric_name,
+                )
+                se_score = 0.0
             logger.info(
-                "Candidate %s scored %.4f on %s (valid)",
+                "Candidate %s scored %.4f (+/- %.4f) on %s (valid)",
                 model_name,
-                score,
+                mean_score,
+                se_score,
                 comparison_metric_name,
             )
-            if score > best_score:
-                best_name, best_pipeline, best_score = model_name, pipeline, score
+            scored.append((model_name, pipeline, mean_score, se_score))
 
-        if best_name is None:
-            best_name = candidates[0][0] if candidates else "unknown"
+        if not scored:
+            return (candidates[0][0] if candidates else "unknown"), None
+
+        best_name, best_pipeline, best_mean, best_se = max(
+            scored, key=lambda item: item[2]
+        )
+
+        # 1-SE rule (only when variance is available): among candidates within
+        # one SE of the best mean, prefer the simplest/cheapest model.
+        if use_se and best_se > 0 and self.model_preference:
+            within_one_se = [item for item in scored if item[2] >= best_mean - best_se]
+            if len(within_one_se) > 1:
+
+                def _preference_rank(name: str) -> int:
+                    return (
+                        self.model_preference.index(name)
+                        if name in self.model_preference
+                        else len(self.model_preference)
+                    )
+
+                chosen = min(within_one_se, key=lambda item: _preference_rank(item[0]))
+                if chosen[0] != best_name:
+                    logger.info(
+                        "1-SE rule: preferring %s over %s (within %.4f of best mean %.4f)",
+                        chosen[0],
+                        best_name,
+                        best_se,
+                        best_mean,
+                    )
+                best_name, best_pipeline = chosen[0], chosen[1]
+
         return best_name, best_pipeline
 
     def run_evaluation_workflow(
@@ -727,10 +937,23 @@ class TestSetEvaluationOrchestrator:
                     evaluation_experiment_name,
                 )
 
-        # Evaluate on test set
-        test_metrics = self.evaluate_on_test_set(
+        # Calibrate and resolve the operating threshold on the dedicated
+        # calibration split BEFORE test evaluation, so the test set is scored on
+        # the exact artifact that gets deployed (calibrated pipeline at its
+        # serving threshold) rather than an uncalibrated model at 0.5.
+        deployable_pipeline, decision_threshold = self.calibrate_and_resolve_threshold(
             model_pipeline=model_pipeline,
             model_name=best_model_name,
+            calibration_features=calibration_features,
+            calibration_class=calibration_class,
+            champion_manager=champion_manager,
+        )
+
+        # Evaluate the deployable model on the held-out test set at its threshold.
+        test_metrics = self.evaluate_on_test_set(
+            model_pipeline=deployable_pipeline,
+            model_name=best_model_name,
+            decision_threshold=decision_threshold,
         )
 
         # Log test metrics with evaluation experiment context
@@ -750,7 +973,7 @@ class TestSetEvaluationOrchestrator:
         )
         self.tracker.log_metrics(test_metrics)
 
-        # Check deployment threshold
+        # Check deployment threshold against the calibrated/thresholded test score.
         metric_key = f"test_{comparison_metric_name}"
         test_score = test_metrics.get(metric_key)
 
@@ -790,12 +1013,11 @@ class TestSetEvaluationOrchestrator:
             deployment_threshold,
         )
 
-        # Calibrate and register as champion (on the dedicated calibration split)
-        self.calibrate_and_register_champion(
-            model_pipeline=model_pipeline,
+        # Register the calibrated champion only after it clears the gate.
+        self.register_champion(
+            calibrated_pipeline=deployable_pipeline,
             model_name=best_model_name,
-            calibration_features=calibration_features,
-            calibration_class=calibration_class,
+            decision_threshold=decision_threshold,
             champion_manager=champion_manager,
         )
 
