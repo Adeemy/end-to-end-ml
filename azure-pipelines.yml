@@ -1,0 +1,62 @@
+# Azure Pipelines: submit the Azure ML training + evaluation jobs.
+# Mirrors orlando_cash_forecast_ts's train_pipeline.yml. The pipeline agent only
+# submits jobs (the heavy training runs on the cluster), so it installs just the
+# azure deps - not `pip install -e .`, which would hit requires-python>=3.14 on
+# the 3.11 agent. Workspace + Service Principal values come from a variable group.
+trigger: none
+pr: none
+
+schedules:
+  - cron: "0 3 1 * *" # 03:00 UTC on the 1st of each month
+    displayName: Monthly training + evaluation
+    branches:
+      include:
+        - main
+    always: false
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  # Define this variable group in Azure DevOps with:
+  #   AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, AZURE_WORKSPACE_NAME,
+  #   AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET (secret)
+  - group: azure-ml-workspace
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.11"
+    displayName: Use Python 3.11
+
+  - script: |
+      python -m pip install --upgrade pip
+      pip install \
+        azure-ai-ml azureml-mlflow azureml-featurestore \
+        azure-identity azure-keyvault-secrets \
+        pyyaml python-dotenv pandas
+    displayName: Install Azure submit dependencies
+
+  - script: |
+      export PYTHONPATH="$(Build.SourcesDirectory)"
+      python src/azureml/submit_train.py --config_yaml_path ./config/training-config.yml --wait
+    displayName: Submit training job
+    env:
+      AZURE_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
+      AZURE_RESOURCE_GROUP: $(AZURE_RESOURCE_GROUP)
+      AZURE_WORKSPACE_NAME: $(AZURE_WORKSPACE_NAME)
+      AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+      AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+      AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+
+  - script: |
+      export PYTHONPATH="$(Build.SourcesDirectory)"
+      python src/azureml/submit_evaluate.py --config_yaml_path ./config/training-config.yml --wait
+    displayName: Submit evaluation job
+    env:
+      AZURE_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
+      AZURE_RESOURCE_GROUP: $(AZURE_RESOURCE_GROUP)
+      AZURE_WORKSPACE_NAME: $(AZURE_WORKSPACE_NAME)
+      AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+      AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+      AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
