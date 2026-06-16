@@ -205,12 +205,15 @@ class ModelChampionManager:
         self,
         local_path: str,
         pipeline: Pipeline,
+        input_example: Optional[pd.DataFrame] = None,
     ) -> None:
         """Logs and registers champion model using the experiment tracker.
 
         Args:
             local_path: Local path to save champion model.
             pipeline: Fitted pipeline.
+            input_example: Optional sample of raw features; passed to the tracker
+                so the logged champion carries a signature and sample input.
 
         Raises:
             ValueError: If no tracker is configured.
@@ -231,6 +234,7 @@ class ModelChampionManager:
             name=self.champ_model_name,
             file_or_folder=model_path,
             overwrite=False,
+            input_example=input_example,
         )
         self.tracker.register_model(model_name=self.champ_model_name)
         self.tracker.end()

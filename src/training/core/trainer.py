@@ -386,12 +386,19 @@ class TrainingOrchestrator:
             metrics_to_log = {**train_metrics, **valid_metrics, "model_ece": model_ece}
             tracker.log_metrics(metrics_to_log)
 
-            # Register model
+            # Register model. A few raw-feature rows give the logged model an
+            # inferred signature and a sample input.
+            input_example = (
+                self.valid_features.head(5)
+                if self.valid_features is not None and len(self.valid_features)
+                else None
+            )
             self.experiment_manager.register_model(
                 experiment=experiment,
                 pipeline=fitted_pipeline,
                 registered_model_name=registered_model_name,
                 artifacts_path=self.artifacts_path,
+                input_example=input_example,
             )
 
         except Exception:  # pylint: disable=W0718

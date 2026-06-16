@@ -24,6 +24,7 @@ from typing import Any, Dict, Optional
 import joblib
 import mlflow
 import mlflow.sklearn
+import pandas as pd
 from comet_ml import Experiment as CometExperiment
 from sklearn.pipeline import Pipeline
 
@@ -153,6 +154,7 @@ class ExperimentManager(ABC):
         pipeline: Pipeline,
         registered_model_name: str,
         artifacts_path: str = "model",
+        input_example: Optional[pd.DataFrame] = None,
     ) -> None:
         """Saves and registers the model.
 
@@ -161,6 +163,7 @@ class ExperimentManager(ABC):
             pipeline: Fitted pipeline object.
             registered_model_name: Name of the registered model.
             artifacts_path: Path to save model artifacts.
+            input_example: Optional sample of raw features for signature inference.
         """
         raise NotImplementedError
 
@@ -357,6 +360,7 @@ class CometExperimentManager(ExperimentManager):
         pipeline: Pipeline,
         registered_model_name: str,
         artifacts_path: str = "model",
+        input_example: Optional[pd.DataFrame] = None,  # pylint: disable=unused-argument
     ) -> None:
         """Saves and registers the model to Comet experiment.
 
@@ -365,6 +369,7 @@ class CometExperimentManager(ExperimentManager):
             pipeline: Fitted pipeline object.
             registered_model_name: Name of the registered model.
             artifacts_path: Path to save model artifacts.
+            input_example: Unused for Comet (kept for interface parity).
         """
         # Ensure artifacts directory exists
         artifacts_dir = Path(artifacts_path)
@@ -532,6 +537,7 @@ class MLflowExperimentManager(ExperimentManager):
         pipeline: Pipeline,
         registered_model_name: str,
         artifacts_path: str = "model",
+        input_example: Optional[pd.DataFrame] = None,
     ) -> None:
         """Saves and registers the model to MLflow.
 
@@ -540,14 +546,36 @@ class MLflowExperimentManager(ExperimentManager):
             pipeline: Fitted pipeline object.
             registered_model_name: Name of the registered model.
             artifacts_path: Path to save model artifacts.
+            input_example: Optional sample of raw features; when given, the
+                model's signature is inferred and attached with the example.
         """
 
         # Log the model to MLflow
         try:
+            signature = None
+            if input_example is not None:
+                try:
+                    from mlflow.models import (  # pylint: disable=import-outside-toplevel
+                        infer_signature,
+                    )
+
+                    signature = infer_signature(
+                        input_example, pipeline.predict(input_example)
+                    )
+                except Exception as sig_err:  # pylint: disable=broad-except
+                    logger.warning(
+                        "Could not infer signature for %s: %s",
+                        registered_model_name,
+                        sig_err,
+                    )
+                    input_example = None
+
             mlflow.sklearn.log_model(
                 sk_model=pipeline,
                 name=registered_model_name,
                 registered_model_name=registered_model_name,
+                signature=signature,
+                input_example=input_example,
             )
 
             # Also save model locally for consistency with Comet implementation

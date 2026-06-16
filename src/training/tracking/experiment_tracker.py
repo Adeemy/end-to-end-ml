@@ -417,7 +417,12 @@ class MLflowExperimentTracker(ExperimentTracker):
         overwrite: bool = False,
         **kwargs,
     ) -> None:
-        """Log a model artifact to MLflow."""
+        """Log a model to MLflow.
+
+        When the caller passes an ``input_example`` (a small DataFrame of raw
+        features), the model's signature is inferred and both are attached so the
+        registered model documents its input/output schema in the UI.
+        """
         # For MLflow, we need to log the actual model object, not just the file
         # Load the model from the pickle file and log it properly
         import joblib
@@ -426,12 +431,28 @@ class MLflowExperimentTracker(ExperimentTracker):
             # Load the model from the pickle file
             model = joblib.load(str(file_or_folder))
 
+            # Infer the signature and attach a sample input when one is provided.
+            signature = None
+            input_example = kwargs.get("input_example")
+            if input_example is not None:
+                try:
+                    from mlflow.models import infer_signature
+
+                    signature = infer_signature(
+                        input_example, model.predict(input_example)
+                    )
+                except Exception as sig_err:  # pylint: disable=broad-except
+                    logger.warning("Could not infer model signature: %s", sig_err)
+                    input_example = None
+
             # Log the model using MLflow's sklearn integration
             # This creates a proper MLflow model with all artifacts and metadata
             self.mlflow.sklearn.log_model(
                 sk_model=model,
                 name=name,  # This will be the path in the MLflow run
                 registered_model_name=None,  # Don't register here, do it separately
+                signature=signature,
+                input_example=input_example,
             )
             logger.info("Successfully logged model %s to MLflow", name)
 

@@ -407,11 +407,18 @@ class TestSetEvaluationOrchestrator:
             metadata_path,
         )
 
-        # Set tracker and register
+        # Set tracker and register. A few raw-feature rows are passed so the
+        # logged champion carries an inferred signature and a sample input.
         champion_manager.tracker = self.tracker
+        input_example = (
+            self.test_features.head(5)
+            if self.test_features is not None and len(self.test_features)
+            else None
+        )
         champion_manager.log_and_register_champ_model(
             local_path=self.artifacts_path,
             pipeline=calibrated_pipeline,
+            input_example=input_example,
         )
 
         try:
@@ -929,9 +936,7 @@ class TestSetEvaluationOrchestrator:
                 if tracker_type == "mlflow" and best_experiment_key:
                     evaluation_kwargs["parent_run_id"] = best_experiment_key
                 self.tracker.set_experiment(**evaluation_kwargs)
-                logger.info(
-                    "Creating evaluation run: %s", evaluation_experiment_name
-                )
+                logger.info("Creating evaluation run: %s", evaluation_experiment_name)
 
         # Calibrate and resolve the operating threshold on the dedicated
         # calibration split BEFORE test evaluation, so the test set is scored on
