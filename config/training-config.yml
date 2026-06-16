@@ -97,6 +97,7 @@ train:
   decision_threshold: 0.5 # Operating point for converting positive-class probability to a label
   tune_decision_threshold: false # If true, pick the threshold that maximizes f_beta on the calibration set
   encoded_pos_class_label: 1 # Encoded label of the positive class (after label encoding)
+  feature_backend: "feast" # Where split_data reads features: "feast" (local, default) or "azureml" (Azure ML feature store)
 
 # Models to train. Add a model by appending an entry here -- no code change needed.
 #   name:                registered model name + experiment key
@@ -212,6 +213,23 @@ modelregistry:
 
 ensemble:
   enabled: false # Train a soft-voting ensemble over the enabled base models above
+
+# Azure ML execution backend (used by the src/azureml submit scripts; ignored by
+# the local pipeline). Workspace + Service Principal identifiers come from the
+# environment (.env), NOT this file. See docs/azure-ml-refactor-plan.md.
+azureml:
+  compute_cluster_name: "model-training-cluster"
+  compute_vm_size: "Standard_DS3_v2"
+  compute_min_nodes: 0
+  compute_max_nodes: 1
+  compute_idle_seconds_before_scaledown: 120
+  environment_name: "end-to-end-ml-train-env"
+  acr_image_name: "end-to-end-ml-train-env"
+  train_experiment_name: "end-to-end-ml-train"
+  eval_experiment_name: "end-to-end-ml-eval"
+  feature_store_name: "end-to-end-ml-fs"
+  feature_set_name: "diabetes_features"
+  feature_set_version: "1"
 
 # Inference config included in training config to ensure model's config during training and inference is the same
 inference:

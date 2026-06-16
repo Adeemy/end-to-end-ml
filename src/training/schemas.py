@@ -254,6 +254,9 @@ class TrainParams:
     decision_threshold: float = 0.5
     tune_decision_threshold: bool = False
     encoded_pos_class_label: int = 1
+    # Where split_data sources features: "feast" (local store, default) or
+    # "azureml" (Azure ML managed feature store; see src/azureml).
+    feature_backend: str = "feast"
 
 
 @dataclass(frozen=True)
@@ -338,6 +341,29 @@ class EnsembleConfig:
 
 
 @dataclass(frozen=True)
+class AzureMLConfig:
+    """Azure ML execution-backend settings (consumed by src/azureml).
+
+    Holds only non-secret, environment-agnostic settings. The workspace
+    (subscription / resource group / workspace name) and the Service Principal
+    are read from environment variables in src/azureml/client.py, not from here.
+    """
+
+    compute_cluster_name: str = "model-training-cluster"
+    compute_vm_size: str = "Standard_DS3_v2"
+    compute_min_nodes: int = 0
+    compute_max_nodes: int = 1
+    compute_idle_seconds_before_scaledown: int = 120
+    environment_name: str = "end-to-end-ml-train-env"
+    acr_image_name: str = "end-to-end-ml-train-env"
+    train_experiment_name: str = "end-to-end-ml-train"
+    eval_experiment_name: str = "end-to-end-ml-eval"
+    feature_store_name: str = "end-to-end-ml-fs"
+    feature_set_name: str = "diabetes_features"
+    feature_set_version: str = "1"
+
+
+@dataclass(frozen=True)
 class TrainingConfig:
     """Main configuration for training experiment."""
 
@@ -350,6 +376,7 @@ class TrainingConfig:
     files: TrainFilesConfig = None
     modelregistry: ModelRegistryConfig = None
     ensemble: EnsembleConfig = None
+    azureml: AzureMLConfig = None
     supported_models: SupportedModelsConfig = None
 
 
@@ -374,6 +401,7 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
         "files",
         "modelregistry",
         "ensemble",
+        "azureml",
         "inference",
     }
     unexpected_sections = set(params) - known_sections
@@ -418,5 +446,6 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
             ModelRegistryConfig, params.get("modelregistry", {})
         ),
         ensemble=map_to_dataclass(EnsembleConfig, params.get("ensemble", {})),
+        azureml=map_to_dataclass(AzureMLConfig, params.get("azureml", {})),
         supported_models=supported_models_config,
     )

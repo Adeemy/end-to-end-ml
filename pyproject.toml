@@ -67,6 +67,19 @@ analysis = [
   "ipython>=8.17.2"
 ]
 
+# Azure ML execution backend (src/azureml). Optional and NOT installed by the
+# default `make install`: the v2 SDK + managed feature store target Python
+# 3.11/3.12, so install these in a 3.11/3.12 env (local submit side or the
+# cluster image), not the 3.14 dev env. See docs/azure-ml-refactor-plan.md.
+azure = [
+  "azure-ai-ml>=1.20",
+  "azureml-mlflow>=1.57",
+  "azureml-featurestore>=1.0",
+  "azure-identity>=1.17",
+  "azure-keyvault-secrets>=4.8",
+  "mlflow>=2.16",
+]
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
