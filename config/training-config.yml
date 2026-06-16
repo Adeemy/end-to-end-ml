@@ -170,6 +170,32 @@ models:
       learning_rate: [1e-5, 1e2, true]
       n_estimators: [20, 100, false]
 
+  - name: "extra-trees"
+    estimator: "sklearn.ensemble.ExtraTreesClassifier"
+    enabled: true
+    params:
+      n_jobs: -1
+      class_weight: "balanced"
+    search_space_params:
+      max_features: [1, 2, false]
+      min_samples_leaf: [3, 8, false]
+      min_samples_split: [2, 100, false]
+      max_depth: [3, 8, false]
+      criterion: [["gini", "entropy"], false]
+      n_estimators: [20, 100, false]
+
+  - name: "decision-tree"
+    estimator: "sklearn.tree.DecisionTreeClassifier"
+    enabled: true
+    params:
+      class_weight: "balanced"
+    search_space_params:
+      max_depth: [3, 8, false]
+      min_samples_leaf: [3, 8, false]
+      min_samples_split: [2, 100, false]
+      criterion: [["gini", "entropy"], false]
+      max_features: [1, 2, false]
+
 files:
   historical_data_file_name: "historical_data.parquet"
   preprocessed_dataset_target_file_name: "preprocessed_dataset_target.parquet"
