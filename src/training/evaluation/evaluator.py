@@ -18,10 +18,10 @@ from sklearn.preprocessing import LabelEncoder
 from src.training.evaluation import metrics
 from src.training.evaluation.visualizer import ModelVisualizer
 from src.training.tracking.experiment_tracker import ExperimentTracker
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 class ModelEvaluator(ABC):

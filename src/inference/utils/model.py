@@ -28,10 +28,10 @@ from fastapi import Body
 from sklearn.pipeline import Pipeline
 
 from src.training.schemas import Config
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 def _positive_class_index(model: Pipeline, pos_label: int = 1) -> int:

@@ -24,10 +24,10 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 class SplitStrategy:

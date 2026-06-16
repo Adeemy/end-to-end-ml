@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from src.utils import path
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 
 def test_paths_exist():
@@ -35,8 +35,8 @@ def test_encoded_split_path():
     )
 
 
-def test_get_console_logger(mocker):
-    """Tests if the get_console_logger function returns a logger with the
+def test_get_logger(mocker):
+    """Tests if the get_logger function returns a logger with the
     correct properties."""
 
     # Mock the logging.getLogger, logging.StreamHandler, and logging.Formatter functions
@@ -49,8 +49,8 @@ def test_get_console_logger(mocker):
     )
     mock_formatter = mocker.patch("logging.Formatter", return_value=logging.Formatter())
 
-    # Call the get_console_logger function
-    logger = get_console_logger("test")
+    # Call the get_logger function
+    logger = get_logger("test")
 
     # Check that the logger has the correct name
     assert logger.name == "test"

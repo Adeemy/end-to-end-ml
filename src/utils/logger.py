@@ -15,7 +15,7 @@ class LoggerConfig:
     project: str
 
 
-def get_console_logger(name: str) -> logging.Logger:
+def get_logger(name: str) -> logging.Logger:
     """Creates a console logger. It can be used when only select
     events only needs to be logged but not print messages.
 

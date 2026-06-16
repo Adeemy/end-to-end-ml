@@ -49,14 +49,14 @@ from src.inference.utils.helpers import (
     extract_model_config,
     positive_class_predictions,
 )
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 from src.utils.path import PARENT_DIR
 
 load_dotenv()
 
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 # Champion model configuration (cheap to read at import; no network/file load).
 CONFIG_PARAMS = extract_model_config(

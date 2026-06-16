@@ -30,9 +30,9 @@ config = load_config(
 Centralized logging configuration for consistent output across modules.
 
 ```python
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
-logger = get_console_logger("module_name")
+logger = get_logger("module_name")
 logger.info("Processing started")
 ```
 
@@ -90,11 +90,11 @@ Provides standardized logging configuration across the entire application with s
 **Usage Example**:
 
 ```python
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 # Get module-specific logger
 module_name = Path(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 # Use logger
 logger.info("Processing started")
@@ -107,7 +107,7 @@ logger.error("Error occurred", exc_info=True)
 
 ```python
 # Default console logger with formatted output
-logger = get_console_logger("module_name")
+logger = get_logger("module_name")
 
 # Example output:
 # 2025-11-23 10:00:00,123 - module_name - INFO - Processing started
@@ -220,11 +220,11 @@ files:
 
 ```python
 from pathlib import PosixPath
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 # Standard pattern for module logging
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 def process_data():
     logger.info("Starting data processing")
@@ -310,9 +310,9 @@ ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 ### Error Handling
 
 ```python
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
-logger = get_console_logger(__name__)
+logger = get_logger(__name__)
 
 def safe_operation(func, *args, **kwargs):
     """Wrapper for safe operation execution with logging."""
@@ -375,12 +375,12 @@ def load_yaml(file_path: Path) -> dict:
 
 ```python
 from src.utils.config_loader import load_config
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 from src.utils.path import DATA_DIR, ARTIFACTS_DIR
 from src.training.schemas import Config, build_training_config
 
 # Setup
-logger = get_console_logger("training")
+logger = get_logger("training")
 config = load_config(Config, build_training_config, "config.yml")
 
 # Use throughout training
@@ -393,9 +393,9 @@ model_save_path = ARTIFACTS_DIR / "model.pkl"
 
 ```python
 from src.utils.path import DATA_DIR
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
-logger = get_console_logger("feature_store")
+logger = get_logger("feature_store")
 
 def process_features():
     logger.info("Processing features")
@@ -413,10 +413,10 @@ def process_features():
 
 ```python
 from src.utils.path import ARTIFACTS_DIR
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 import joblib
 
-logger = get_console_logger("inference")
+logger = get_logger("inference")
 
 def load_model():
     model_path = ARTIFACTS_DIR / "champion_model.pkl"

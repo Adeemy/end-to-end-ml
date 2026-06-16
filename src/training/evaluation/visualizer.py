@@ -19,10 +19,10 @@ from sklearn.metrics import (
     roc_curve,
 )
 
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 class ModelVisualizer:

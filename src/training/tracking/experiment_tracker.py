@@ -17,10 +17,10 @@ import numpy as np
 from comet_ml import ExistingExperiment, Experiment
 from matplotlib.figure import Figure
 
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 class ExperimentTracker(ABC):

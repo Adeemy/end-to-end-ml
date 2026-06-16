@@ -34,10 +34,10 @@ from sklearn.pipeline import Pipeline
 from src.training.evaluation import metrics
 from src.training.schemas import SupportedModelsConfig
 from src.training.tracking.experiment_tracker import ExperimentTracker
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 # Metrics for which a *lower* value is better, used to derive the Optuna study
 # direction so a lower-is-better metric (e.g. log_loss) is not optimized

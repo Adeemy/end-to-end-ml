@@ -42,11 +42,11 @@ from src.training.evaluation.selector import ModelSelector
 from src.training.schemas import Config, build_training_config
 from src.training.tracking.experiment import get_tracker_credentials
 from src.utils.config_loader import load_config
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 from src.utils.path import ARTIFACTS_DIR, DATA_DIR, encoded_split_path
 
 module_name: str = PosixPath(__file__).stem
-console_logger = get_console_logger(module_name)
+console_logger = get_logger(module_name)
 
 
 def main(
