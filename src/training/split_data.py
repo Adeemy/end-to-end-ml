@@ -241,13 +241,30 @@ def main(
     training_config = config.data
     files_config = config.files
 
-    preprocessed_data = import_data(
-        training_config=training_config,
-        files_config=files_config,
-        data_dir=data_dir,
-        feast_repo_dir=feast_repo_dir,
-    )
-    logger.info("Preprocessed data imported from feature store.")
+    # Source features from the configured backend. "feast" (default) uses the
+    # local store; "azureml" uses the Azure ML managed feature store (imported
+    # lazily so the local path needs no Azure dependencies).
+    feature_backend = config.train_params.feature_backend.lower()
+    if feature_backend == "azureml":
+        from src.azureml.feature_store import (  # pylint: disable=import-outside-toplevel
+            get_training_features,
+        )
+
+        preprocessed_data = get_training_features(
+            data_config=training_config,
+            files_config=files_config,
+            data_dir=data_dir,
+            azureml_config=config.azureml,
+        )
+        logger.info("Preprocessed data imported from the Azure ML feature store.")
+    else:
+        preprocessed_data = import_data(
+            training_config=training_config,
+            files_config=files_config,
+            data_dir=data_dir,
+            feast_repo_dir=feast_repo_dir,
+        )
+        logger.info("Preprocessed data imported from the Feast feature store.")
 
     training_set, testing_set = split_data(preprocessed_data, training_config)
     logger.info("Preprocessed data split into training and testing sets.")

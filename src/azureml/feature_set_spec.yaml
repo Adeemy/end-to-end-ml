@@ -1,0 +1,63 @@
+# Azure ML feature-set spec for the UCI Diabetes features.
+# Template: point `source.path` at the offline store location where prep_data
+# writes the prepared, UCI-derived data, set the index (entity) + timestamp to
+# match prep_data's output, and enumerate the prepared feature columns. Validate
+# against the installed azureml-featurestore version.
+$schema: http://azureml/sdk-2-0/FeatureSetSpec.json
+
+source:
+  type: parquet
+  path: azureml://datastores/end_to_end_ml_offline_store/paths/diabetes_features/
+  timestamp_column:
+    name: event_timestamp
+
+index_columns:
+  - name: ID
+    type: long
+
+# Point-in-time aggregation window (none needed for the static UCI snapshot).
+# temporal_join_lookback omitted on purpose.
+
+features:
+  - name: BMI
+    type: float
+  - name: PhysHlth
+    type: float
+  - name: Age
+    type: string
+  - name: HighBP
+    type: string
+  - name: HighChol
+    type: string
+  - name: CholCheck
+    type: string
+  - name: Smoker
+    type: string
+  - name: Stroke
+    type: string
+  - name: HeartDiseaseorAttack
+    type: string
+  - name: PhysActivity
+    type: string
+  - name: Fruits
+    type: string
+  - name: Veggies
+    type: string
+  - name: HvyAlcoholConsump
+    type: string
+  - name: AnyHealthcare
+    type: string
+  - name: NoDocbcCost
+    type: string
+  - name: GenHlth
+    type: string
+  - name: MentHlth
+    type: string
+  - name: DiffWalk
+    type: string
+  - name: Sex
+    type: string
+  - name: Education
+    type: string
+  - name: Income
+    type: string
