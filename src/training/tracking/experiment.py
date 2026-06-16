@@ -49,6 +49,14 @@ logger = get_logger(module_name)
 os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
 os.environ.setdefault("MLFLOW_TRACKING_URI", (PARENT_DIR.parent / "mlruns").as_uri())
 
+# MLflow 3.x records a logged model's pip requirements by running ``uv export``
+# on uv.lock when it detects a uv project, then warns at load time if that lock
+# has drifted from the installed environment. Disable the auto-detection so
+# requirements are inferred from the actually-installed packages, keeping the
+# model's recorded dependencies accurate to the environment that produced it
+# (and avoiding noisy lock-vs-environment mismatch warnings).
+os.environ.setdefault("MLFLOW_UV_AUTO_DETECT", "false")
+
 
 class ExperimentManager(ABC):
     """Abstract base class for experiment management.
