@@ -37,6 +37,13 @@ from src.utils.logger import get_console_logger
 module_name: str = PosixPath(__file__).stem
 logger = get_console_logger(module_name)
 
+# MLflow 3.x puts the filesystem tracking backend (e.g. ``./mlruns``) in
+# maintenance mode and raises unless this is set. Keep the repo's file-store
+# workflow (``make view_mlflow``) working by opting in. To use a database
+# backend instead, set MLFLOW_TRACKING_URI (e.g. ``sqlite:///mlflow.db``);
+# setdefault leaves any user-provided value untouched.
+os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
+
 
 class ExperimentManager(ABC):
     """Abstract base class for experiment management.

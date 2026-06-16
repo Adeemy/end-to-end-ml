@@ -1,4 +1,4 @@
-[![CI/CD](https://github.com/Adeemy/end-to-end-ml/actions/workflows/main.yml/badge.svg)](https://github.com/Adeemy/end-to-end-ml/actions/workflows/main.yml)[![python](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org)
+[![CI/CD](https://github.com/Adeemy/end-to-end-ml/actions/workflows/main.yml/badge.svg)](https://github.com/Adeemy/end-to-end-ml/actions/workflows/main.yml)[![python](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.99.1-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
 [![codecov](https://codecov.io/gh/Adeemy/end-to-end-ml/graph/badge.svg?token=LO67YZIGXR)](https://codecov.io/gh/Adeemy/end-to-end-ml)
@@ -157,8 +157,8 @@ Below is the repo structure.
 
 This project uses [uv](https://github.com/astral-sh/uv) to manage dependencies, which are defined in the `pyproject.toml` file. A devcontainer is configured to set up a full-featured development environment and install required dependencies in addition to some useful VS Code extensions. It allows isolating the tools, libraries, and runtimes needed for working with this project codebase, and to use VS Code’s full feature set inside the container. A devcontainer requires [Docker](https://docs.docker.com/engine/install/) to be up and running. It's recommended to use the devcontainer for this project to ensure consistency and reproducibility across different machines and platforms, but if not desired, for whatever reason, you can create a virtual environment and install the python dependencies by running the following commands from the project root:
 
-    python3.10 -m venv .venv
-    source .venv/bin/activate
+    python3.14 -m venv ml_env
+    source ml_env/bin/activate
     make install
 
 #### Environment Variables

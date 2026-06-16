@@ -17,6 +17,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.frozen import FrozenEstimator
 from sklearn.metrics import fbeta_score
 from sklearn.pipeline import Pipeline
 
@@ -116,16 +117,15 @@ class ModelChampionManager:
             valid_features_transformed
         )
 
-        # Calibrate the already-fitted model on the held-out validation set.
-        # NOTE: cv="prefit" is required here. The `model` extracted above was
-        # fitted on the full training set during tuning; passing an integer cv
-        # would make CalibratedClassifierCV clone it and refit on cross-validation
-        # folds of the (small) validation set, discarding the trained model.
-        # "prefit" keeps the trained model and only fits the calibration map.
+        # Calibrate the already-fitted model on the held-out calibration set.
+        # NOTE: the `model` extracted above was fitted on the full training set
+        # during tuning. Wrapping it in FrozenEstimator keeps that trained model
+        # fixed so CalibratedClassifierCV fits ONLY the calibration map (it does
+        # not clone/refit on folds of the small calibration set). This is the
+        # supported replacement for the removed ``cv="prefit"`` (scikit-learn 1.6+).
         calibrator = CalibratedClassifierCV(
-            estimator=model,
+            estimator=FrozenEstimator(model),
             method=("isotonic" if len(valid_class) > 1000 else "sigmoid"),
-            cv="prefit",
         )
         calibrator.fit(valid_features_transformed, valid_class)
 

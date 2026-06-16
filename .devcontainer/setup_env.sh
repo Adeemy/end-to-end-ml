@@ -11,13 +11,13 @@ fi
 
 # Create a virtual environment if it doesn't exist
 echo "Setting up virtual environment..."
-if [ ! -d ".venv" ]; then
-    python3 -m venv .venv
+if [ ! -d "ml_env" ]; then
+    python3 -m venv ml_env
 fi
 
 # Activate the virtual environment for the current script
 echo "Activating virtual environment..."
-source .venv/bin/activate
+source ml_env/bin/activate
 
 # Install/Upgrade uv using pip
 echo "Installing/upgrading uv..."
@@ -26,6 +26,13 @@ pip install -U uv
 # Install all dependencies from pyproject.toml using uv
 echo "Installing project dependencies with uv..."
 uv pip install --link-mode=copy -e '.[dev]'
+
+# Optional extras: feature store (feast) and distributed search (optuna-distributed).
+# Non-fatal: these pin heavier transitive deps that may lag new Python releases;
+# the core dev/test/lint environment works without them.
+echo "Installing optional extras (feature-store, distributed)..."
+uv pip install --link-mode=copy -e '.[feature-store,distributed]' \
+    || echo "Optional extras not installed (unsupported on this Python); continuing."
 
 # Create pytest.ini to filter common warnings from jupyter_client when running tests
 echo "Configuring pytest..."
@@ -44,7 +51,7 @@ sudo apt-get install -y tree # To print project structure
 
 # Add the venv activation command to .bashrc if it's not already there.
 echo "Configuring virtual environment activation in .bashrc..."
-VENV_ACTIVATE_COMMAND="source $(pwd)/.venv/bin/activate"
+VENV_ACTIVATE_COMMAND="source $(pwd)/ml_env/bin/activate"
 if ! grep -qF "$VENV_ACTIVATE_COMMAND" ~/.bashrc; then
     echo "$VENV_ACTIVATE_COMMAND" >> ~/.bashrc
 fi

@@ -18,10 +18,10 @@ jobs:
       # Use cache action to cache the virtual environment (https://stackoverflow.com/a/62639424)
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.10.*
+      - name: Set up Python 3.14.*
         uses: actions/setup-python@v4
         with:
-          python-version: 3.10.*
+          python-version: 3.14.*
 
       - name: Get pip cache dir
         id: pip-cache

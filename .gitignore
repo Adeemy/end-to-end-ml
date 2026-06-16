@@ -173,3 +173,4 @@ cython_debug/
 .localconfig
 .DS_Store
 /mlruns*
+mlflow.db
