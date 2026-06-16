@@ -109,6 +109,18 @@ view_mlflow:
 	  open http://localhost:$$P 2>/dev/null || xdg-open http://localhost:$$P 2>/dev/null || true ) & \
 	MLFLOW_ALLOW_FILE_STORE=true $(VENV_BIN)/mlflow ui --backend-store-uri "file://$(CURDIR)/mlruns" --host 0.0.0.0 --port $$P
 
+# Azure ML: submit training / evaluation as Azure ML jobs. Requires the `azure`
+# optional extra in a Python 3.11/3.12 env (NOT ml_env/3.14) and .env workspace
+# credentials. AZURE_PYTHON points at that interpreter (defaults to `python`).
+# See docs/azure-ml-refactor-plan.md.
+AZURE_PYTHON ?= python
+
+azure_submit_train:
+	$(AZURE_PYTHON) ./src/azureml/submit_train.py --config_yaml_path ./config/training-config.yml $(if $(WAIT),--wait,)
+
+azure_submit_evaluate:
+	$(AZURE_PYTHON) ./src/azureml/submit_evaluate.py --config_yaml_path ./config/training-config.yml $(if $(WAIT),--wait,)
+
 # Test champion model via CLI (batch scoring requires inference.parquet file)
 test_model_cli:
 	$(PYTHON) ./src/inference/predict.py --config_yaml_path ./config/training-config.yml --logger_path ./config/logging.conf
