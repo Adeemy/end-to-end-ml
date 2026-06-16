@@ -1,0 +1,13 @@
+# Submit-side dependencies for the Azure ML jobs (run on the machine that submits
+# jobs - a compute instance, local, or CI - NOT the cluster). Install into a
+# Python 3.11/3.12 environment. The project itself is not installed here
+# (requires-python>=3.14); set PYTHONPATH to the repo root so `import src.*`
+# resolves, or use `make azure_submit_env`.
+azure-ai-ml>=1.20
+azure-identity>=1.17
+azure-keyvault-secrets>=4.8
+azureml-mlflow>=1.57
+azureml-featurestore>=1.0
+pyyaml>=6.0
+python-dotenv>=1.0
+pandas>=2.2

@@ -1,0 +1,24 @@
+# Sample environment file. Copy to .env (git-ignored) and fill in values.
+# This sample is git-ignored as well.
+
+# --- Experiment tracking (Comet ML; optional - MLflow is the default tracker) ---
+COMET_API_KEY=YOUR_COMET_API_KEY
+ENABLE_COMET_LOGGING=false # Required for Comet logging only; leave false for MLflow.
+
+# --- Azure ML workspace (required to submit Azure ML jobs; see src/azureml) ---
+AZURE_SUBSCRIPTION_ID=your-subscription-id
+AZURE_RESOURCE_GROUP=your-resource-group
+AZURE_WORKSPACE_NAME=your-workspace-name
+
+# --- Azure auth ---
+# On an Azure ML compute instance/cluster the managed identity is used
+# automatically (DefaultAzureCredential), so the Service Principal vars below can
+# be left blank. Set them for local or CI submission without a managed identity.
+AZURE_TENANT_ID=
+AZURE_CLIENT_ID=
+AZURE_CLIENT_SECRET=
+
+# --- Optional: resolve the Service Principal secret from Key Vault instead of
+# setting AZURE_CLIENT_SECRET above ---
+AZURE_KEY_VAULT_URL=
+AZURE_CLIENT_SECRET_NAME=

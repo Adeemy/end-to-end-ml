@@ -116,6 +116,7 @@ celerybeat.pid
 .env
 .venv
 ml_env/
+azure_env/
 .eda_venv/
 env/
 venv/

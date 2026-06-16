@@ -109,11 +109,22 @@ view_mlflow:
 	  open http://localhost:$$P 2>/dev/null || xdg-open http://localhost:$$P 2>/dev/null || true ) & \
 	MLFLOW_ALLOW_FILE_STORE=true $(VENV_BIN)/mlflow ui --backend-store-uri "file://$(CURDIR)/mlruns" --host 0.0.0.0 --port $$P
 
-# Azure ML: submit training / evaluation as Azure ML jobs. Requires the `azure`
-# optional extra in a Python 3.11/3.12 env (NOT ml_env/3.14) and .env workspace
+# Azure ML: submit training / evaluation as Azure ML jobs. Requires a Python
+# 3.11/3.12 env (NOT ml_env/3.14) with the submit deps, plus .env workspace
 # credentials. AZURE_PYTHON points at that interpreter (defaults to `python`).
 # See docs/azure-ml-refactor-plan.md.
 AZURE_PYTHON ?= python
+# Interpreter used to CREATE the submit env (azure_submit_env); 3.11/3.12 only.
+AZURE_SUBMIT_PYTHON ?= python3.11
+
+# Create the Azure ML submit-side virtualenv (azure_env) with the submit deps,
+# then run the submit targets against it:
+#   make azure_submit_env
+#   make azure_submit_train AZURE_PYTHON=azure_env/bin/python
+azure_submit_env:
+	$(AZURE_SUBMIT_PYTHON) -m venv azure_env
+	azure_env/bin/python -m pip install -U pip
+	azure_env/bin/python -m pip install -r ./src/azureml/requirements-submit.txt
 
 azure_submit_train:
 	$(AZURE_PYTHON) ./src/azureml/submit_train.py --config_yaml_path ./config/training-config.yml $(if $(WAIT),--wait,)
