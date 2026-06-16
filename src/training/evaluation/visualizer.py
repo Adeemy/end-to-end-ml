@@ -19,10 +19,10 @@ from sklearn.metrics import (
     roc_curve,
 )
 
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 class ModelVisualizer:
@@ -72,6 +72,7 @@ class ModelVisualizer:
                 va="center",
             )
 
+        plt.close(fig)  # release from pyplot; the caller logs the returned figure
         return fig
 
     @staticmethod
@@ -102,6 +103,7 @@ class ModelVisualizer:
         plt.legend(loc="lower right")
         plt.tight_layout()
 
+        plt.close(fig)  # release from pyplot; the caller logs the returned figure
         return fig
 
     @staticmethod
@@ -136,6 +138,7 @@ class ModelVisualizer:
         plt.legend(loc="upper right")
         plt.tight_layout()
 
+        plt.close(fig)  # release from pyplot; the caller logs the returned figure
         return fig
 
     @staticmethod
@@ -158,6 +161,7 @@ class ModelVisualizer:
         fig = plt.gcf()
         plt.tight_layout()
 
+        plt.close(fig)  # release from pyplot; the caller logs the returned figure
         return fig
 
     @staticmethod
@@ -180,4 +184,5 @@ class ModelVisualizer:
         fig = plt.gcf()
         plt.tight_layout()
 
+        plt.close(fig)  # release from pyplot; the caller logs the returned figure
         return fig

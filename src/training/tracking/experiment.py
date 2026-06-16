@@ -24,6 +24,7 @@ from typing import Any, Dict, Optional
 import joblib
 import mlflow
 import mlflow.sklearn
+import pandas as pd
 from comet_ml import Experiment as CometExperiment
 from sklearn.pipeline import Pipeline
 
@@ -32,10 +33,30 @@ from src.training.tracking.experiment_tracker import (
     ExperimentTracker,
     MLflowExperimentTracker,
 )
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
+from src.utils.path import PARENT_DIR
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
+
+# MLflow 3.x changed defaults: the filesystem backend is in maintenance mode (it
+# raises unless MLFLOW_ALLOW_FILE_STORE is set), and when no ``mlruns`` directory
+# exists MLflow now falls back to a repo-root SQLite DB (``mlflow.db``). To keep
+# the repo's intended file-store workflow (``mlruns/`` + ``make view_mlflow``) and
+# avoid surprise SQLite databases (and their lock/read-only issues), pin the
+# tracking URI to the local ``mlruns`` store and opt in to the file backend.
+# Both use setdefault, so a user-provided MLFLOW_TRACKING_URI (remote server,
+# ``sqlite:///mlflow.db``, etc.) or MLFLOW_ALLOW_FILE_STORE is respected.
+os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
+os.environ.setdefault("MLFLOW_TRACKING_URI", (PARENT_DIR.parent / "mlruns").as_uri())
+
+# MLflow 3.x records a logged model's pip requirements by running ``uv export``
+# on uv.lock when it detects a uv project, then warns at load time if that lock
+# has drifted from the installed environment. Disable the auto-detection so
+# requirements are inferred from the actually-installed packages, keeping the
+# model's recorded dependencies accurate to the environment that produced it
+# (and avoiding noisy lock-vs-environment mismatch warnings).
+os.environ.setdefault("MLFLOW_UV_AUTO_DETECT", "false")
 
 
 class ExperimentManager(ABC):
@@ -133,6 +154,7 @@ class ExperimentManager(ABC):
         pipeline: Pipeline,
         registered_model_name: str,
         artifacts_path: str = "model",
+        input_example: Optional[pd.DataFrame] = None,
     ) -> None:
         """Saves and registers the model.
 
@@ -141,6 +163,7 @@ class ExperimentManager(ABC):
             pipeline: Fitted pipeline object.
             registered_model_name: Name of the registered model.
             artifacts_path: Path to save model artifacts.
+            input_example: Optional sample of raw features for signature inference.
         """
         raise NotImplementedError
 
@@ -337,6 +360,7 @@ class CometExperimentManager(ExperimentManager):
         pipeline: Pipeline,
         registered_model_name: str,
         artifacts_path: str = "model",
+        input_example: Optional[pd.DataFrame] = None,  # pylint: disable=unused-argument
     ) -> None:
         """Saves and registers the model to Comet experiment.
 
@@ -345,6 +369,7 @@ class CometExperimentManager(ExperimentManager):
             pipeline: Fitted pipeline object.
             registered_model_name: Name of the registered model.
             artifacts_path: Path to save model artifacts.
+            input_example: Unused for Comet (kept for interface parity).
         """
         # Ensure artifacts directory exists
         artifacts_dir = Path(artifacts_path)
@@ -406,8 +431,12 @@ class MLflowExperimentManager(ExperimentManager):
         return credentials
 
     def get_base_config(self, experiment_kwargs: Dict[str, Any]) -> Dict[str, Any]:
-        """Get MLflow specific base configuration."""
-        return {}  # MLflow uses experiment_name directly
+        """Get MLflow specific base configuration.
+
+        Passes the project name so evaluation runs log to the project experiment
+        (named by experiment_name as the run), instead of MLflow's Default.
+        """
+        return {"project_name": experiment_kwargs.get("project_name")}
 
     def should_initialize_project(self, config_params: Dict[str, Any]) -> bool:
         """MLflow doesn't require explicit project initialization."""
@@ -438,21 +467,24 @@ class MLflowExperimentManager(ExperimentManager):
         """
 
         try:
-            # Enable autologging for automatic tracing and logging
-            # This captures model artifacts, parameters, metrics, and traces automatically
-            mlflow.autolog(
-                log_input_examples=False,
-                log_model_signatures=True,
-                log_models=True,
-                disable=False,
-                exclusive=False,
-                disable_for_unsupported_versions=False,
-                silent=False,
-            )
+            # Disable MLflow autologging during training. All Optuna trials share
+            # a single MLflow run, but autolog logs each trial's fit
+            # hyperparameters as run *params*, which are immutable in MLflow: the
+            # second trial's differing value (e.g. colsample_bytree) raises
+            # "Changing param values is not allowed" and aborts autologging for
+            # every trial after the first. (Autolog also re-logs metrics on every
+            # fit and logs a model per trial via MLflow 3.x's deprecated
+            # `artifact_path` API.) Everything needed is logged explicitly: the
+            # search metric per trial, the best model's params/metrics, the study
+            # trials CSV, and champion registration.
+            mlflow.autolog(disable=True)
 
-            # Set experiment and start run with proper context
+            # Set experiment and start run with proper context. Tag run_type so
+            # the UI separates these train_* runs from eval_* runs in the same
+            # experiment.
             mlflow.set_experiment(project_name)
             run = mlflow.start_run(run_name=experiment_name)
+            mlflow.set_tag("run_type", "training")
             return run
         except Exception as e:
             raise ValueError(f"MLflow experiment creation error --> {e}") from e
@@ -505,6 +537,7 @@ class MLflowExperimentManager(ExperimentManager):
         pipeline: Pipeline,
         registered_model_name: str,
         artifacts_path: str = "model",
+        input_example: Optional[pd.DataFrame] = None,
     ) -> None:
         """Saves and registers the model to MLflow.
 
@@ -513,14 +546,36 @@ class MLflowExperimentManager(ExperimentManager):
             pipeline: Fitted pipeline object.
             registered_model_name: Name of the registered model.
             artifacts_path: Path to save model artifacts.
+            input_example: Optional sample of raw features; when given, the
+                model's signature is inferred and attached with the example.
         """
 
         # Log the model to MLflow
         try:
+            signature = None
+            if input_example is not None:
+                try:
+                    from mlflow.models import (  # pylint: disable=import-outside-toplevel
+                        infer_signature,
+                    )
+
+                    signature = infer_signature(
+                        input_example, pipeline.predict(input_example)
+                    )
+                except Exception as sig_err:  # pylint: disable=broad-except
+                    logger.warning(
+                        "Could not infer signature for %s: %s",
+                        registered_model_name,
+                        sig_err,
+                    )
+                    input_example = None
+
             mlflow.sklearn.log_model(
                 sk_model=pipeline,
                 name=registered_model_name,
                 registered_model_name=registered_model_name,
+                signature=signature,
+                input_example=input_example,
             )
 
             # Also save model locally for consistency with Comet implementation

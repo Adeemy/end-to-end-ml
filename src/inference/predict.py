@@ -7,13 +7,13 @@ input data in parquet format.
 
 Usage:
     # Batch prediction from parquet file (run from project root)
-    python src/inference/predict.py --config_yaml_path ./src/config/training-config.yml --input_file data.parquet
+    python src/inference/predict.py --config_yaml_path ./config/training-config.yml --input_file data.parquet
 
     # With custom output file
-    python src/inference/predict.py --config_yaml_path ./src/config/training-config.yml --input_file data.parquet --output_file predictions.parquet
+    python src/inference/predict.py --config_yaml_path ./config/training-config.yml --input_file data.parquet --output_file predictions.parquet
 
     # Using config defaults (input/output paths from config file)
-    python src/inference/predict.py --config_yaml_path ./src/config/training-config.yml
+    python src/inference/predict.py --config_yaml_path ./config/training-config.yml
 
 Supports both MLflow and Comet ML model registries for loading trained models.
 """
@@ -27,12 +27,12 @@ from dotenv import load_dotenv
 
 from src.inference.utils.helpers import predict_from_file
 from src.training.schemas import Config
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 load_dotenv()
 
 module_name: str = PosixPath(__file__).stem
-console_logger = get_console_logger(module_name)
+console_logger = get_logger(module_name)
 
 # Required API keys for model loading
 COMET_API_KEY = os.environ.get("COMET_API_KEY")

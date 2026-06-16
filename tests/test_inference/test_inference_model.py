@@ -21,7 +21,7 @@ def model_loader():
 def test_get_config_params(model_loader):  # pylint: disable=redefined-outer-name
     """Tests that get_config_params returns the correct configuration parameters."""
 
-    config_yaml_abs_path = f"{str(PARENT_DIR)}/config/training-config.yml"
+    config_yaml_abs_path = f"{str(PARENT_DIR.parent)}/config/training-config.yml"
 
     config = Config(config_path=config_yaml_abs_path)
     tracker_type = config.params["train"]["experiment_tracker"]

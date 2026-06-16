@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.frozen import FrozenEstimator
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -49,8 +50,8 @@ def fitted_pipeline_fixture(binary_data):
     return pipeline
 
 
-def test_calibrate_pipeline_uses_prefit(binary_data, fitted_pipeline):
-    """Calibration must keep the trained model (cv='prefit'), not refit it."""
+def test_calibrate_pipeline_keeps_trained_model_frozen(binary_data, fitted_pipeline):
+    """Calibration must keep the trained model fixed (FrozenEstimator), not refit it."""
     features, labels = binary_data
     trained_classifier = fitted_pipeline.named_steps["classifier"]
     original_coef = trained_classifier.coef_.copy()
@@ -62,8 +63,10 @@ def test_calibrate_pipeline_uses_prefit(binary_data, fitted_pipeline):
     )
     calibrator = calibrated.named_steps["classifier"]
     assert isinstance(calibrator, CalibratedClassifierCV)
-    assert calibrator.cv == "prefit"
-    # The prefit estimator is the same trained object — coefficients unchanged.
+    # The trained model is wrapped frozen so only the calibration map is fit
+    # (the supported replacement for the removed cv="prefit").
+    assert isinstance(calibrator.estimator, FrozenEstimator)
+    # The frozen estimator is the same trained object -> coefficients unchanged.
     assert np.allclose(trained_classifier.coef_, original_coef)
 
 
@@ -89,3 +92,58 @@ def test_save_model_metadata_roundtrip(tmp_path):
         metadata = json.load(handle)
     assert metadata["decision_threshold"] == pytest.approx(0.42)
     assert metadata["encoded_pos_class_label"] == 1
+
+
+def test_select_best_performer_picks_highest_metric():
+    """select_best_performer returns the model with the highest tracked metric."""
+    from unittest.mock import MagicMock  # pylint: disable=import-outside-toplevel
+
+    lr_tracker = MagicMock()
+    lr_tracker.get_metric.return_value = 0.70
+    rf_tracker = MagicMock()
+    rf_tracker.get_metric.return_value = 0.85
+    manager = ModelChampionManager(champ_model_name="champion")
+
+    best = manager.select_best_performer(
+        trackers={"lr": lr_tracker, "rf": rf_tracker},
+        comparison_metric="valid_roc_auc",
+    )
+    assert best == "rf"
+
+
+def test_select_best_performer_raises_without_scores():
+    """A metric absent from every tracker raises rather than guessing."""
+    from unittest.mock import MagicMock  # pylint: disable=import-outside-toplevel
+
+    tracker = MagicMock()
+    tracker.get_metric.return_value = None
+    manager = ModelChampionManager(champ_model_name="champion")
+    with pytest.raises(ValueError):
+        manager.select_best_performer(
+            trackers={"lr": tracker}, comparison_metric="valid_roc_auc"
+        )
+
+
+def test_log_and_register_champ_model_writes_and_registers(tmp_path, fitted_pipeline):
+    """log_and_register_champ_model dumps the pkl and calls the tracker once each."""
+    from unittest.mock import MagicMock  # pylint: disable=import-outside-toplevel
+
+    tracker = MagicMock()
+    manager = ModelChampionManager(champ_model_name="champion", tracker=tracker)
+    manager.log_and_register_champ_model(
+        local_path=str(tmp_path), pipeline=fitted_pipeline
+    )
+
+    assert (tmp_path / "champion.pkl").exists()
+    tracker.log_model.assert_called_once()
+    tracker.register_model.assert_called_once()
+    tracker.end.assert_called_once()
+
+
+def test_log_and_register_requires_tracker(tmp_path, fitted_pipeline):
+    """Registration without a configured tracker raises."""
+    manager = ModelChampionManager(champ_model_name="champion", tracker=None)
+    with pytest.raises(ValueError):
+        manager.log_and_register_champ_model(
+            local_path=str(tmp_path), pipeline=fitted_pipeline
+        )

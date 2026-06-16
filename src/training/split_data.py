@@ -28,11 +28,11 @@ from src.training.schemas import (
     build_training_config,
 )
 from src.utils.config_loader import load_config
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 from src.utils.path import DATA_DIR, FEATURE_REPO_DIR
 
 module_name: str = PosixPath(__file__).stem
-console_logger = get_console_logger(module_name)
+console_logger = get_logger(module_name)
 
 
 def load_training_config(config_yaml_path: str) -> TrainingConfig:

@@ -1,300 +1,168 @@
-[![CI/CD](https://github.com/Adeemy/end-to-end-ml/actions/workflows/main.yml/badge.svg)](https://github.com/Adeemy/end-to-end-ml/actions/workflows/main.yml)[![python](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org)
+[![CI/CD](https://github.com/Adeemy/end-to-end-ml/actions/workflows/main.yml/badge.svg)](https://github.com/Adeemy/end-to-end-ml/actions/workflows/main.yml)[![python](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.99.1-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
 [![codecov](https://codecov.io/gh/Adeemy/end-to-end-ml/graph/badge.svg?token=LO67YZIGXR)](https://codecov.io/gh/Adeemy/end-to-end-ml)
 
 # End-to-end ML
 
-An end-to-end ML project for tabular data that incorporates software engineering principles in machine learning. It spans the whole lifecycle of a ML model, from data exploration, preprocessing, feature engineering, model selection, training, evaluation, to deployment.
+An end-to-end ML project for tabular data covering the full lifecycle of a classifier: data exploration, preprocessing, feature engineering, model selection, training, evaluation, and deployment.
 
-The project leverages the Diabetes Health Indicators public dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators). The dataset comprises various information about patients, such as demographics, lab results, and self-reported health history. The goal is to develop a classifier that can discern whether a patient has diabetes, is pre-diabetic, or healthy.
-
-The project adheres to best practices of machine learning engineering, such as modular code, documentation, testing, logging, configuration, and version control. The project also demonstrates how to utilize various tools and frameworks, such as pandas, scikit-learn, [feast](https://feast.dev), [optuna](https://optuna.org), experiment tracking using [MLflow](https://mlflow.org) (default) and [Comet](https://www.comet.com/site/), and Docker, to facilitate the ML workflow and enhance the model performance.
+The project uses the Diabetes Health Indicators dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators) (patient demographics, lab results, and self-reported health history) to predict whether a patient is diabetic. It applies ML engineering practices (modular code, tests, logging, YAML configuration, version control) and tools including pandas, scikit-learn, [Feast](https://feast.dev) (feature store), [Optuna](https://optuna.org) (hyperparameter search), experiment tracking with [MLflow](https://mlflow.org) (default) or [Comet](https://www.comet.com/site/), and Docker.
 
 ## Key Features
 
-- **Configurable Pipeline**: YAML-based configuration for easy parameter tuning
-- **Hyperparameter Optimization**: Automated tuning using Optuna
-- **Experiment Tracking**: Complete experiment management with MLflow (default) and Comet ML support
-- **Feature Engineering**: Feast-based feature store for consistent data processing
-- **Model Evaluation**: F-beta score optimization with configurable precision/recall weighting
-- **Containerized Deployment**: Docker-based model serving with REST API
-- **CI/CD Integration**: GitHub Actions for automated testing and deployment
-- **Reproducible Environment**: Dev containers and dependency management with uv
+- **Config-driven models**: add or remove a model by editing the `models:` list in `config/training-config.yml`; no code change.
+- **Hyperparameter search**: per-model Optuna search spaces, optionally with stratified K-fold CV.
+- **Variance-aware selection**: champion chosen by a 1-SE rule over candidate scores, then calibrated and gated on a held-out test set.
+- **Experiment tracking**: MLflow (default, local file store) or Comet ML, switchable in config.
+- **Serving**: CLI batch scoring (`predict.py`) and a FastAPI REST service (`api_server.py`), containerized with Docker.
+- **Reproducible environment**: dev container and `uv`-managed dependencies.
 
 ## Project Structure
 
-- **`notebooks/`**: Exploratory data analysis and baseline model development (only directory for notebooks)
-- **`src/config/`**: YAML configuration files for data processing and training
-- **`src/feature/`**: Data ingestion, preprocessing, and feature engineering
-- **`src/training/`**: Model training, hyperparameter optimization, and evaluation
-- **`src/inference/`**: Model serving with CLI batch scoring (`predict.py`) and REST API service (`api_server.py`)
-- **`src/utils/`**: Shared utilities, logging, and configuration management
-- **`tests/`**: Unit tests for ML components and pipeline validation
+- **`notebooks/`**: exploratory data analysis and baseline model development.
+- **`config/`**: YAML configuration for the feature store and training.
+- **`src/feature/`**: data ingestion, preprocessing, and the Feast feature store.
+- **`src/training/`**: training, hyperparameter search, the model factory, evaluation, and champion selection.
+- **`src/inference/`**: serving - CLI batch scoring (`predict.py`) and the REST API (`api_server.py`).
+- **`src/utils/`**: shared logging, paths, and config loading.
+- **`tests/`**: unit tests for the feature, training, and inference components.
 
-### ML Pipeline Flow
+```
+.
+├── config/                feature-store-config.yml, training-config.yml, logging.conf
+├── Makefile, pyproject.toml
+└── src/
+    ├── feature/           generate_initial_data.py, prep_data.py, feature_repo/ (Feast)
+    ├── training/          train.py, evaluate.py, split_data.py
+    │   ├── core/          optimizer.py, trainer.py, ensemble.py, model_factory.py
+    │   ├── evaluation/    orchestrator.py, evaluator.py, champion.py, selector.py
+    │   └── tracking/      experiment.py, experiment_tracker.py
+    ├── inference/         predict.py, api_server.py, utils/model.py, Dockerfile
+    └── utils/             config_loader.py, logger.py, path.py
+```
 
-1. **Data Preparation** (`split_data.py`): Load from feature store → create train/validation/test splits
-2. **Training** (`train.py`): Hyperparameter optimization → model training → experiment tracking
-3. **Evaluation** (`evaluate.py`): Model selection based on validation set → testign set evaluation → champion registration if meets deployment criteria
-4. **Deployment**: Containerized model serving via REST API
+### ML pipeline flow
 
-Below is the repo structure.
+1. **Split** (`split_data.py`): load from the feature store and create train/validation/calibration/test splits.
+2. **Train** (`train.py`): per-model Optuna search, fit, and register each enabled model with the tracker.
+3. **Evaluate** (`evaluate.py`): rank candidates on the validation set, calibrate the best, evaluate on the held-out test set, and register it as champion if it clears the deployment gate.
+4. **Serve**: load the champion for batch scoring or via the REST API.
 
-        end-to-end-ml
-        ├── LICENSE
-        ├── Makefile
-        ├── README.md
-        ├── dist
-        │   ├── end_to_end_ml-0.1.0-py3-none-any.whl
-        │   └── end_to_end_ml-0.1.0.tar.gz
-        ├── docs
-        ├── examples
-        ├── img
-        │   └── feast_workflow.png
-        ├── notebooks
-        │   ├── eda.ipynb
-        │   └── utils.py
-        ├── pyproject.toml
-        ├── pytest.ini
-        ├── scripts
-        ├── src
-        │   ├── __init__.py
-        │   ├── config
-        │   │   ├── feature-store-config.yml
-        │   │   ├── logging.conf
-        │   │   └── training-config.yml
-        │   ├── end_to_end_ml.egg-info
-        │   │   ├── PKG-INFO
-        │   │   ├── SOURCES.txt
-        │   │   ├── dependency_links.txt
-        │   │   ├── requires.txt
-        │   │   └── top_level.txt
-        │   ├── feature
-        │   │   ├── README.md
-        │   │   ├── __init__.py
-        │   │   ├── feature_repo
-        │   │   │   ├── data
-        │   │   │   │   ├── historical_data.parquet
-        │   │   │   │   ├── inference.parquet
-        │   │   │   │   ├── online_store.db
-        │   │   │   │   ├── preprocessed_dataset_features.parquet
-        │   │   │   │   ├── preprocessed_dataset_target.parquet
-        │   │   │   │   ├── raw_dataset.parquet
-        │   │   │   │   ├── registry.db
-        │   │   │   │   ├── test.parquet
-        │   │   │   │   ├── train.parquet
-        │   │   │   │   └── validation.parquet
-        │   │   │   ├── define_feature.py
-        │   │   │   └── feature_store.yaml
-        │   │   ├── generate_initial_data.py
-        │   │   ├── prep_data.py
-        │   │   ├── schemas.py
-        │   │   └── utils
-        │   │       ├── __init__.py
-        │   │       ├── data.py
-        │   │       └── prep.py
-        │   ├── inference
-        │   │   ├── Dockerfile
-        │   │   ├── README.md
-        │   │   ├── __init__.py
-        │   │   ├── api_server.py
-        │   │   ├── predict.py
-        │   │   └── utils
-        │   │       ├── __init__.py
-        │   │       └── model.py
-        │   ├── training
-        │   │   ├── README.md
-        │   │   ├── __init__.py
-        │   │   ├── artifacts
-        │   │   │   ├── champion_model.pkl
-        │   │   │   └── study_LGBMClassifier.csv
-        │   │   ├── core
-        │   │   │   ├── __init__.py
-        │   │   │   ├── ensemble.py
-        │   │   │   ├── optimizer.py
-        │   │   │   └── trainer.py
-        │   │   ├── evaluate.py
-        │   │   ├── evaluation
-        │   │   │   ├── __init__.py
-        │   │   │   ├── champion.py
-        │   │   │   ├── evaluator.py
-        │   │   │   ├── orchestrator.py
-        │   │   │   ├── selector.py
-        │   │   │   └── visualizer.py
-        │   │   ├── schemas.py
-        │   │   ├── split_data.py
-        │   │   ├── tracking
-        │   │   │   ├── __init__.py
-        │   │   │   ├── experiment.py
-        │   │   │   ├── experiment_tracker.py
-        │   │   │   └── study_logger.py
-        │   │   └── train.py
-        │   └── utils
-        │       ├── README.md
-        │       ├── __init__.py
-        │       ├── config_loader.py
-        │       ├── logger.py
-        │       └── path.py
-        ├── tests
-        │   ├── __init__.py
-        │   ├── test_feature
-        │   │   ├── test_data_preprocessor.py
-        │   │   ├── test_data_splitter.py
-        │   │   ├── test_data_transformer.py
-        │   │   └── test_feature_store_config.py
-        │   ├── test_inference
-        │   │   └── test_inference_model.py
-        │   ├── test_training
-        │   │   ├── test_data_utils.py
-        │   │   ├── test_job.py
-        │   │   ├── test_training_config.py
-        │   │   └── test_training_model.py
-        │   └── test_utils.py
-        └── uv.lock
+## Environment setup
 
-### Environment setup & usage
+The project uses [uv](https://github.com/astral-sh/uv) to manage dependencies (defined in `pyproject.toml`). A dev container is provided for a reproducible environment and is the recommended path; it requires [Docker](https://docs.docker.com/engine/install/). To set up a local virtual environment instead, run from the project root:
 
-This project uses [uv](https://github.com/astral-sh/uv) to manage dependencies, which are defined in the `pyproject.toml` file. A devcontainer is configured to set up a full-featured development environment and install required dependencies in addition to some useful VS Code extensions. It allows isolating the tools, libraries, and runtimes needed for working with this project codebase, and to use VS Code’s full feature set inside the container. A devcontainer requires [Docker](https://docs.docker.com/engine/install/) to be up and running. It's recommended to use the devcontainer for this project to ensure consistency and reproducibility across different machines and platforms, but if not desired, for whatever reason, you can create a virtual environment and install the python dependencies by running the following commands from the project root:
-
-    python3.10 -m venv .venv
-    source .venv/bin/activate
+    python3.14 -m venv ml_env
+    source ml_env/bin/activate
     make install
 
-#### Environment Variables
+### Experiment tracker credentials
 
-**MLflow** is used as the default experiment tracker and requires no additional configuration.
-
-When using **Comet ML as the experiment tracker**, set these environment variables:
+MLflow is the default tracker and needs no configuration; it logs to a local `./mlruns` file store. To use Comet ML instead, set `experiment_tracker: "comet"` in `config/training-config.yml` and provide:
 
     COMET_API_KEY=your_comet_api_key
     ENABLE_COMET_LOGGING=true
 
-The `ENABLE_COMET_LOGGING` variable ensures proper import order for automatic logging. For MLflow, these variables are not needed.
+`ENABLE_COMET_LOGGING` ensures `comet_ml` is imported early enough for auto-logging. Copy `.env_template` to `.env` and add your keys (`cp .env_template .env`).
 
-Copy `.env_template` to `.env` and add your API keys:
+## Configuring models
 
-    cp .env_template .env
-    # Edit .env with your actual API keys
+The set of models to train is the `models:` list in `config/training-config.yml`. Each entry is self-contained and resolved by the model factory (`src/training/core/model_factory.py`), which imports the estimator class and instantiates it. **Adding a model is config-only** - append an entry with any scikit-learn-compatible classifier; no code change is needed.
 
-#### Pipeline Commands
+```yaml
+models:
+  - name: "lightgbm"                       # registered model name + experiment key
+    estimator: "lightgbm.LGBMClassifier"   # importable class path, resolved via importlib
+    enabled: true                          # whether this model is trained
+    params:                                # fixed estimator kwargs
+      objective: "binary"
+      class_weight: "balanced"
+    search_space_params:                   # Optuna search space
+      max_depth: [3, 8, false]             #   numeric: [min, max, log_scale]
+      learning_rate: [1e-4, 1e-1, true]
+      n_estimators: [20, 100, false]
+  - name: "xgboost"
+    estimator: "xgboost.XGBClassifier"
+    enabled: false
+    params:
+      objective: "binary:logistic"
+      scale_pos_weight: "${scale_pos_weight}"  # runtime placeholder: train-set neg/pos ratio
+    search_space_params:
+      criterion: [["gini", "entropy"], false]  # categorical: [[choices], false]
+```
 
-The training and deployment pipelines can be run in GitHub Actions. You can also run the following commands in CLI to implement all steps from generating raw dataset to pulling packaged model:
+- Set `enabled: true`/`false` to include or exclude a model from training.
+- A param value of the form `"${scale_pos_weight}"` is substituted at runtime with the train-set negative/positive ratio (class-imbalance weighting).
+- `ensemble: {enabled: true}` trains a soft-voting ensemble over the enabled base models. `modelregistry` holds the ensemble and champion registered names.
 
-- Import raw dataset from [UCI](https://archive.ics.uci.edu/dataset/891/cdc+diabetes+health+indicators) and generate raw dataset for training and inference set (5% holdout) to simulate production data
+## Running the pipeline
 
-        make gen_init_data
+Each stage is a `make` target (also wired into GitHub Actions):
 
-- Preprocess data before ingesting it by feature store
+| Command | What it does |
+|---|---|
+| `make gen_init_data` | Import the raw UCI dataset and hold out a 5% inference set. |
+| `make prep_data` | Preprocess data before feature-store ingestion. |
+| `make setup_feast` | Set up the Feast feature store. |
+| `make split_data` | Create train/validation/calibration/test splits from the feature store. |
+| `make train` | **Training only**: Optuna search, fit, and register each enabled model. Requires existing splits; does not select or deploy a champion. |
+| `make evaluate` | Select the champion among the most recent runs, calibrate it, evaluate on the test set, and deploy it if it clears the gate. |
+| `make submit_train` | **Full pipeline**: `prep_data` → `split_data` → `train` → `evaluate`. |
 
-        make prep_data
+### `train` vs `evaluate` vs `submit_train`
 
-- Setup feature store
+- **`make train`** runs the training stage alone. It assumes the data splits already exist (from `make split_data`) and stops after fitting and registering the enabled models. It does no model selection.
+- **`make evaluate`** runs the selection-and-deployment stage on its own. By default it evaluates the most recent training run, discovered live from the tracking store (the latest registered version of each enabled model). To evaluate a specific MLflow run instead:
 
-        make setup_feast
+      make evaluate RUN_ID=<mlflow_run_id>
 
-- Split dataset extracted from feature store
+- **`make submit_train`** chains the data, training, and evaluation stages end-to-end (`prep_data → split_data → train → evaluate`), taking preprocessed data through to a deployed champion in one command.
 
-        make split_data
+### Browsing experiments
 
-- Submit training job
+Launch the MLflow UI to view and compare training and evaluation runs:
 
-        make train
+    make view_mlflow          # serves http://localhost:8080
+    make view_mlflow PORT=8088 # override the port
 
-- Evaluate models
+Use this target, not a bare `mlflow ui`. MLflow 3.x refuses the local `./mlruns`
+file store in "maintenance mode" unless `MLFLOW_ALLOW_FILE_STORE=true` is set;
+`make view_mlflow` sets it and points at this repo's `mlruns`, so it works right
+after a clone and a training run.
 
-        make evaluate
+## Champion selection and deployment gate
 
-**Champion Model Registration:**
-The evaluation process automatically:
-- Selects the best performing model based on validation metrics from both training and evaluation runs
-- Registers it as "champion_model" in the experiment tracker's model registry with complete artifacts
-- Saves it locally as `src/training/artifacts/champion_model.pkl` for deployment
-- Includes all necessary files: model.pkl, MLmodel metadata, environment specs, and dependencies
-- Ensures the model meets deployment criteria before registration
-- Provides production-ready model accessible via `models:/champion_model/latest`
-- Both training and evaluation runs log complete model artifacts for full traceability
-- The packaged model includes the complete preprocessing pipeline to ensure consistent feature transformations during inference
+`make evaluate` ranks candidate models on the validation set, selects the champion using a 1-SE rule (the simplest model within one standard error of the best), calibrates it on the calibration split, and evaluates the calibrated model on the untouched test set. The champion is deployed only if its test score clears `deployment_score_thresh` in the config. When deployed, it is:
 
-- **Test champion model via API (batch scoring)**
+- registered with the tracker under `champion_model_name` (default `champion_model`), and
+- saved to `src/training/artifacts/champion_model.pkl` with its decision threshold in `champion_model_metadata.json`.
 
-        make test_api_cli
+The saved champion is a calibrated pipeline that includes preprocessing, so inference takes raw input and applies the same transformations used in training.
 
-- **Batch prediction on parquet files**
+## Inference and serving
 
-        # Predict on inference.parquet file
-        make predict_batch
+Serving loads the champion from the tracker registry, falling back to the local `champion_model.pkl` if the registry lookup misses.
 
-        # Predict on custom parquet files
-        make predict_batch_custom INPUT_FILE=./src/feature/feature_repo/data/inference.parquet OUTPUT_FILE=./src/inference/artifacts/batch_predictions.parquet
+**Batch scoring (CLI):**
 
-- **Start REST API server for real-time predictions**
+    make test_api_cli                  # score the built-in sample rows
+    make predict_batch                 # score src/feature/feature_repo/data/inference.parquet
+    make predict_batch_custom INPUT_FILE=path/to/input.parquet OUTPUT_FILE=path/to/output.parquet
 
-        make start_api_server
-        # Then visit http://localhost:8000/docs to test the API
+**REST API (FastAPI):**
 
-- **Test API server with sample data**
+    make start_api_server              # serve at http://localhost:8000 (docs at /docs)
+    make test_api_with_sample          # POST sample rows to a running server
+    make test_api_full                 # start server -> test health + /predict -> stop
+    make help_api                      # list the API/CLI testing commands
 
-        # Option 1: Test against running server
-        make test_api_with_sample
+**Containerized model** (example image tag):
 
-        # Option 2: Full end-to-end test (start → test → stop)
-        make test_api_full
+    docker pull ghcr.io/adeemy/end-to-end-ml:<image-tag>
 
-        # Show all API testing options
-        make help_api
+## Testing and code quality
 
-- **Pull containerized model**
-
-        docker pull ghcr.io/adeemy/end-to-end-ml:c35fb9610651e155d7a3799644e6ff64c1a5a2db
-
-## Experiment Tracking
-
-This project supports both Comet ML and MLflow for experiment tracking. You can switch between them by modifying the `experiment_tracker` parameter in `src/config/training-config.yml`.
-
-### Using Comet ML
-
-Set `experiment_tracker: "comet"` in the training configuration. Experiments will be tracked in your Comet workspace with the configured project name.
-
-### Using MLflow
-
-Set `experiment_tracker: "mlflow"` in the training configuration.
-
-#### Viewing MLflow Dashboard
-
-To view the MLflow web interface and track your experiments:
-
-1. **Start MLflow UI server:**
-   ```bash
-   mlflow ui --host 0.0.0.0 --port 8080
-   ```
-
-2. **If the dashboard appears blank, try with additional security options:**
-   ```bash
-   mlflow ui --host 0.0.0.0 --port 8080 --allowed-hosts "*"
-   ```
-
-3. **For persistent background running:**
-   ```bash
-   nohup mlflow ui --host 0.0.0.0 --port 8080 --allowed-hosts "*" > mlflow.log 2>&1 &
-   ```
-
-4. **Access the dashboard:**
-   - **Local development:** Open http://localhost:8080 in your browser
-   - **Dev container/Codespaces:** Use VS Code's port forwarding or `"$BROWSER" http://localhost:8080`
-   - **Remote server:** Replace `localhost` with your server's IP address
-
-5. **Dashboard features:**
-   - View all experiments and runs
-   - Compare metrics and parameters across runs
-   - Download model artifacts
-   - Visualize experiment results and trends
-
-**Troubleshooting blank dashboard:**
-- **Check if server is running**: `curl -I http://localhost:8080` should return HTTP 200
-- **JavaScript issues**: Ensure JavaScript is enabled in your browser
-- **Browser compatibility**: Try different browsers (Chrome, Firefox, Edge)
-- **Port forwarding**: In VS Code dev containers, use the "Ports" tab to forward port 8080
-- **Try different port**: Use `--port 8088` if port 8080 has conflicts
-
-The MLflow tracking server will automatically detect experiments logged to the default `./mlruns` directory.
+    make test     # pytest + coverage
+    make lint     # pylint
+    make format   # isort + black

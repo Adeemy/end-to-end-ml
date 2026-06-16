@@ -5,30 +5,23 @@ and a concrete implementation for classification model evaluation.
 
 from abc import ABC, abstractmethod
 from pathlib import PosixPath
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike
 from sklearn.calibration import CalibrationDisplay
-from sklearn.metrics import (
-    accuracy_score,
-    confusion_matrix,
-    f1_score,
-    fbeta_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
+from sklearn.metrics import confusion_matrix
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
+from src.training.evaluation import metrics
 from src.training.evaluation.visualizer import ModelVisualizer
 from src.training.tracking.experiment_tracker import ExperimentTracker
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 class ModelEvaluator(ABC):
@@ -326,9 +319,10 @@ class ModelEvaluator(ABC):
 
         raise NotImplementedError
 
-    @abstractmethod
     def _get_pred_class(self, pred_probs: np.ndarray, threshold: float) -> np.ndarray:
         """Returns predicted class labels based on decision threshold value.
+
+        Classification-specific; concrete classification evaluators override it.
 
         Args:
             pred_probs (np.ndarray): predicted probabilities.
@@ -466,62 +460,36 @@ class ModelEvaluator(ABC):
             labels=original_class_labels,
         )
 
-    @abstractmethod
+    # The curve and ECE helpers below are classification-specific. They are kept
+    # concrete (not abstract) so non-classification evaluators (e.g. regression)
+    # can be instantiated without implementing them; the classification
+    # evaluators override them.
     def _log_calibration_curve(self, pred_probs: np.ndarray) -> None:
-        """Logs calibration curve for the best model on the validation set.
-
-        Args:
-            pred_probs (np.ndarray): predicted probabilities.
-        """
+        """Logs calibration curve for the best model on the validation set."""
         raise NotImplementedError
 
-    @abstractmethod
     def _log_roc_curve(
         self, pred_probs: np.ndarray, encoded_pos_class_label: int
     ) -> None:
-        """Logs ROC curve for the best model on the validation set.
-
-        Args:
-            pred_probs (np.ndarray): predicted probabilities.
-            encoded_pos_class_label (int): encoded positive class label.
-        """
+        """Logs ROC curve for the best model on the validation set."""
         raise NotImplementedError
 
-    @abstractmethod
     def _log_precision_recall_curve(
         self, pred_probs: np.ndarray, encoded_pos_class_label: int
     ) -> None:
-        """Logs precision-recall curve for the best model on the validation set.
-
-        Args:
-            pred_probs (np.ndarray): predicted probabilities.
-            encoded_pos_class_label (int): encoded positive class label.
-        """
+        """Logs precision-recall curve for the best model on the validation set."""
         raise NotImplementedError
 
-    @abstractmethod
     def _log_cumulative_gains(
         self, pred_probs: np.ndarray, valid_class: np.ndarray
     ) -> None:
-        """Logs cumulative gains curve for the best model on the validation set.
-
-        Args:
-            pred_probs (np.ndarray): predicted probabilities.
-            valid_class (np.ndarray): validation class labels.
-        """
+        """Logs cumulative gains curve for the best model on the validation set."""
         raise NotImplementedError
 
-    @abstractmethod
     def _log_lift_curve(self, pred_probs: np.ndarray, valid_class: np.ndarray) -> None:
-        """Logs lift curve for the best model on the validation set.
-
-        Args:
-            pred_probs (np.ndarray): predicted probabilities.
-            valid_class (np.ndarray): validation class labels.
-        """
+        """Logs lift curve for the best model on the validation set."""
         raise NotImplementedError
 
-    @abstractmethod
     def calc_expected_calibration_error(
         self,
         pred_probs: np.ndarray,
@@ -567,42 +535,19 @@ class BinaryClassificationEvaluator(ModelEvaluator):
             performance_metrics (pd.DataFrame): a dataframe with metric name and score columns.
         """
 
-        cal_metrics = [
-            ("accuracy", accuracy_score(true_class, pred_class)),
-            (
-                "precision",
-                precision_score(
-                    true_class,
-                    pred_class,
-                ),
-            ),
-            ("recall", recall_score(true_class, pred_class)),
-            ("f1", f1_score(true_class, pred_class)),
-            (
-                f"f_{self.fbeta_score_beta}_score",
-                fbeta_score(
-                    true_class,
-                    pred_class,
-                    beta=self.fbeta_score_beta,
-                ),
-            ),
-        ]
-
-        # ROC-AUC must be computed from positive-class probabilities, not hard
-        # labels. roc_auc_score(true, hard_labels) silently degenerates into a
-        # balanced-accuracy proxy, so only add it when probabilities are provided.
-        if pred_proba is not None:
-            cal_metrics.append(("roc_auc", roc_auc_score(true_class, pred_proba)))
-
-        performance_metrics = pd.DataFrame(cal_metrics, columns=["Metric", "Score"])
-
-        return performance_metrics
+        rows = metrics.binary_classification_metrics(
+            y_true=true_class,
+            y_pred=pred_class,
+            fbeta_beta=self.fbeta_score_beta,
+            pos_proba=pred_proba,
+        )
+        return metrics.rows_to_dataframe(rows)
 
     def evaluate_model_perf(
         self,
         class_encoder: Optional[LabelEncoder] = None,
         pos_class_label_thresh: float = 0.5,
-    ) -> Union[pd.DataFrame, pd.DataFrame]:
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Evaluates the best model returned by hyperparameters optimization procedure
         on both training and validation set.
 
@@ -709,7 +654,20 @@ class BinaryClassificationEvaluator(ModelEvaluator):
         pos_probs = self._safe_extract_pos_probs(
             pred_probs, self.encoded_pos_class_label
         )
-        pred_class = np.where(pos_probs > threshold, 1, 0)
+
+        # Emit the model's own class labels rather than literal 1/0, so the
+        # result is correct even if the encoded positive label is not 1 or the
+        # classes are not {0, 1}.
+        classes = list(self.pipeline.classes_)
+        pos_label = (
+            self.encoded_pos_class_label
+            if self.encoded_pos_class_label in classes
+            else classes[-1]
+        )
+        neg_label = next(c for c in classes if c != pos_label)
+        # Use >= to match the serving decision rule (positive_class_predictions)
+        # and threshold tuning, so reported metrics reflect the deployed model.
+        pred_class = np.where(pos_probs >= threshold, pos_label, neg_label)
 
         return pred_class
 
@@ -836,43 +794,17 @@ class BinaryClassificationEvaluator(ModelEvaluator):
             ece (float): ECE value ([0, 1])
         """
 
-        # Equal-size binning approach with nbins number of bins
-        bin_boundaries = np.linspace(0, 1, nbins + 1)
-        bin_lowers = bin_boundaries[:-1]
-        bin_uppers = bin_boundaries[1:]
-
-        # Keep predicted "probabilities" as is for binary classifier
-        _confidences = self._safe_extract_pos_probs(
+        # Confidence is the positive-class probability; a prediction is "correct"
+        # when the threshold decision matches the true label. Binning/gap logic
+        # is shared with the multi-class evaluator via metrics.expected_calibration_error.
+        confidences = self._safe_extract_pos_probs(
             pred_probs, self.encoded_pos_class_label
         )
-
-        # Get binary predictions from confidences
-        pred_label = (_confidences > decision_thresh_val).astype(float)
-
-        # Get a boolean list of correct/false predictions
-        accuracies = pred_label == true_labels
-
-        ece = np.zeros(1)
-        for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
-            # Determine if sample is in bin m (between bin lower & upper)
-            in_bin = np.logical_and(
-                _confidences > bin_lower.item(), _confidences <= bin_upper.item()
-            )
-
-            # Calculate the empirical probability of a sample falling into bin m: (|Bm|/n)
-            prop_in_bin = in_bin.astype(float).mean()
-
-            if prop_in_bin.item() > 0:
-                # Accuracy of bin m: acc(Bm)
-                accuracy_in_bin = accuracies[in_bin].astype(float).mean()
-
-                # Calculate the average confidence of bin m: conf(Bm)
-                avg_confidence_in_bin = _confidences[in_bin].mean()
-
-                # Calculate |acc(Bm) - conf(Bm)| * (|Bm|/n) for bin m and add to the total ECE
-                ece += np.abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
-
-        return ece[0]
+        pred_label = (confidences > decision_thresh_val).astype(float)
+        correct = (pred_label == np.asarray(true_labels)).astype(float)
+        return metrics.expected_calibration_error(
+            confidences=confidences, correct=correct, nbins=nbins
+        )
 
     def evaluate_test_set_only(
         self,
@@ -884,6 +816,8 @@ class BinaryClassificationEvaluator(ModelEvaluator):
         Args:
             class_encoder (LabelEncoder): class encoder object for confusion matrix labels.
             pos_class_label_thresh (float): decision threshold value for positive class.
+                For binary models this is the operating threshold to apply (so the
+                reported test metrics reflect the deployed operating point).
 
         Returns:
             test_scores (pd.DataFrame): test set scores.
@@ -988,96 +922,19 @@ class MultiClassificationEvaluator(ModelEvaluator):
             performance_metrics (pd.DataFrame): a dataframe with metric name and score columns.
         """
 
-        # For multi-class, use appropriate averaging strategies
-        cal_metrics = [
-            ("accuracy", accuracy_score(true_class, pred_class)),
-            (
-                "precision_macro",
-                precision_score(
-                    true_class,
-                    pred_class,
-                    average="macro",
-                ),
-            ),
-            (
-                "precision_micro",
-                precision_score(
-                    true_class,
-                    pred_class,
-                    average="micro",
-                ),
-            ),
-            (
-                "precision_weighted",
-                precision_score(
-                    true_class,
-                    pred_class,
-                    average="weighted",
-                ),
-            ),
-            ("recall_macro", recall_score(true_class, pred_class, average="macro")),
-            ("recall_micro", recall_score(true_class, pred_class, average="micro")),
-            (
-                "recall_weighted",
-                recall_score(true_class, pred_class, average="weighted"),
-            ),
-            ("f1_macro", f1_score(true_class, pred_class, average="macro")),
-            ("f1_micro", f1_score(true_class, pred_class, average="micro")),
-            ("f1_weighted", f1_score(true_class, pred_class, average="weighted")),
-            (
-                f"f_{self.fbeta_score_beta}_score_macro",
-                fbeta_score(
-                    true_class,
-                    pred_class,
-                    beta=self.fbeta_score_beta,
-                    average="macro",
-                ),
-            ),
-            (
-                f"f_{self.fbeta_score_beta}_score_micro",
-                fbeta_score(
-                    true_class,
-                    pred_class,
-                    beta=self.fbeta_score_beta,
-                    average="micro",
-                ),
-            ),
-            (
-                f"f_{self.fbeta_score_beta}_score_weighted",
-                fbeta_score(
-                    true_class,
-                    pred_class,
-                    beta=self.fbeta_score_beta,
-                    average="weighted",
-                ),
-            ),
-        ]
-
-        # ROC-AUC for multi-class needs the full probability matrix (not hard
-        # labels). Use one-vs-rest with macro averaging when probabilities are
-        # supplied; skip otherwise.
-        if pred_proba is not None:
-            cal_metrics.append(
-                (
-                    "roc_auc_macro",
-                    roc_auc_score(
-                        true_class,
-                        pred_proba,
-                        multi_class="ovr",
-                        average="macro",
-                    ),
-                )
-            )
-
-        performance_metrics = pd.DataFrame(cal_metrics, columns=["Metric", "Score"])
-
-        return performance_metrics
+        rows = metrics.multiclass_classification_metrics(
+            y_true=true_class,
+            y_pred=pred_class,
+            fbeta_beta=self.fbeta_score_beta,
+            proba=pred_proba,
+        )
+        return metrics.rows_to_dataframe(rows)
 
     def evaluate_model_perf(
         self,
         class_encoder: Optional[LabelEncoder] = None,
         pos_class_label_thresh: float = 0.5,
-    ) -> Union[pd.DataFrame, pd.DataFrame]:
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Evaluates the best model returned by hyperparameters optimization procedure
         on both training and validation set for multi-class classification.
 
@@ -1296,41 +1153,15 @@ class MultiClassificationEvaluator(ModelEvaluator):
             ece (float): ECE value ([0, 1])
         """
 
-        # Equal-size binning approach with nbins number of bins
-        bin_boundaries = np.linspace(0, 1, nbins + 1)
-        bin_lowers = bin_boundaries[:-1]
-        bin_uppers = bin_boundaries[1:]
-
-        # Get max probability per sample for multi-class
-        _confidences = np.max(pred_probs, axis=1)
-
-        # Get predictions from confidences (positional in this case)
-        pred_label = np.argmax(pred_probs, axis=1).astype(float)
-
-        # Get a boolean list of correct/false predictions
-        accuracies = pred_label == true_labels
-
-        ece = np.zeros(1)
-        for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
-            # Determine if sample is in bin m (between bin lower & upper)
-            in_bin = np.logical_and(
-                _confidences > bin_lower.item(), _confidences <= bin_upper.item()
-            )
-
-            # Calculate the empirical probability of a sample falling into bin m: (|Bm|/n)
-            prop_in_bin = in_bin.astype(float).mean()
-
-            if prop_in_bin.item() > 0:
-                # Accuracy of bin m: acc(Bm)
-                accuracy_in_bin = accuracies[in_bin].astype(float).mean()
-
-                # Calculate the average confidence of bin m: conf(Bm)
-                avg_confidence_in_bin = _confidences[in_bin].mean()
-
-                # Calculate |acc(Bm) - conf(Bm)| * (|Bm|/n) for bin m and add to the total ECE
-                ece += np.abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
-
-        return ece[0]
+        # Top-label ECE: confidence is the max class probability and a prediction
+        # is correct when the argmax class matches the true label. Binning is
+        # shared with the binary path via metrics.expected_calibration_error.
+        confidences = np.max(pred_probs, axis=1)
+        pred_label = np.argmax(pred_probs, axis=1)
+        correct = (pred_label == np.asarray(true_labels)).astype(float)
+        return metrics.expected_calibration_error(
+            confidences=confidences, correct=correct, nbins=nbins
+        )
 
     def evaluate_test_set_only(
         self,
@@ -1420,6 +1251,108 @@ class MultiClassificationEvaluator(ModelEvaluator):
         return test_scores
 
 
+class RegressionEvaluator(ModelEvaluator):
+    """Concrete ModelEvaluator for regression tasks.
+
+    Provides regression metrics (MAE, RMSE, R2, MAPE) and a predicted-vs-actual
+    plot. Classification-only machinery (probabilities, thresholds, calibration,
+    label encoding, ROC/PR/lift curves) does not apply and is not implemented.
+
+    Note: regression is supported here to keep the evaluator layer task-agnostic.
+    The end-to-end regression training/serving path is intentionally left as a
+    documented extension point (see docs/enhancement-plan.md).
+    """
+
+    def calc_perf_metrics(  # pylint: disable=unused-argument
+        self,
+        true_class: ArrayLike,
+        pred_class: ArrayLike,
+        pred_proba: ArrayLike = None,  # unused; kept for interface symmetry
+    ) -> pd.DataFrame:
+        """Computes regression metrics (``true_class``/``pred_class`` are values).
+
+        Args:
+            true_class (ArrayLike): true target values.
+            pred_class (ArrayLike): predicted target values.
+            pred_proba (ArrayLike): ignored for regression.
+
+        Returns:
+            performance_metrics (pd.DataFrame): metric name/score dataframe.
+        """
+        rows = metrics.regression_metrics(y_true=true_class, y_pred=pred_class)
+        return metrics.rows_to_dataframe(rows)
+
+    def _log_predicted_vs_actual(
+        self, y_true: np.ndarray, y_pred: np.ndarray, set_label: str
+    ) -> None:
+        """Logs a predicted-vs-actual scatter to the tracker."""
+        try:
+            import matplotlib.pyplot as plt  # local import: optional plotting dep
+
+            fig, axis = plt.subplots(figsize=(6, 6))
+            axis.scatter(y_true, y_pred, s=8, alpha=0.5)
+            lo = float(min(np.min(y_true), np.min(y_pred)))
+            hi = float(max(np.max(y_true), np.max(y_pred)))
+            axis.plot([lo, hi], [lo, hi], "r--", linewidth=1)
+            axis.set_xlabel("Actual")
+            axis.set_ylabel("Predicted")
+            axis.set_title(f"{set_label}: Predicted vs Actual")
+            self.tracker.log_figure(
+                figure_name=f"{set_label} Predicted vs Actual",
+                figure=fig,
+                overwrite=True,
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.info("Predicted-vs-actual plot skipped: %s", exc)
+
+    def evaluate_model_perf(
+        self,
+        class_encoder: Optional[LabelEncoder] = None,
+        pos_class_label_thresh: float = 0.5,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Evaluates the regressor on the training and validation sets.
+
+        Args:
+            class_encoder (LabelEncoder): unused for regression.
+            pos_class_label_thresh (float): unused for regression.
+
+        Returns:
+            tuple: (train_scores, valid_scores).
+        """
+        pred_train = self.pipeline.predict(self.train_features)
+        pred_valid = self.pipeline.predict(self.valid_features)
+        train_scores = self.calc_perf_metrics(self.train_class, pred_train)
+        valid_scores = self.calc_perf_metrics(self.valid_class, pred_valid)
+        self._log_predicted_vs_actual(
+            np.asarray(self.valid_class), np.asarray(pred_valid), "Validation Set"
+        )
+        return train_scores, valid_scores
+
+    def evaluate_test_set_only(
+        self,
+        class_encoder: LabelEncoder,
+        pos_class_label_thresh: float = 0.5,
+    ) -> pd.DataFrame:
+        """Evaluates the regressor on the held-out test set.
+
+        Note: as elsewhere in this module, ``valid_features``/``valid_class`` hold
+        the test data in the test-evaluation orchestrator.
+
+        Args:
+            class_encoder (LabelEncoder): unused for regression.
+            pos_class_label_thresh (float): unused for regression.
+
+        Returns:
+            test_scores (pd.DataFrame): test set scores.
+        """
+        pred_test = self.pipeline.predict(self.valid_features)
+        test_scores = self.calc_perf_metrics(self.valid_class, pred_test)
+        self._log_predicted_vs_actual(
+            np.asarray(self.valid_class), np.asarray(pred_test), "Test Set"
+        )
+        return test_scores
+
+
 def create_model_evaluator(
     tracker: ExperimentTracker,
     pipeline: Pipeline,
@@ -1431,53 +1364,72 @@ def create_model_evaluator(
     encoded_pos_class_label: int = 1,
     is_voting_ensemble: bool = False,
     visualizer: Optional[ModelVisualizer] = None,
+    task_type: Optional[str] = None,
 ) -> ModelEvaluator:
     """Factory function to create the appropriate ModelEvaluator implementation.
 
-    Automatically chooses between BinaryClassificationEvaluator and
-    MultiClassificationEvaluator based on the number of unique classes.
+    Dispatch is driven by the explicit ``task_type`` when provided
+    (``binary``/``multiclass``/``regression``). When ``task_type`` is None it
+    falls back to inferring binary vs multi-class from the number of unique
+    classes (backward-compatible), and cross-checks an explicit classification
+    ``task_type`` against the observed class count.
 
     Args:
         tracker: Experiment tracker for logging.
         pipeline: Fitted pipeline.
         train_features: Train features.
-        train_class: Train class labels.
+        train_class: Train class labels (or target values for regression).
         valid_features: Validation features.
-        valid_class: Validation class labels.
+        valid_class: Validation class labels (or target values for regression).
         fbeta_score_beta: Beta value for fbeta score.
         encoded_pos_class_label: Encoded positive class label.
         is_voting_ensemble: Whether the model is a voting ensemble.
         visualizer: Optional visualizer instance. If None, creates a new one.
+        task_type: Explicit task type; overrides the class-count heuristic.
 
     Returns:
-        ModelEvaluator: Appropriate concrete implementation based on problem type.
-    """
-    # Determine number of unique classes
-    n_classes = len(np.unique(np.concatenate([train_class, valid_class])))
+        ModelEvaluator: Appropriate concrete implementation for the task.
 
-    if n_classes <= 2:
-        return BinaryClassificationEvaluator(
-            tracker=tracker,
-            pipeline=pipeline,
-            train_features=train_features,
-            train_class=train_class,
-            valid_features=valid_features,
-            valid_class=valid_class,
-            fbeta_score_beta=fbeta_score_beta,
-            encoded_pos_class_label=encoded_pos_class_label,
-            is_voting_ensemble=is_voting_ensemble,
-            visualizer=visualizer,
-        )
+    Raises:
+        ValueError: If task_type is provided but not supported.
+    """
+    common_kwargs = {
+        "tracker": tracker,
+        "pipeline": pipeline,
+        "train_features": train_features,
+        "train_class": train_class,
+        "valid_features": valid_features,
+        "valid_class": valid_class,
+        "fbeta_score_beta": fbeta_score_beta,
+        "encoded_pos_class_label": encoded_pos_class_label,
+        "is_voting_ensemble": is_voting_ensemble,
+        "visualizer": visualizer,
+    }
+
+    if task_type == metrics.REGRESSION:
+        return RegressionEvaluator(**common_kwargs)
+
+    # Classification: trust an explicit task_type, else infer from class count.
+    n_classes = len(np.unique(np.concatenate([train_class, valid_class])))
+    if task_type == metrics.MULTICLASS:
+        is_binary = False
+    elif task_type == metrics.BINARY:
+        is_binary = True
+        if n_classes > 2:
+            logger.warning(
+                "task_type='binary' but %d classes observed; using the "
+                "multi-class evaluator to avoid incorrect metrics.",
+                n_classes,
+            )
+            is_binary = False
+    elif task_type is None:
+        is_binary = n_classes <= 2
     else:
-        return MultiClassificationEvaluator(
-            tracker=tracker,
-            pipeline=pipeline,
-            train_features=train_features,
-            train_class=train_class,
-            valid_features=valid_features,
-            valid_class=valid_class,
-            fbeta_score_beta=fbeta_score_beta,
-            encoded_pos_class_label=encoded_pos_class_label,
-            is_voting_ensemble=is_voting_ensemble,
-            visualizer=visualizer,
+        raise ValueError(
+            f"Unsupported task_type: {task_type}. "
+            f"Supported: {sorted(metrics.SUPPORTED_TASKS)}"
         )
+
+    if is_binary:
+        return BinaryClassificationEvaluator(**common_kwargs)
+    return MultiClassificationEvaluator(**common_kwargs)

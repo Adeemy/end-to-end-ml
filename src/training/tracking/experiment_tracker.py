@@ -12,15 +12,16 @@ from abc import ABC, abstractmethod
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Optional, Union
 
+import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
 from comet_ml import ExistingExperiment, Experiment
 from matplotlib.figure import Figure
 
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 class ExperimentTracker(ABC):
@@ -249,6 +250,7 @@ class CometExperimentTracker(ExperimentTracker):
         self.experiment.log_figure(
             figure_name=figure_name, figure=figure, step=step, overwrite=overwrite
         )
+        plt.close(figure)  # release the figure once logged so they do not accumulate
 
     def log_confusion_matrix(
         self,
@@ -316,25 +318,41 @@ class MLflowExperimentTracker(ExperimentTracker):
         self._metrics_cache: Dict[str, float] = {}
 
     def set_experiment(self, **kwargs) -> None:
-        """Set experiment for MLflow tracking.
+        """Set up the MLflow experiment and run.
+
+        Logs to the project experiment (``project_name``) and names the run by
+        ``experiment_name`` (e.g. ``eval_<model>_<ts>``), tagging ``run_type``
+        (training/evaluation) so the MLflow UI separates evaluation runs from the
+        ``train_*`` runs in the same experiment. The parent training run, when
+        known, is recorded in a ``parent_run_id`` tag.
 
         Args:
-            **kwargs: Should contain MLflow-specific parameters like 'run_id', 'experiment_id', etc.
+            **kwargs: 'run_id' (resume a run), 'project_name' (experiment to log
+                to), 'experiment_name' (the run's name), 'experiment_id', and
+                optional 'parent_run_id'.
         """
 
         if "run_id" in kwargs:
-            # Use existing run
+            # Resume an existing run (e.g. evaluation continuing a training run).
             mlflow.start_run(run_id=kwargs["run_id"])
             self.run_id = kwargs["run_id"]
+            return
+
+        run_name = kwargs.get("experiment_name")
+        if kwargs.get("project_name"):
+            mlflow.set_experiment(kwargs["project_name"])
         elif "experiment_id" in kwargs:
-            # Start new run in existing experiment
             mlflow.set_experiment(experiment_id=kwargs["experiment_id"])
-            mlflow.start_run()
-        elif "experiment_name" in kwargs:
-            # Start run in experiment by name
-            mlflow.set_experiment(kwargs["experiment_name"])
-            mlflow.start_run()
-        # If no specific parameters, assume run is already active
+
+        mlflow.start_run(run_name=run_name)
+
+        if run_name:
+            mlflow.set_tag(
+                "run_type",
+                "evaluation" if run_name.startswith("eval") else "training",
+            )
+        if kwargs.get("parent_run_id"):
+            mlflow.set_tag("parent_run_id", kwargs["parent_run_id"])
 
     def log_metric(self, name: str, value: float, step: Optional[int] = None) -> None:
         """Log a single metric value to MLflow."""
@@ -365,6 +383,7 @@ class MLflowExperimentTracker(ExperimentTracker):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             figure.savefig(tmp.name, bbox_inches="tight")
             self.mlflow.log_artifact(tmp.name, f"figures/{figure_name}.png")
+        plt.close(figure)  # release the figure once logged so they do not accumulate
 
     def log_confusion_matrix(
         self,
@@ -398,7 +417,12 @@ class MLflowExperimentTracker(ExperimentTracker):
         overwrite: bool = False,
         **kwargs,
     ) -> None:
-        """Log a model artifact to MLflow."""
+        """Log a model to MLflow.
+
+        When the caller passes an ``input_example`` (a small DataFrame of raw
+        features), the model's signature is inferred and both are attached so the
+        registered model documents its input/output schema in the UI.
+        """
         # For MLflow, we need to log the actual model object, not just the file
         # Load the model from the pickle file and log it properly
         import joblib
@@ -407,12 +431,28 @@ class MLflowExperimentTracker(ExperimentTracker):
             # Load the model from the pickle file
             model = joblib.load(str(file_or_folder))
 
+            # Infer the signature and attach a sample input when one is provided.
+            signature = None
+            input_example = kwargs.get("input_example")
+            if input_example is not None:
+                try:
+                    from mlflow.models import infer_signature
+
+                    signature = infer_signature(
+                        input_example, model.predict(input_example)
+                    )
+                except Exception as sig_err:  # pylint: disable=broad-except
+                    logger.warning("Could not infer model signature: %s", sig_err)
+                    input_example = None
+
             # Log the model using MLflow's sklearn integration
             # This creates a proper MLflow model with all artifacts and metadata
             self.mlflow.sklearn.log_model(
                 sk_model=model,
                 name=name,  # This will be the path in the MLflow run
                 registered_model_name=None,  # Don't register here, do it separately
+                signature=signature,
+                input_example=input_example,
             )
             logger.info("Successfully logged model %s to MLflow", name)
 

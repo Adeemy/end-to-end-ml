@@ -11,10 +11,10 @@ from typing import Any, Dict, List
 import yaml
 
 from src.utils.config_loader import map_to_dataclass
-from src.utils.logger import LoggerConfig, get_console_logger
+from src.utils.logger import LoggerConfig, get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 class PrettySafeLoader(yaml.SafeLoader):

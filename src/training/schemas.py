@@ -12,10 +12,10 @@ from typing import Any, Dict, List, Optional, Union
 import yaml
 
 from src.utils.config_loader import map_to_dataclass
-from src.utils.logger import LoggerConfig, get_console_logger
+from src.utils.logger import LoggerConfig, get_logger
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 class PrettySafeLoader(yaml.SafeLoader):
@@ -104,37 +104,64 @@ class Config:
             raise KeyError("modelregistry is not included in config file")
 
         # Check data split params are of correct types
-        if not isinstance(int(self.params["data"]["split_rand_seed"]), int):
+        try:
+            int(self.params["data"]["split_rand_seed"])
+        except (TypeError, ValueError) as exc:
             raise ValueError(
-                f"split_rand_seed must be integer type. Got {self.params['data']['params']['split_rand_seed']}"
-            )
+                f"split_rand_seed must be integer type. Got {self.params['data']['split_rand_seed']}"
+            ) from exc
 
         if self.params["data"]["split_type"] not in ["random", "time"]:
             raise ValueError(
-                f"split_type must be either 'random' or 'time'. Got {self.params['data']['params']['split_type']}"
+                f"split_type must be either 'random' or 'time'. Got {self.params['data']['split_type']}"
             )
 
         # Check beta value (primarily used to compare models)
-        if isinstance(float(self.params["train"]["fbeta_score_beta_val"]), float):
+        try:
             fbeta_score_beta_val = float(self.params["train"]["fbeta_score_beta_val"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"fbeta_score_beta_val must be float type. Got {self.params['train']['fbeta_score_beta_val']}"
+            ) from exc
+        if fbeta_score_beta_val <= 0:
+            raise ValueError(
+                f"fbeta_score_beta_val must be > 0. Got {fbeta_score_beta_val}"
+            )
 
-            if fbeta_score_beta_val <= 0:
+        # Validate task type (optional; defaults to binary) and the metrics that
+        # are valid for it. comparison_metric is the optimization metric;
+        # selection_metric is optional and falls back to comparison_metric.
+        task_type = self.params["train"].get("task_type", "binary")
+        supported_tasks = ("binary", "multiclass", "regression")
+        if task_type not in supported_tasks:
+            raise ValueError(
+                f"task_type must be one of {supported_tasks}. Got {task_type}!"
+            )
+
+        classification_metrics = (
+            "recall",
+            "precision",
+            "f1",
+            "roc_auc",
+            "fbeta_score",
+            "average_precision",
+            "log_loss",
+            "brier_score",
+        )
+        regression_metrics = ("mae", "rmse", "r2", "mape")
+        valid_metrics = (
+            regression_metrics if task_type == "regression" else classification_metrics
+        )
+        for metric_key in ("comparison_metric", "selection_metric"):
+            metric_value = self.params["train"].get(metric_key)
+            # selection_metric is optional; empty/None means "use comparison_metric".
+            if metric_key == "selection_metric" and not metric_value:
+                continue
+            if metric_value not in valid_metrics:
                 raise ValueError(
-                    f"fbeta_score_beta_val must be > 0. Got {fbeta_score_beta_val}"
+                    f"{metric_key} must be one of {valid_metrics} for "
+                    f"task_type='{task_type}'. Got {metric_value}!"
                 )
-
-        else:
-            raise ValueError(
-                f"fbeta_score_beta_val must be float type. Got {self.params['train']['params']['fbeta_score_beta_val']}"
-            )
-
-        # Check if comparison metric is a valid value
-        comparison_metric = self.params["train"]["comparison_metric"]
-        comparison_metrics = ("recall", "precision", "f1", "roc_auc", "fbeta_score")
-        if comparison_metric not in comparison_metrics:
-            raise ValueError(
-                f"Supported metrics are {comparison_metrics}. Got {comparison_metric}!"
-            )
 
         # Check if input split cutoff date (if split_type == "time") is in proper date format
         if self.params["data"]["split_type"] == "time" and (
@@ -142,7 +169,7 @@ class Config:
             or self.params["data"]["train_valid_split_curoff_date"] == "none"
         ):
             raise ValueError(
-                f"train_test_split_curoff_date and train_valid_split_curoff_date must be a date (format {self.params['data']['params']['split_date_col_format']}) or None if split type is 'random'."
+                f"train_test_split_curoff_date and train_valid_split_curoff_date must be a date (format {self.params['data']['split_date_col_format']}) or None if split type is 'random'."
             )
 
         # Check if voting rule is a valid value
@@ -203,12 +230,24 @@ class TrainParams:
     experiment_tracker: str = "comet"
     project_name: str = "default-project"
     workspace_name: str = "comet-workspace-name"
+    # Task the pipeline solves. Drives evaluator/metric selection and which
+    # classification-only steps (label encoding, calibration, threshold tuning)
+    # run. One of "binary", "multiclass", "regression".
+    task_type: str = "binary"
     search_max_iters: int = 10
     parallel_jobs_count: int = 1
     exp_timout_secs: int = 3600
+    # Number of stratified CV folds used to estimate the metric during the
+    # search and champion selection. cross_val_folds > 1 enables CV; a value of
+    # 1 (or less) falls back to the single train/valid holdout.
     cross_val_folds: int = 5
     fbeta_score_beta_val: float = 0.5
+    # Metric the Optuna search optimizes (the "optimization metric").
     comparison_metric: str = "fbeta_score"
+    # Metric used to rank candidates for the champion and gate deployment. Kept
+    # separate from comparison_metric to break the tuning/selection circularity;
+    # empty string means "fall back to comparison_metric".
+    selection_metric: str = ""
     voting_rule: str = "soft"
     deployment_score_thresh: float = 0.8
     max_eval_experiments: int = 10
@@ -218,35 +257,29 @@ class TrainParams:
 
 
 @dataclass(frozen=True)
-class LogisticRegressionConfig:
-    """Configuration for Logistic Regression."""
+class ModelSpecConfig:
+    """Config-driven definition of one trainable model.
 
-    params: Dict[str, Union[int, str]] = None
-    search_space_params: Dict[str, List[Union[float, List[str], bool]]] = None
+    The set of models to train is the YAML ``models:`` list; each entry maps to
+    one of these. ``estimator`` is the importable class path (e.g.
+    ``lightgbm.LGBMClassifier``) that the model factory resolves and
+    instantiates, so adding a model is purely a new YAML entry -- no code change.
 
+    Attributes:
+        name: Registered model name and experiment key (e.g. ``lightgbm``).
+        estimator: Importable estimator class path passed to the model factory.
+        enabled: Whether this model is trained.
+        params: Fixed estimator kwargs. A value of ``"${name}"`` is replaced at
+            runtime with a data-derived value (e.g. ``scale_pos_weight``).
+        search_space_params: Optuna search space; ``[min, max, log]`` for numeric
+            or ``[[choices], false]`` for categorical params.
+    """
 
-@dataclass(frozen=True)
-class RandomForestConfig:
-    """Configuration for Random Forest."""
-
-    params: Dict[str, Union[int, str]] = None
+    name: str
+    estimator: str
+    enabled: bool = False
+    params: Dict[str, Any] = None
     search_space_params: Dict[str, List[Union[int, float, List[str], bool]]] = None
-
-
-@dataclass(frozen=True)
-class LGBMConfig:
-    """Configuration for LightGBM."""
-
-    params: Dict[str, Union[int, float, str]] = None
-    search_space_params: Dict[str, List[Union[int, float, bool]]] = None
-
-
-@dataclass(frozen=True)
-class XGBoostConfig:
-    """Configuration for XGBoost."""
-
-    params: Dict[str, str] = None
-    search_space_params: Dict[str, List[Union[int, float, bool]]] = None
 
 
 @dataclass(frozen=True)
@@ -264,22 +297,23 @@ class TrainFilesConfig:
 
 @dataclass(frozen=True)
 class ModelRegistryConfig:
-    """Configuration for model registry."""
+    """Cross-cutting model registry names.
 
-    lr_registered_model_name: str = "default-lr-model"
-    rf_registered_model_name: str = "default-rf-model"
-    lgbm_registered_model_name: str = "default-lgbm-model"
-    xgb_registered_model_name: str = "default-xgb-model"
+    Per-model registered names now come from each entry's ``name`` in the
+    ``models:`` list; only the ensemble and champion names live here.
+    """
+
     voting_ensemble_registered_model_name: str = "default-voting-ensemble-model"
     champion_model_name: str = "default-champion-model"
 
 
 @dataclass(frozen=True)
 class SupportedModelsConfig:
-    """Configuration for supported models in ModelOptimizer.
+    """Names of the models defined in the config ``models:`` list.
 
-    Note: When adding a new model, update the search space definition
-    in the ModelOptimizer.generate_trial_params method.
+    Used by ModelOptimizer to validate a ``registered_model_name``. The search
+    space is consumed generically (ModelOptimizer.generate_trial_params), so a
+    new model needs no code change here -- only a new ``models:`` entry.
     """
 
     models: tuple
@@ -297,14 +331,10 @@ class SupportedModelsConfig:
 
 
 @dataclass(frozen=True)
-class IncludedModelsConfig:
-    """Configuration for included models."""
+class EnsembleConfig:
+    """Configuration for the voting ensemble over the enabled base models."""
 
-    include_logistic_regression: bool = True
-    include_random_forest: bool = True
-    include_lightgbm: bool = True
-    include_xgboost: bool = True
-    include_voting_ensemble: bool = True
+    enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -316,13 +346,10 @@ class TrainingConfig:
     data: TrainFeaturesConfig = None
     preprocessing: TrainPreprocessingConfig = None
     train_params: TrainParams = None
-    logistic_regression: LogisticRegressionConfig = None
-    random_forest: RandomForestConfig = None
-    lightgbm: LGBMConfig = None
-    xgboost: XGBoostConfig = None
+    models: List[ModelSpecConfig] = None
     files: TrainFilesConfig = None
     modelregistry: ModelRegistryConfig = None
-    included_models: IncludedModelsConfig = None
+    ensemble: EnsembleConfig = None
     supported_models: SupportedModelsConfig = None
 
 
@@ -335,19 +362,47 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
     Returns:
         TrainingConfig: The training configuration as a dataclass instance.
     """
-    included_models_params = params.get(
-        "included_models", {}
-    )  # Fallback to an empty dictionary
+    # Surface top-level section typos instead of silently loading section
+    # defaults.
+    known_sections = {
+        "description",
+        "logger",
+        "data",
+        "preprocessing",
+        "train",
+        "models",
+        "files",
+        "modelregistry",
+        "ensemble",
+        "inference",
+    }
+    unexpected_sections = set(params) - known_sections
+    if unexpected_sections:
+        logger.warning(
+            "Unexpected top-level config section(s) (ignored): %s",
+            ", ".join(sorted(unexpected_sections)),
+        )
 
-    # Build supported models tuple from modelregistry
-    modelregistry_params = params["modelregistry"]
-    models = (
-        modelregistry_params["lr_registered_model_name"],
-        modelregistry_params["rf_registered_model_name"],
-        modelregistry_params["lgbm_registered_model_name"],
-        modelregistry_params["xgb_registered_model_name"],
+    # Build the config-driven model list and the supported-model names from it.
+    model_specs = [
+        map_to_dataclass(ModelSpecConfig, spec) for spec in params.get("models", [])
+    ]
+    # Each entry must set a name and an importable estimator path; surface a clear
+    # error rather than failing cryptically when one is omitted (map_to_dataclass
+    # leaves required fields as a sentinel for missing keys).
+    for index, spec in enumerate(model_specs):
+        if not isinstance(spec.name, str) or not spec.name:
+            raise ValueError(
+                f"Config `models:` entry #{index} must set a string `name`."
+            )
+        if not isinstance(spec.estimator, str) or not spec.estimator:
+            raise ValueError(
+                f"Config `models:` entry '{spec.name}' must set an `estimator` "
+                "class path (e.g. 'lightgbm.LGBMClassifier')."
+            )
+    supported_models_config = SupportedModelsConfig(
+        models=tuple(spec.name for spec in model_specs)
     )
-    supported_models_config = SupportedModelsConfig(models=models)
 
     return TrainingConfig(
         description=params["description"],
@@ -357,18 +412,11 @@ def build_training_config(params: Dict[str, Any]) -> TrainingConfig:
             TrainPreprocessingConfig, params.get("preprocessing", {})
         ),
         train_params=map_to_dataclass(TrainParams, params.get("train", {})),
-        logistic_regression=map_to_dataclass(
-            LogisticRegressionConfig, params.get("logisticregression", {})
-        ),
-        random_forest=map_to_dataclass(
-            RandomForestConfig, params.get("randomforest", {})
-        ),
-        lightgbm=map_to_dataclass(LGBMConfig, params.get("lgbm", {})),
-        xgboost=map_to_dataclass(XGBoostConfig, params.get("xgboost", {})),
+        models=model_specs,
         files=map_to_dataclass(TrainFilesConfig, params["files"]),
         modelregistry=map_to_dataclass(
             ModelRegistryConfig, params.get("modelregistry", {})
         ),
-        included_models=map_to_dataclass(IncludedModelsConfig, included_models_params),
+        ensemble=map_to_dataclass(EnsembleConfig, params.get("ensemble", {})),
         supported_models=supported_models_config,
     )

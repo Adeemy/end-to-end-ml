@@ -4,12 +4,12 @@ from dataclasses import fields
 from pathlib import PosixPath
 from typing import Any, Callable, Dict, Type, TypeVar
 
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 
 T = TypeVar("T")  # Generic type for any config dataclass
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
 
 def map_to_dataclass(dataclass_type: Type[T], config_dict: Dict[str, Any]) -> T:

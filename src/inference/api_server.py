@@ -40,7 +40,7 @@ from typing import List, Union
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from src.inference.utils.helpers import (
     LocalModelLoader,
@@ -49,40 +49,80 @@ from src.inference.utils.helpers import (
     extract_model_config,
     positive_class_predictions,
 )
-from src.utils.logger import get_console_logger
+from src.utils.logger import get_logger
 from src.utils.path import PARENT_DIR
 
 load_dotenv()
 
 
 module_name: str = PosixPath(__file__).stem
-logger = get_console_logger(module_name)
+logger = get_logger(module_name)
 
-# Load champion model at startup using strategy pattern
+# Champion model configuration (cheap to read at import; no network/file load).
 CONFIG_PARAMS = extract_model_config(
-    config_yaml_path=f"{str(PARENT_DIR.parent)}/src/config/training-config.yml"
+    config_yaml_path=f"{str(PARENT_DIR.parent)}/config/training-config.yml"
 )
 
 # Required API keys for model loading
 COMET_API_KEY = os.environ.get("COMET_API_KEY")
 
-# Create loading strategies with fallback
-primary_strategy = RegistryModelLoader()
-fallback_strategy = LocalModelLoader()
-loader_context = ModelLoadingContext(primary_strategy, fallback_strategy)
+# Loading strategy: registry first, then local file fallback.
+_loader_context = ModelLoadingContext(RegistryModelLoader(), LocalModelLoader())
 
-model = loader_context.load_model(
-    model_name=CONFIG_PARAMS["model_name"],
-    config_params=CONFIG_PARAMS,
-    comet_api_key=COMET_API_KEY,
-    logger=logger,
-)
+# Lazily-loaded, cached model state. The model is loaded on the first request (or
+# /health probe), not at import, so a transient registry/file outage does not
+# stop the service from starting; the load is retried on the next call.
+_model = None
+_expected_features = None
+_last_load_error = None
 
-# Feature columns the loaded model was fitted on (when available), used to give
-# callers precise validation errors instead of cryptic sklearn failures.
-EXPECTED_FEATURES = (
-    list(model.feature_names_in_) if hasattr(model, "feature_names_in_") else None
-)
+
+def _ensure_model() -> object:
+    """Loads and caches the champion model on first use; retries after a failure.
+
+    Returns:
+        The loaded model/pipeline.
+
+    Raises:
+        Exception: re-raises the underlying load error (registry + local both
+            failed), recording it for /health to report.
+    """
+    global _model, _expected_features, _last_load_error  # pylint: disable=global-statement
+    if _model is not None:
+        return _model
+    try:
+        model = _loader_context.load_model(
+            model_name=CONFIG_PARAMS["model_name"],
+            config_params=CONFIG_PARAMS,
+            comet_api_key=COMET_API_KEY,
+            logger=logger,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _last_load_error = str(exc)
+        _model = None
+        logger.exception("Champion model load failed; will retry on next request.")
+        raise
+    _model = model
+    # Feature columns the model was fitted on (when available), used to return
+    # precise validation errors instead of cryptic sklearn failures.
+    _expected_features = (
+        list(model.feature_names_in_) if hasattr(model, "feature_names_in_") else None
+    )
+    _last_load_error = None
+    logger.info("Champion model '%s' loaded and cached.", CONFIG_PARAMS["model_name"])
+    return model
+
+
+def _get_model_or_503() -> object:
+    """Returns the cached model or raises HTTP 503 if it cannot be loaded."""
+    try:
+        return _ensure_model()
+    except Exception as exc:  # pylint: disable=broad-except
+        raise HTTPException(
+            status_code=503,
+            detail=f"Model is not available: {exc}",
+        ) from exc
+
 
 # FastAPI app
 app = FastAPI()
@@ -91,6 +131,29 @@ app = FastAPI()
 @app.get("/")
 def root():
     return HTMLResponse("<h1>Predict pre-diabetes/diabetes.</h1>")
+
+
+@app.get("/health")
+def health():
+    """Reports service health and whether the champion model is loadable."""
+    try:
+        model = _ensure_model()
+        return {
+            "status": "ok",
+            "model_loaded": True,
+            "model_name": CONFIG_PARAMS["model_name"],
+            "model_type": type(model).__name__,
+        }
+    except Exception as exc:  # pylint: disable=broad-except
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "degraded",
+                "model_loaded": False,
+                "model_name": CONFIG_PARAMS["model_name"],
+                "error": str(exc),
+            },
+        )
 
 
 def _validate_records(records: List[dict]) -> None:
@@ -114,10 +177,10 @@ def _validate_records(records: List[dict]) -> None:
                 status_code=422, detail=f"Record {index} must be a JSON object."
             )
 
-    if EXPECTED_FEATURES is None:
+    if _expected_features is None:
         return
 
-    expected = set(EXPECTED_FEATURES)
+    expected = set(_expected_features)
     for index, record in enumerate(records):
         keys = set(record)
         missing = sorted(expected - keys)
@@ -147,6 +210,10 @@ def predict(data: Union[dict, List[dict]] = Body(...)):
         HTTPException: 422 if the request body is malformed or does not match the
             model's expected feature schema.
     """
+    # Ensure the model is loaded (lazily, with retry) before validating so the
+    # feature schema is populated; returns HTTP 503 if it cannot be loaded.
+    model = _get_model_or_503()
+
     # Handle both single sample and batch processing
     is_single_sample = isinstance(data, dict)
 
