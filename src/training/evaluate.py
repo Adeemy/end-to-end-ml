@@ -43,15 +43,37 @@ from src.training.schemas import Config, build_training_config
 from src.training.tracking.experiment import get_tracker_credentials
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
-from src.utils.path import (
-    ARTIFACTS_DIR,
-    DATA_DIR,
-    TRAINING_EXPERIMENTS_FILE,
-    encoded_split_path,
-)
+from src.utils.path import ARTIFACTS_DIR, DATA_DIR, encoded_split_path
 
 module_name: str = PosixPath(__file__).stem
 console_logger = get_logger(module_name)
+
+
+def _materialize_version(
+    version, artifacts_dir: PosixPath, logger: logging.Logger
+) -> None:
+    """Loads a registered MLflow model version and writes it to the local
+    artifacts dir, so the evaluation workflow scores that exact registered model
+    (rather than whatever pkl happens to be on disk).
+
+    Args:
+        version: An MLflow ``ModelVersion`` (has ``name``, ``version``, ``run_id``).
+        artifacts_dir: Directory where candidate model pkls are read from.
+        logger: Logger object.
+    """
+    import joblib  # pylint: disable=import-outside-toplevel
+    import mlflow.sklearn  # pylint: disable=import-outside-toplevel
+
+    model = mlflow.sklearn.load_model(f"models:/{version.name}/{version.version}")
+    local_path = artifacts_dir / f"{version.name}.pkl"
+    joblib.dump(model, local_path)
+    logger.info(
+        "Materialized model '%s' v%s (run %s) -> %s",
+        version.name,
+        version.version,
+        version.run_id,
+        local_path,
+    )
 
 
 def _resolve_mlflow_run(
@@ -74,8 +96,6 @@ def _resolve_mlflow_run(
     Raises:
         ValueError: If no registered model is associated with ``run_id``.
     """
-    import joblib  # pylint: disable=import-outside-toplevel
-    import mlflow.sklearn  # pylint: disable=import-outside-toplevel
     from mlflow.tracking import MlflowClient  # pylint: disable=import-outside-toplevel
 
     versions = MlflowClient().search_model_versions(f"run_id='{run_id}'")
@@ -85,17 +105,52 @@ def _resolve_mlflow_run(
             "Check the run id (browse runs with `make view_mlflow`)."
         )
     version = versions[0]
-    model = mlflow.sklearn.load_model(f"models:/{version.name}/{version.version}")
-    local_path = artifacts_dir / f"{version.name}.pkl"
-    joblib.dump(model, local_path)
-    logger.info(
-        "Evaluating MLflow run %s: model '%s' v%s materialized to %s",
-        run_id,
-        version.name,
-        version.version,
-        local_path,
-    )
+    logger.info("Evaluating MLflow run %s.", run_id)
+    _materialize_version(version, artifacts_dir, logger)
     return pd.DataFrame([[version.name, run_id]])
+
+
+def _discover_latest_runs(
+    model_names: list[str], artifacts_dir: PosixPath, logger: logging.Logger
+) -> pd.DataFrame:
+    """Discovers the most recent training run of each candidate model from MLflow.
+
+    For every registered model name, queries the MLflow Model Registry and keeps
+    the version with the newest ``creation_timestamp`` (i.e. the latest run by
+    date created), then materializes it locally. This reads the latest run
+    directly from the tracking store, so it needs no sidecar file recording which
+    runs train.py produced.
+
+    Args:
+        model_names: Registered model names to look up (the config's included models).
+        artifacts_dir: Directory where candidate model pkls are read from.
+        logger: Logger object.
+
+    Returns:
+        pd.DataFrame: one ``[model_name, run_id]`` row per discovered model.
+
+    Raises:
+        ValueError: If none of ``model_names`` are registered in MLflow.
+    """
+    from mlflow.tracking import MlflowClient  # pylint: disable=import-outside-toplevel
+
+    client = MlflowClient()
+    rows = []
+    for name in model_names:
+        versions = client.search_model_versions(f"name='{name}'")
+        if not versions:
+            continue
+        latest = max(versions, key=lambda v: int(v.creation_timestamp))
+        _materialize_version(latest, artifacts_dir, logger)
+        rows.append([name, latest.run_id])
+
+    if not rows:
+        raise ValueError(
+            "No registered MLflow models found for the included models "
+            f"({', '.join(model_names)}). Run 'make train' first."
+        )
+    logger.info("Evaluating the latest training run of %d model(s).", len(rows))
+    return pd.DataFrame(rows)
 
 
 def main(
@@ -108,9 +163,10 @@ def main(
 ) -> tuple[str, dict]:
     """Evaluates best model on test set and registers as champion.
 
-    By default this evaluates the most recent training run (the models recorded
-    in the ``training_experiments.json`` written by train.py). Pass ``run_id`` to
-    evaluate a specific MLflow run instead.
+    By default this evaluates the most recent training run, discovered live from
+    the MLflow Model Registry (the latest registered version of each included
+    model, by creation date). Pass ``run_id`` to evaluate a specific MLflow run
+    instead.
 
     Args:
         config_yaml_path: Path to training config YAML file.
@@ -119,8 +175,9 @@ def main(
         logger: Logger object.
         experiment_keys: Optional DataFrame with experiment keys passed in-process
                         from training. If None, the keys are resolved from
-                        ``run_id``, then the last-run keys file, then (Comet only)
-                        remote discovery.
+                        ``run_id``, then MLflow registry discovery (the latest
+                        run of each included model), then (Comet only) remote
+                        discovery.
         run_id: Optional MLflow run id to evaluate a specific run instead of the
                 most recent one.
 
@@ -141,34 +198,40 @@ def main(
 
     # Resolve which trained models to evaluate. Priority:
     #   1. keys passed in-process from train.py (--run_evaluation),
-    #   2. the keys file written by the most recent `make train`,
-    #   3. Comet workspace discovery (only when the tracker is Comet).
-    # For MLflow with no keys file we fail fast rather than querying Comet.
+    #   2. a specific MLflow run (--run_id),
+    #   3. Comet workspace discovery (only when the tracker is Comet),
+    #   4. MLflow registry discovery: the latest registered version (by creation
+    #      date) of each included model -- i.e. the most recent training run,
+    #      read live from the tracking store with no sidecar file.
     tracker_name = training_config.train_params.experiment_tracker.lower()
+    registry = training_config.modelregistry
+    included = training_config.included_models
+    included_model_names = [
+        name
+        for include, name in (
+            (included.include_logistic_regression, registry.lr_registered_model_name),
+            (included.include_random_forest, registry.rf_registered_model_name),
+            (included.include_lightgbm, registry.lgbm_registered_model_name),
+            (included.include_xgboost, registry.xgb_registered_model_name),
+            (
+                included.include_voting_ensemble,
+                registry.voting_ensemble_registered_model_name,
+            ),
+        )
+        if include
+    ]
+
     if experiment_keys is not None:
         logger.info("Using experiment keys passed in-process from training.")
     elif run_id:
         experiment_keys = _resolve_mlflow_run(run_id, artifacts_dir, logger)
+    elif tracker_name == "comet":
+        logger.info("Discovering recent experiments via the Comet workspace.")
+        # experiment_keys stays None -> ModelSelector (Comet) discovery
     else:
-        keys_path = artifacts_dir / TRAINING_EXPERIMENTS_FILE
-        if keys_path.exists():
-            experiment_keys = pd.read_json(keys_path, orient="values", dtype=str)
-            logger.info(
-                "Evaluating the most recent training run: loaded %d model key(s) from %s",
-                len(experiment_keys),
-                keys_path,
-            )
-        elif tracker_name == "comet":
-            logger.info(
-                "No %s found; discovering recent experiments via the Comet workspace.",
-                TRAINING_EXPERIMENTS_FILE,
-            )  # experiment_keys stays None -> ModelSelector (Comet) discovery
-        else:
-            raise ValueError(
-                f"No '{TRAINING_EXPERIMENTS_FILE}' found in {artifacts_dir}. Run "
-                f"'make train' first (experiment_tracker='{tracker_name}' evaluates "
-                "the most recent local training run; it has no remote discovery)."
-            )
+        experiment_keys = _discover_latest_runs(
+            included_model_names, artifacts_dir, logger
+        )
 
     # Load the feature-selected, label-encoded splits written by train.py
     # (separate "*_encoded.parquet" files; the canonical splits are left intact).
