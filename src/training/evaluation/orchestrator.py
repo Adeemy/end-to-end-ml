@@ -891,50 +891,46 @@ class TestSetEvaluationOrchestrator:
         # Handle experiment creation based on tracker type and available experiment ID
         if hasattr(self.tracker, "set_experiment"):
             tracker_type = experiment_kwargs.get("experiment_tracker_type", "comet")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            evaluation_experiment_name = (
+                f"eval_{best_model_name.replace('-', '_')}_{timestamp}"
+            )
 
-            # Check if we're running from training pipeline (with experiment_keys) or standalone
-            if experiment_keys is not None and best_experiment_key:
-                # Running from training pipeline - create child/linked experiment
+            if (
+                tracker_type == "comet"
+                and experiment_keys is not None
+                and best_experiment_key
+            ):
+                # Comet: continue the champion's parent experiment so the
+                # evaluation is linked to the training run.
                 evaluation_kwargs = {
                     "is_child_experiment": True,
+                    "experiment_key": best_experiment_key,
                 }
-
-                # Add tracker-specific parent/child linking
-                if tracker_type == "comet":
-                    evaluation_kwargs["experiment_key"] = best_experiment_key
-                elif tracker_type == "mlflow":
-                    evaluation_kwargs["parent_run_id"] = best_experiment_key
-                # Additional trackers can be added here without modifying existing code
-
-                # Add credentials using the credential provider
                 try:
-                    credentials = get_tracker_credentials(tracker_type)
-                    evaluation_kwargs.update(credentials)
+                    evaluation_kwargs.update(get_tracker_credentials(tracker_type))
                 except ValueError:
                     logger.warning(
                         "Could not get credentials for tracker type: %s", tracker_type
                     )
-
                 self.tracker.set_experiment(**evaluation_kwargs)
                 logger.info(
-                    "Creating child/linked evaluation experiment for model: %s (parent: %s)",
-                    best_model_name,
+                    "Linking evaluation to parent Comet experiment: %s",
                     best_experiment_key,
                 )
             else:
-                # Running standalone - create independent evaluation experiment
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                evaluation_experiment_name = (
-                    f"eval_{best_model_name.replace('-', '_')}_{timestamp}"
-                )
+                # MLflow (and standalone Comet): a clearly named evaluation run in
+                # the project experiment, tagged so the UI separates it from the
+                # train_* runs. MLflow has no cross-experiment child runs, so the
+                # parent training run is recorded as a tag instead.
                 evaluation_kwargs = self._create_standalone_evaluation_kwargs(
                     experiment_kwargs, evaluation_experiment_name
                 )
-
+                if tracker_type == "mlflow" and best_experiment_key:
+                    evaluation_kwargs["parent_run_id"] = best_experiment_key
                 self.tracker.set_experiment(**evaluation_kwargs)
                 logger.info(
-                    "Creating standalone evaluation experiment: %s",
-                    evaluation_experiment_name,
+                    "Creating evaluation run: %s", evaluation_experiment_name
                 )
 
         # Calibrate and resolve the operating threshold on the dedicated

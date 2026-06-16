@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Optional, Union
 
+import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
 from comet_ml import ExistingExperiment, Experiment
@@ -249,6 +250,7 @@ class CometExperimentTracker(ExperimentTracker):
         self.experiment.log_figure(
             figure_name=figure_name, figure=figure, step=step, overwrite=overwrite
         )
+        plt.close(figure)  # release the figure once logged so they do not accumulate
 
     def log_confusion_matrix(
         self,
@@ -316,25 +318,41 @@ class MLflowExperimentTracker(ExperimentTracker):
         self._metrics_cache: Dict[str, float] = {}
 
     def set_experiment(self, **kwargs) -> None:
-        """Set experiment for MLflow tracking.
+        """Set up the MLflow experiment and run.
+
+        Logs to the project experiment (``project_name``) and names the run by
+        ``experiment_name`` (e.g. ``eval_<model>_<ts>``), tagging ``run_type``
+        (training/evaluation) so the MLflow UI separates evaluation runs from the
+        ``train_*`` runs in the same experiment. The parent training run, when
+        known, is recorded in a ``parent_run_id`` tag.
 
         Args:
-            **kwargs: Should contain MLflow-specific parameters like 'run_id', 'experiment_id', etc.
+            **kwargs: 'run_id' (resume a run), 'project_name' (experiment to log
+                to), 'experiment_name' (the run's name), 'experiment_id', and
+                optional 'parent_run_id'.
         """
 
         if "run_id" in kwargs:
-            # Use existing run
+            # Resume an existing run (e.g. evaluation continuing a training run).
             mlflow.start_run(run_id=kwargs["run_id"])
             self.run_id = kwargs["run_id"]
+            return
+
+        run_name = kwargs.get("experiment_name")
+        if kwargs.get("project_name"):
+            mlflow.set_experiment(kwargs["project_name"])
         elif "experiment_id" in kwargs:
-            # Start new run in existing experiment
             mlflow.set_experiment(experiment_id=kwargs["experiment_id"])
-            mlflow.start_run()
-        elif "experiment_name" in kwargs:
-            # Start run in experiment by name
-            mlflow.set_experiment(kwargs["experiment_name"])
-            mlflow.start_run()
-        # If no specific parameters, assume run is already active
+
+        mlflow.start_run(run_name=run_name)
+
+        if run_name:
+            mlflow.set_tag(
+                "run_type",
+                "evaluation" if run_name.startswith("eval") else "training",
+            )
+        if kwargs.get("parent_run_id"):
+            mlflow.set_tag("parent_run_id", kwargs["parent_run_id"])
 
     def log_metric(self, name: str, value: float, step: Optional[int] = None) -> None:
         """Log a single metric value to MLflow."""
@@ -365,6 +383,7 @@ class MLflowExperimentTracker(ExperimentTracker):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             figure.savefig(tmp.name, bbox_inches="tight")
             self.mlflow.log_artifact(tmp.name, f"figures/{figure_name}.png")
+        plt.close(figure)  # release the figure once logged so they do not accumulate
 
     def log_confusion_matrix(
         self,

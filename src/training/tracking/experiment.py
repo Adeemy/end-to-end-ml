@@ -426,8 +426,12 @@ class MLflowExperimentManager(ExperimentManager):
         return credentials
 
     def get_base_config(self, experiment_kwargs: Dict[str, Any]) -> Dict[str, Any]:
-        """Get MLflow specific base configuration."""
-        return {}  # MLflow uses experiment_name directly
+        """Get MLflow specific base configuration.
+
+        Passes the project name so evaluation runs log to the project experiment
+        (named by experiment_name as the run), instead of MLflow's Default.
+        """
+        return {"project_name": experiment_kwargs.get("project_name")}
 
     def should_initialize_project(self, config_params: Dict[str, Any]) -> bool:
         """MLflow doesn't require explicit project initialization."""
@@ -470,9 +474,12 @@ class MLflowExperimentManager(ExperimentManager):
             # trials CSV, and champion registration.
             mlflow.autolog(disable=True)
 
-            # Set experiment and start run with proper context
+            # Set experiment and start run with proper context. Tag run_type so
+            # the UI separates these train_* runs from eval_* runs in the same
+            # experiment.
             mlflow.set_experiment(project_name)
             run = mlflow.start_run(run_name=experiment_name)
+            mlflow.set_tag("run_type", "training")
             return run
         except Exception as e:
             raise ValueError(f"MLflow experiment creation error --> {e}") from e
