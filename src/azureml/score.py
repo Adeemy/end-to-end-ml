@@ -40,6 +40,4 @@ def run(raw_data: str):
     records = payload if isinstance(payload, list) else [payload]
     frame = pd.DataFrame(records)
     predictions = _model.predict(frame)
-    return (
-        predictions.tolist() if hasattr(predictions, "tolist") else list(predictions)
-    )
+    return predictions.tolist() if hasattr(predictions, "tolist") else list(predictions)

@@ -70,7 +70,9 @@ def deploy(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Deploy champion to an online endpoint.")
+    parser = argparse.ArgumentParser(
+        description="Deploy champion to an online endpoint."
+    )
     parser.add_argument(
         "--config_yaml_path", type=str, default="./config/training-config.yml"
     )
